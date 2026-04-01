@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 
 import { AgentDetail } from "@/components/AgentDetail";
@@ -28,39 +28,58 @@ export default function AgentPage() {
   const [events, setEvents] = useState<Record<string, unknown>[]>([]);
   const [sending, setSending] = useState(false);
   const { events: liveEvents, connectionState } = useEventStream(agentId);
+  const promptInFlight = useRef(false);
+
+  const refreshAll = async () => {
+    const [a, evts, convos] = await Promise.all([
+      fetchAgent(agentId),
+      fetchAgentEvents(agentId),
+      fetchAgentConversations(agentId),
+    ]);
+    setAgent(a);
+    setEvents(evts);
+    if (convos.length > 0) setMessages(convos[0].messages);
+  };
 
   useEffect(() => {
-    fetchAgent(agentId).then(setAgent).catch(() => {});
-    fetchAgentEvents(agentId).then(setEvents).catch(() => {});
-    fetchAgentConversations(agentId)
-      .then((convos: { messages: { role: string; content: string }[] }[]) => {
-        if (convos.length > 0) setMessages(convos[0].messages);
-      })
-      .catch(() => {});
+    refreshAll().catch(() => {});
   }, [agentId]);
 
-  // Merge live events
+  // React to live events — refresh agent status on HITL and completion events
   useEffect(() => {
-    if (liveEvents.length > 0) {
-      setEvents((prev) => [...prev, ...liveEvents.slice(prev.length)]);
+    if (liveEvents.length === 0) return;
+    const latest = liveEvents[liveEvents.length - 1];
+    const eventType = latest.event_type as string;
+
+    // Merge into events list
+    setEvents((prev) => {
+      const ids = new Set(prev.map((e) => (e as Record<string, unknown>).id));
+      const newEvents = liveEvents.filter((e) => !ids.has(e.id));
+      return newEvents.length > 0 ? [...prev, ...newEvents] : prev;
+    });
+
+    // On HITL request or response, refresh agent to get updated status
+    if (
+      eventType === "hitl_request" ||
+      eventType === "hitl_response" ||
+      eventType === "error"
+    ) {
+      fetchAgent(agentId).then(setAgent).catch(() => {});
     }
-  }, [liveEvents]);
+  }, [liveEvents, agentId]);
 
   const handlePrompt = async (message: string) => {
     setSending(true);
-    try {
-      await sendPrompt(agentId, message);
-      const [a, evts, convos] = await Promise.all([
-        fetchAgent(agentId),
-        fetchAgentEvents(agentId),
-        fetchAgentConversations(agentId),
-      ]);
-      setAgent(a);
-      setEvents(evts);
-      if (convos.length > 0) setMessages(convos[0].messages);
-    } finally {
-      setSending(false);
-    }
+    promptInFlight.current = true;
+
+    // Fire prompt in background — don't block UI
+    sendPrompt(agentId, message)
+      .then(() => refreshAll())
+      .catch(() => {})
+      .finally(() => {
+        setSending(false);
+        promptInFlight.current = false;
+      });
   };
 
   const handleHITLRespond = async (
@@ -69,8 +88,8 @@ export default function AgentPage() {
     message?: string,
   ) => {
     await respondHITL(id, approved, message);
-    const updated = await fetchAgent(agentId);
-    setAgent(updated);
+    // Agent will resume — refresh status
+    fetchAgent(agentId).then(setAgent).catch(() => {});
   };
 
   if (!agent) {
@@ -81,11 +100,15 @@ export default function AgentPage() {
     (e) => e.event_type === "tool_call" || e.event_type === "tool_result",
   );
 
-  const hitlEvents = (events as Record<string, unknown>[]).filter(
-    (e) =>
-      e.event_type === "hitl_request" &&
-      (agent as Record<string, unknown>).status === "waiting_hitl",
-  );
+  // Show HITL panel when agent is waiting, based on live status
+  const isWaitingHITL = (agent as Record<string, unknown>).status === "waiting_hitl";
+  const hitlEvents = isWaitingHITL
+    ? (events as Record<string, unknown>[]).filter(
+        (e) => e.event_type === "hitl_request",
+      )
+    : [];
+  // Only show the most recent HITL request
+  const pendingHITL = hitlEvents.length > 0 ? [hitlEvents[hitlEvents.length - 1]] : [];
 
   return (
     <div>
@@ -116,8 +139,14 @@ export default function AgentPage() {
       {sending && (
         <div
           style={{
-            background: "rgba(0, 255, 65, 0.04)",
-            border: "1px solid rgba(0, 255, 65, 0.15)",
+            background: isWaitingHITL
+              ? "rgba(255, 170, 0, 0.04)"
+              : "rgba(0, 255, 65, 0.04)",
+            border: `1px solid ${
+              isWaitingHITL
+                ? "rgba(255, 170, 0, 0.15)"
+                : "rgba(0, 255, 65, 0.15)"
+            }`,
             borderRadius: "4px",
             padding: "12px 16px",
             marginBottom: "16px",
@@ -132,17 +161,33 @@ export default function AgentPage() {
               width: "8px",
               height: "8px",
               borderRadius: "50%",
-              background: "#00ff41",
+              background: isWaitingHITL ? "#ffaa00" : "#00ff41",
               animation: "blink 1s step-end infinite",
             }}
           />
-          <span style={{ fontSize: "12px", color: "#00ff41", fontWeight: 700, letterSpacing: "1px" }}>
-            AGENT RUNNING
+          <span
+            style={{
+              fontSize: "12px",
+              color: isWaitingHITL ? "#ffaa00" : "#00ff41",
+              fontWeight: 700,
+              letterSpacing: "1px",
+            }}
+          >
+            {isWaitingHITL ? "WAITING FOR APPROVAL" : "AGENT RUNNING"}
           </span>
           <span style={{ fontSize: "11px", color: "#555" }}>
-            Processing your request...
+            {isWaitingHITL
+              ? "Approve or deny the pending tool call below"
+              : "Processing your request..."}
           </span>
         </div>
+      )}
+
+      {pendingHITL.length > 0 && (
+        <HITLPanel
+          pendingActions={pendingHITL as never}
+          onRespond={handleHITLRespond}
+        />
       )}
 
       <AgentDetail
@@ -152,13 +197,6 @@ export default function AgentPage() {
       />
 
       <PromptInput onSubmit={handlePrompt} disabled={sending} />
-
-      {hitlEvents.length > 0 && (
-        <HITLPanel
-          pendingActions={hitlEvents as never}
-          onRespond={handleHITLRespond}
-        />
-      )}
 
       {toolEvents.length > 0 && (
         <ToolInspector toolEvents={toolEvents as never} />
