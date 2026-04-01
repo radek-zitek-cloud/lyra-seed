@@ -2,6 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 
+function fmtTime(ts?: string | null): string {
+  if (!ts) return "";
+  const d = new Date(ts);
+  return d.toISOString().slice(11, 19);
+}
+
 interface Agent {
   id: string;
   name: string;
@@ -187,9 +193,16 @@ export function AgentDetail({
                     letterSpacing: "1px",
                     marginBottom: "6px",
                     textTransform: "uppercase",
+                    display: "flex",
+                    justifyContent: "space-between",
                   }}
                 >
-                  {msg.role}
+                  <span>{msg.role}</span>
+                  {msg.timestamp && (
+                    <span style={{ fontWeight: 400, color: "#333" }}>
+                      {fmtTime(msg.timestamp)}
+                    </span>
+                  )}
                 </div>
                 <div style={{ color: "#b0b0b0", fontSize: "13px", whiteSpace: "pre-wrap" }}>
                   {msg.content}
@@ -261,6 +274,7 @@ export function AgentDetail({
                         <span style={{ color: "#444", fontSize: "11px" }}>{evt.duration_ms}ms</span>
                       )}
                       <span style={{ color: "#333", fontSize: "11px" }}>{evt.module}</span>
+                      <span style={{ color: "#333", fontSize: "11px" }}>{fmtTime(evt.timestamp)}</span>
                     </div>
                   </button>
                   {expanded.has(evt.id) && (

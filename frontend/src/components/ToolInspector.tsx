@@ -2,6 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 
+function fmtTime(ts?: string | null): string {
+  if (!ts) return "";
+  const d = new Date(ts);
+  return d.toISOString().slice(11, 19);
+}
+
 interface ToolEvent {
   id: string;
   agent_id: string;
@@ -126,6 +132,7 @@ export function ToolInspector({ toolEvents }: { toolEvents: ToolEvent[] }) {
                 {call.duration_ms != null && (
                   <span style={{ color: "#444", fontSize: "11px" }}>{call.duration_ms}ms</span>
                 )}
+                <span style={{ color: "#333", fontSize: "11px" }}>{fmtTime(call.timestamp)}</span>
               </div>
               <span
                 style={{
