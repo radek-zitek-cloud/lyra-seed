@@ -12,5 +12,5 @@
     }
   },
   "systemPromptsDir": "./prompts",
-  "defaultModel": "google/gemini-3-flash-preview"
+  "defaultModel": "openai/gpt-5.4"
 }

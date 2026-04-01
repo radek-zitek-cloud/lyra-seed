@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 interface ToolEvent {
   id: string;
@@ -44,6 +44,12 @@ export function ToolInspector({ toolEvents }: { toolEvents: ToolEvent[] }) {
     });
   };
 
+  const toolsEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    toolsEndRef.current?.scrollIntoView?.({ behavior: "smooth" });
+  }, [toolEvents]);
+
   return (
     <div
       style={{
@@ -65,6 +71,7 @@ export function ToolInspector({ toolEvents }: { toolEvents: ToolEvent[] }) {
       >
         TOOL CALLS
       </h2>
+      <div style={{ maxHeight: "400px", overflowY: "auto" }}>
       {calls.map(({ call, result }) => {
         const isSuccess = result?.payload?.success;
         const statusColor =
@@ -202,6 +209,8 @@ export function ToolInspector({ toolEvents }: { toolEvents: ToolEvent[] }) {
           No tool calls yet.
         </div>
       )}
+      <div ref={toolsEndRef} />
+      </div>
     </div>
   );
 }

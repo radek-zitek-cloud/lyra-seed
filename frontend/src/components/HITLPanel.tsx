@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 interface HITLEvent {
   id: string;
@@ -21,6 +21,12 @@ interface HITLPanelProps {
 
 export function HITLPanel({ pendingActions, onRespond }: HITLPanelProps) {
   const [messages, setMessages] = useState<Record<string, string>>({});
+
+  const hitlEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    hitlEndRef.current?.scrollIntoView?.({ behavior: "smooth" });
+  }, [pendingActions]);
 
   return (
     <div
@@ -43,6 +49,7 @@ export function HITLPanel({ pendingActions, onRespond }: HITLPanelProps) {
       >
         PENDING APPROVALS
       </h2>
+      <div style={{ maxHeight: "400px", overflowY: "auto" }}>
       {pendingActions.map((action) => (
         <div
           key={action.id}
@@ -147,6 +154,8 @@ export function HITLPanel({ pendingActions, onRespond }: HITLPanelProps) {
           No pending approvals.
         </div>
       )}
+      <div ref={hitlEndRef} />
+      </div>
     </div>
   );
 }

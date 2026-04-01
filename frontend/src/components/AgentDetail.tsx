@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 interface Agent {
   id: string;
@@ -74,6 +74,16 @@ export function AgentDetail({
   };
 
   const s = STATUS_STYLES[agent.status] ?? DEFAULT_STATUS;
+  const convoEndRef = useRef<HTMLDivElement>(null);
+  const eventsEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    convoEndRef.current?.scrollIntoView?.({ behavior: "smooth" });
+  }, [messages]);
+
+  useEffect(() => {
+    eventsEndRef.current?.scrollIntoView?.({ behavior: "smooth" });
+  }, [events]);
 
   return (
     <div>
@@ -177,6 +187,7 @@ export function AgentDetail({
                 No messages yet.
               </div>
             )}
+            <div ref={convoEndRef} />
           </div>
         </div>
 
@@ -265,6 +276,7 @@ export function AgentDetail({
                 No events yet.
               </div>
             )}
+            <div ref={eventsEndRef} />
           </div>
         </div>
       </div>
