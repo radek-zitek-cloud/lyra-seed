@@ -4,10 +4,13 @@ import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from agent_platform.api import _deps
 from agent_platform.api.macro_routes import router as macro_router
+from agent_platform.api.observation_routes import router as observation_router
 from agent_platform.api.routes import router
+from agent_platform.api.ws_routes import router as ws_router
 from agent_platform.core.config import Settings
 from agent_platform.core.runtime import AgentRuntime
 from agent_platform.db.sqlite_agent_repo import SqliteAgentRepo
@@ -84,6 +87,14 @@ def create_app(
 
     app = FastAPI(title="Agent Platform", version="0.1.0", lifespan=lifespan)
 
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
     app.state.event_bus = event_bus
     app.state.agent_repo = agent_repo
     app.state.conversation_repo = conv_repo
@@ -92,6 +103,8 @@ def create_app(
 
     app.include_router(router)
     app.include_router(macro_router)
+    app.include_router(observation_router)
+    app.include_router(ws_router)
 
     @app.get("/health")
     async def health():

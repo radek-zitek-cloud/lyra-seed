@@ -247,96 +247,105 @@ class TestV1Phase5:
     @pytest.mark.asyncio
     async def test_st_5_6_ws_agent_event_stream(self, app_client):
         """ST-5.6: WebSocket agent event stream."""
-        client, app = app_client
+        _, app = app_client
 
-        # Create agent
-        resp = await client.post(
-            "/agents",
-            json={"name": "ws-agent", "config": {"model": "test/model"}},
-        )
-        agent_id = resp.json()["id"]
+        from unittest.mock import AsyncMock
 
+        from fastapi import WebSocketDisconnect
+
+        from agent_platform.api.ws_routes import agent_event_stream
         from agent_platform.observation.events import Event, EventType
-        from starlette.testclient import TestClient
 
-        sync_client = TestClient(app)
+        event_bus = app.state.event_bus
+        agent_id = "ws-test-agent"
 
-        with sync_client.websocket_connect(
-            f"/agents/{agent_id}/events/stream"
-        ) as ws:
-            # Emit an event in a background task
-            event = Event(
-                agent_id=agent_id,
-                event_type=EventType.LLM_REQUEST,
-                module="llm.test",
-                payload={"model": "test"},
-            )
+        # Mock WebSocket — capture sent data, disconnect after first event
+        mock_ws = AsyncMock()
+        received: list[dict] = []
 
-            # We need to emit from within the same event loop
-            # Use a thread to emit since TestClient runs its own loop
-            import json
-            import threading
+        async def capture_and_disconnect(data):
+            received.append(data)
+            raise WebSocketDisconnect()
 
-            def emit_event():
-                import asyncio as _asyncio
+        mock_ws.send_json = capture_and_disconnect
 
-                loop = _asyncio.new_event_loop()
-                loop.run_until_complete(app.state.event_bus.emit(event))
-                loop.close()
+        event = Event(
+            agent_id=agent_id,
+            event_type=EventType.LLM_REQUEST,
+            module="llm.test",
+            payload={"model": "test"},
+        )
 
-            threading.Thread(target=emit_event, daemon=True).start()
+        async def emit_after_delay():
+            await asyncio.sleep(0.05)
+            await event_bus.emit(event)
 
-            # Receive the event
-            data = ws.receive_json(mode="text")
-            assert data["agent_id"] == agent_id
-            assert data["event_type"] == "llm_request"
+        await asyncio.gather(
+            agent_event_stream(mock_ws, agent_id),
+            emit_after_delay(),
+        )
+
+        mock_ws.accept.assert_called_once()
+        assert len(received) == 1
+        assert received[0]["agent_id"] == agent_id
+        assert received[0]["event_type"] == "llm_request"
 
     @pytest.mark.asyncio
     async def test_st_5_7_ws_global_event_stream(self, app_client):
         """ST-5.7: WebSocket global event stream."""
-        client, app = app_client
+        _, app = app_client
 
+        from unittest.mock import AsyncMock
+
+        from fastapi import WebSocketDisconnect
+
+        from agent_platform.api.ws_routes import global_event_stream
         from agent_platform.observation.events import Event, EventType
-        from starlette.testclient import TestClient
 
-        sync_client = TestClient(app)
+        event_bus = app.state.event_bus
 
-        with sync_client.websocket_connect("/events/stream") as ws:
-            import threading
+        mock_ws = AsyncMock()
+        received: list[dict] = []
+        call_count = 0
 
-            def emit_events():
-                import asyncio as _asyncio
+        async def capture_send(data):
+            nonlocal call_count
+            received.append(data)
+            call_count += 1
+            if call_count >= 2:
+                raise WebSocketDisconnect()
 
-                async def _emit():
-                    await app.state.event_bus.emit(
-                        Event(
-                            agent_id="agent-x",
-                            event_type=EventType.LLM_REQUEST,
-                            module="llm.test",
-                            payload={},
-                        )
-                    )
-                    await app.state.event_bus.emit(
-                        Event(
-                            agent_id="agent-y",
-                            event_type=EventType.TOOL_CALL,
-                            module="tools.test",
-                            payload={},
-                        )
-                    )
+        mock_ws.send_json = capture_send
 
-                loop = _asyncio.new_event_loop()
-                loop.run_until_complete(_emit())
-                loop.close()
+        async def emit_events():
+            await asyncio.sleep(0.05)
+            await event_bus.emit(
+                Event(
+                    agent_id="agent-x",
+                    event_type=EventType.LLM_REQUEST,
+                    module="llm.test",
+                    payload={},
+                )
+            )
+            await event_bus.emit(
+                Event(
+                    agent_id="agent-y",
+                    event_type=EventType.TOOL_CALL,
+                    module="tools.test",
+                    payload={},
+                )
+            )
 
-            threading.Thread(target=emit_events, daemon=True).start()
+        await asyncio.gather(
+            global_event_stream(mock_ws),
+            emit_events(),
+        )
 
-            # Receive events from different agents
-            data1 = ws.receive_json(mode="text")
-            data2 = ws.receive_json(mode="text")
-            agent_ids = {data1["agent_id"], data2["agent_id"]}
-            assert "agent-x" in agent_ids
-            assert "agent-y" in agent_ids
+        mock_ws.accept.assert_called_once()
+        assert len(received) == 2
+        agent_ids = {r["agent_id"] for r in received}
+        assert "agent-x" in agent_ids
+        assert "agent-y" in agent_ids
 
     @pytest.mark.asyncio
     async def test_st_5_8_cors_headers(self, app_client):
