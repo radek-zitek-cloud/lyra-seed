@@ -89,8 +89,11 @@ class InProcessEventBus:
     async def _iter_subscription(self, sub: _Subscription) -> AsyncIterator[Event]:
         """Async iterator that yields events from a subscription queue."""
         try:
-            while True:
-                event = await sub.queue.get()
+            while not sub.closed:
+                try:
+                    event = await asyncio.wait_for(sub.queue.get(), timeout=1.0)
+                except TimeoutError:
+                    continue
                 if event is None or sub.closed:
                     return
                 yield event
