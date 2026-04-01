@@ -71,8 +71,15 @@ class OpenRouterProvider:
             },
         )
         duration_ms = int((time.monotonic() - start) * 1000)
-        resp.raise_for_status()
         data = resp.json()
+
+        # Handle HTTP errors with response body context
+        if resp.status_code >= 400:
+            err = data.get("error", {})
+            msg = err.get("message", str(err)) if isinstance(err, dict) else str(err)
+            raise RuntimeError(
+                f"OpenRouter API error ({resp.status_code}): {msg}"
+            )
 
         # OpenRouter may return errors with 200 status
         if "error" in data:
@@ -81,7 +88,9 @@ class OpenRouterProvider:
             raise RuntimeError(f"OpenRouter API error: {msg}")
 
         if "choices" not in data or not data["choices"]:
-            raise RuntimeError(f"OpenRouter returned unexpected response: {data}")
+            raise RuntimeError(
+                f"OpenRouter returned unexpected response: {data}"
+            )
 
         # Parse response
         result = self._parse_response(data)

@@ -63,12 +63,22 @@ export function AgentDetail({
   events: EventItem[];
 }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const eventItemRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const toggle = (id: string) => {
     setExpanded((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+        setTimeout(() => {
+          eventItemRefs.current[id]?.scrollIntoView?.({
+            behavior: "smooth",
+            block: "nearest",
+          });
+        }, 50);
+      }
       return next;
     });
   };
@@ -215,7 +225,7 @@ export function AgentDetail({
             {events.map((evt) => {
               const color = EVENT_COLORS[evt.event_type] ?? "#555";
               return (
-                <div key={evt.id} style={{ borderLeft: `3px solid ${color}`, marginBottom: "4px" }}>
+                <div key={evt.id} ref={(el) => { eventItemRefs.current[evt.id] = el; }} style={{ borderLeft: `3px solid ${color}`, marginBottom: "4px" }}>
                   <button
                     onClick={() => toggle(evt.id)}
                     style={{

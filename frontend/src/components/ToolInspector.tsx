@@ -35,16 +35,27 @@ export function ToolInspector({ toolEvents }: { toolEvents: ToolEvent[] }) {
     }
   }
 
+  const itemRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const toolsEndRef = useRef<HTMLDivElement>(null);
+
   const toggle = (id: string) => {
     setExpanded((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+        // Scroll expanded item into view after render
+        setTimeout(() => {
+          itemRefs.current[id]?.scrollIntoView?.({
+            behavior: "smooth",
+            block: "nearest",
+          });
+        }, 50);
+      }
       return next;
     });
   };
-
-  const toolsEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     toolsEndRef.current?.scrollIntoView?.({ behavior: "smooth" });
@@ -82,6 +93,7 @@ export function ToolInspector({ toolEvents }: { toolEvents: ToolEvent[] }) {
         return (
           <div
             key={call.id}
+            ref={(el) => { itemRefs.current[call.id] = el; }}
             style={{
               borderLeft: "3px solid #aa66ff",
               marginBottom: "4px",
