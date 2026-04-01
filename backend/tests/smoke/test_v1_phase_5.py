@@ -6,7 +6,6 @@ All LLM calls are mocked — no real API calls.
 """
 
 import asyncio
-from unittest.mock import AsyncMock
 
 import httpx
 import pytest
@@ -173,22 +172,19 @@ class TestV1Phase5:
         """ST-5.4: Tools list endpoint."""
         client, app = app_client
 
-        # Register a macro tool
-        from agent_platform.tools.models import Tool, ToolType
-
-        tool_registry = app.state.tool_registry
-
         # Add a macro via the macro routes
-        resp = await client.post(
+        await client.post(
             "/macros",
             json={
                 "name": "test_macro",
                 "description": "A test macro",
                 "template": "Do {{thing}}",
-                "parameters": {"type": "object", "properties": {"thing": {"type": "string"}}},
+                "parameters": {
+                    "type": "object",
+                    "properties": {"thing": {"type": "string"}},
+                },
             },
         )
-        # May or may not succeed depending on macro setup, but tools endpoint should work
 
         resp = await client.get("/tools")
         assert resp.status_code == 200
@@ -249,7 +245,7 @@ class TestV1Phase5:
         """ST-5.6: WebSocket agent event stream."""
         _, app = app_client
 
-        from unittest.mock import AsyncMock
+        from unittest.mock import AsyncMock as _AsyncMock
 
         from fastapi import WebSocketDisconnect
 
@@ -260,7 +256,7 @@ class TestV1Phase5:
         agent_id = "ws-test-agent"
 
         # Mock WebSocket — capture sent data, disconnect after first event
-        mock_ws = AsyncMock()
+        mock_ws = _AsyncMock()
         received: list[dict] = []
 
         async def capture_and_disconnect(data):
@@ -295,7 +291,7 @@ class TestV1Phase5:
         """ST-5.7: WebSocket global event stream."""
         _, app = app_client
 
-        from unittest.mock import AsyncMock
+        from unittest.mock import AsyncMock as _AsyncMock2
 
         from fastapi import WebSocketDisconnect
 
@@ -304,7 +300,7 @@ class TestV1Phase5:
 
         event_bus = app.state.event_bus
 
-        mock_ws = AsyncMock()
+        mock_ws = _AsyncMock2()
         received: list[dict] = []
         call_count = 0
 

@@ -68,7 +68,5 @@ async def get_tool_calls(tool_name: str):
         EventFilter(event_types=[EventType.TOOL_CALL, EventType.TOOL_RESULT])
     )
     # Filter by tool_name in payload
-    filtered = [
-        e for e in call_events if e.payload.get("tool_name") == tool_name
-    ]
+    filtered = [e for e in call_events if e.payload.get("tool_name") == tool_name]
     return [e.model_dump(mode="json") for e in filtered]
