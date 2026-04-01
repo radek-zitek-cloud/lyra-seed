@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 interface Agent {
   id: string;
   name: string;
@@ -56,6 +58,17 @@ export function AgentDetail({
   messages: Message[];
   events: EventItem[];
 }) {
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+
+  const toggle = (id: string) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -108,18 +121,39 @@ export function AgentDetail({
             {events.map((evt) => (
               <div
                 key={evt.id}
-                className={`border-l-4 pl-3 py-2 ${EVENT_COLORS[evt.event_type] ?? "border-l-gray-300"}`}
+                className={`border-l-4 ${EVENT_COLORS[evt.event_type] ?? "border-l-gray-300"}`}
               >
-                <div className="flex items-center justify-between">
-                  <span className="font-mono text-sm font-medium">
-                    {evt.event_type}
-                  </span>
-                  <span className="text-xs text-gray-400">{evt.module}</span>
-                </div>
-                {evt.duration_ms != null && (
-                  <span className="text-xs text-gray-400">
-                    {evt.duration_ms}ms
-                  </span>
+                <button
+                  onClick={() => toggle(evt.id)}
+                  className="w-full pl-3 py-2 text-left hover:bg-gray-50 transition-colors"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-gray-400">
+                        {expanded.has(evt.id) ? "\u25BC" : "\u25B6"}
+                      </span>
+                      <span className="font-mono text-sm font-medium">
+                        {evt.event_type}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {evt.duration_ms != null && (
+                        <span className="text-xs text-gray-400">
+                          {evt.duration_ms}ms
+                        </span>
+                      )}
+                      <span className="text-xs text-gray-400">
+                        {evt.module}
+                      </span>
+                    </div>
+                  </div>
+                </button>
+                {expanded.has(evt.id) && (
+                  <div className="pl-3 pb-2 pr-2">
+                    <pre className="text-xs bg-white border rounded p-2 overflow-x-auto whitespace-pre-wrap">
+                      {JSON.stringify(evt.payload, null, 2)}
+                    </pre>
+                  </div>
                 )}
               </div>
             ))}
