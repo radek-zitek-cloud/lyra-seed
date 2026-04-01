@@ -35,8 +35,12 @@ export function ToolInspector({ toolEvents }: { toolEvents: ToolEvent[] }) {
     }
   }
 
-  const itemRefs = useRef<Record<string, HTMLDivElement | null>>({});
-  const toolsEndRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const scrollToBottom = () => {
+    const el = scrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  };
 
   const toggle = (id: string) => {
     setExpanded((prev) => {
@@ -45,20 +49,14 @@ export function ToolInspector({ toolEvents }: { toolEvents: ToolEvent[] }) {
         next.delete(id);
       } else {
         next.add(id);
-        // Scroll expanded item into view after render
-        setTimeout(() => {
-          itemRefs.current[id]?.scrollIntoView?.({
-            behavior: "smooth",
-            block: "nearest",
-          });
-        }, 50);
+        setTimeout(scrollToBottom, 50);
       }
       return next;
     });
   };
 
   useEffect(() => {
-    toolsEndRef.current?.scrollIntoView?.({ behavior: "smooth" });
+    scrollToBottom();
   }, [toolEvents]);
 
   return (
@@ -82,7 +80,7 @@ export function ToolInspector({ toolEvents }: { toolEvents: ToolEvent[] }) {
       >
         TOOL CALLS
       </h2>
-      <div style={{ maxHeight: "400px", overflowY: "auto" }}>
+      <div ref={scrollRef} style={{ maxHeight: "400px", overflowY: "auto" }}>
       {calls.map(({ call, result }) => {
         const isSuccess = result?.payload?.success;
         const statusColor =
@@ -93,7 +91,6 @@ export function ToolInspector({ toolEvents }: { toolEvents: ToolEvent[] }) {
         return (
           <div
             key={call.id}
-            ref={(el) => { itemRefs.current[call.id] = el; }}
             style={{
               borderLeft: "3px solid #aa66ff",
               marginBottom: "4px",
@@ -221,7 +218,6 @@ export function ToolInspector({ toolEvents }: { toolEvents: ToolEvent[] }) {
           No tool calls yet.
         </div>
       )}
-      <div ref={toolsEndRef} />
       </div>
     </div>
   );

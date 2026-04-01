@@ -22,10 +22,11 @@ interface HITLPanelProps {
 export function HITLPanel({ pendingActions, onRespond }: HITLPanelProps) {
   const [messages, setMessages] = useState<Record<string, string>>({});
 
-  const hitlEndRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    hitlEndRef.current?.scrollIntoView?.({ behavior: "smooth" });
+    const el = scrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
   }, [pendingActions]);
 
   return (
@@ -49,7 +50,7 @@ export function HITLPanel({ pendingActions, onRespond }: HITLPanelProps) {
       >
         PENDING APPROVALS
       </h2>
-      <div style={{ maxHeight: "400px", overflowY: "auto" }}>
+      <div ref={scrollRef} style={{ maxHeight: "400px", overflowY: "auto" }}>
       {pendingActions.map((action) => (
         <div
           key={action.id}
@@ -154,7 +155,6 @@ export function HITLPanel({ pendingActions, onRespond }: HITLPanelProps) {
           No pending approvals.
         </div>
       )}
-      <div ref={hitlEndRef} />
       </div>
     </div>
   );

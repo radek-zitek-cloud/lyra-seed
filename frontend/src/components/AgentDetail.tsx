@@ -63,7 +63,18 @@ export function AgentDetail({
   events: EventItem[];
 }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const eventItemRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const convoScrollRef = useRef<HTMLDivElement>(null);
+  const eventsScrollRef = useRef<HTMLDivElement>(null);
+
+  const scrollConvoToBottom = () => {
+    const el = convoScrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  };
+
+  const scrollEventsToBottom = () => {
+    const el = eventsScrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  };
 
   const toggle = (id: string) => {
     setExpanded((prev) => {
@@ -72,27 +83,20 @@ export function AgentDetail({
         next.delete(id);
       } else {
         next.add(id);
-        setTimeout(() => {
-          eventItemRefs.current[id]?.scrollIntoView?.({
-            behavior: "smooth",
-            block: "nearest",
-          });
-        }, 50);
+        setTimeout(scrollEventsToBottom, 50);
       }
       return next;
     });
   };
 
   const s = STATUS_STYLES[agent.status] ?? DEFAULT_STATUS;
-  const convoEndRef = useRef<HTMLDivElement>(null);
-  const eventsEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    convoEndRef.current?.scrollIntoView?.({ behavior: "smooth" });
+    scrollConvoToBottom();
   }, [messages]);
 
   useEffect(() => {
-    eventsEndRef.current?.scrollIntoView?.({ behavior: "smooth" });
+    scrollEventsToBottom();
   }, [events]);
 
   return (
@@ -157,7 +161,7 @@ export function AgentDetail({
           >
             CONVERSATION
           </h2>
-          <div style={{ maxHeight: "400px", overflowY: "auto" }}>
+          <div ref={convoScrollRef} style={{ maxHeight: "400px", overflowY: "auto" }}>
             {messages.map((msg, i) => (
               <div
                 key={i}
@@ -197,7 +201,6 @@ export function AgentDetail({
                 No messages yet.
               </div>
             )}
-            <div ref={convoEndRef} />
           </div>
         </div>
 
@@ -221,11 +224,11 @@ export function AgentDetail({
           >
             EVENTS
           </h2>
-          <div style={{ maxHeight: "400px", overflowY: "auto" }}>
+          <div ref={eventsScrollRef} style={{ maxHeight: "400px", overflowY: "auto" }}>
             {events.map((evt) => {
               const color = EVENT_COLORS[evt.event_type] ?? "#555";
               return (
-                <div key={evt.id} ref={(el) => { eventItemRefs.current[evt.id] = el; }} style={{ borderLeft: `3px solid ${color}`, marginBottom: "4px" }}>
+                <div key={evt.id} style={{ borderLeft: `3px solid ${color}`, marginBottom: "4px" }}>
                   <button
                     onClick={() => toggle(evt.id)}
                     style={{
@@ -286,7 +289,6 @@ export function AgentDetail({
                 No events yet.
               </div>
             )}
-            <div ref={eventsEndRef} />
           </div>
         </div>
       </div>
