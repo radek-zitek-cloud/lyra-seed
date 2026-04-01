@@ -52,6 +52,12 @@ export async function createAgent(name: string, config?: Record<string, unknown>
   return res.json();
 }
 
+export async function deleteAgent(id: string) {
+  const res = await fetch(`${API_BASE}/agents/${id}`, { method: "DELETE" });
+  if (!res.ok) throw new Error("Failed to delete agent");
+  return res.json();
+}
+
 export async function sendPrompt(agentId: string, message: string) {
   const res = await fetch(`${API_BASE}/agents/${agentId}/prompt`, {
     method: "POST",

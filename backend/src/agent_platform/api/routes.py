@@ -53,6 +53,18 @@ async def get_agent(agent_id: str):
     return agent.model_dump(mode="json")
 
 
+@router.delete("/agents/{agent_id}")
+async def delete_agent(agent_id: str):
+    """Delete an agent."""
+    from agent_platform.api._deps import get_agent_repo
+
+    repo = get_agent_repo()
+    deleted = await repo.delete(agent_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    return {"status": "ok"}
+
+
 @router.post("/agents/{agent_id}/prompt")
 async def prompt_agent(agent_id: str, req: PromptRequest):
     """Send a prompt to an agent."""

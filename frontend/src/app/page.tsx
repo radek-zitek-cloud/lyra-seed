@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { AgentList } from "@/components/AgentList";
 import { ConnectionStatus } from "@/components/ConnectionStatus";
 import { useEventStream } from "@/hooks/useEventStream";
-import { createAgent, fetchAgents } from "@/lib/api";
+import { createAgent, deleteAgent, fetchAgents } from "@/lib/api";
 
 export default function HomePage() {
   const [agents, setAgents] = useState<
@@ -32,6 +32,12 @@ export default function HomePage() {
     if (!newName.trim()) return;
     await createAgent(newName.trim());
     setNewName("");
+    const updated = await fetchAgents();
+    setAgents(updated);
+  };
+
+  const handleDelete = async (id: string) => {
+    await deleteAgent(id);
     const updated = await fetchAgents();
     setAgents(updated);
   };
@@ -103,7 +109,7 @@ export default function HomePage() {
         </button>
       </form>
 
-      <AgentList agents={agents} />
+      <AgentList agents={agents} onDelete={handleDelete} />
     </div>
   );
 }

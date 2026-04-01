@@ -39,7 +39,13 @@ const STATUS_STYLES: Record<string, { color: string; bg: string; border: string 
 
 const DEFAULT_STATUS = { color: "#555", bg: "transparent", border: "#222" };
 
-export function AgentList({ agents }: { agents: Agent[] }) {
+export function AgentList({
+  agents,
+  onDelete,
+}: {
+  agents: Agent[];
+  onDelete?: (id: string) => void;
+}) {
   return (
     <div
       style={{
@@ -51,17 +57,13 @@ export function AgentList({ agents }: { agents: Agent[] }) {
       {agents.map((agent) => {
         const s = STATUS_STYLES[agent.status] ?? DEFAULT_STATUS;
         return (
-          <a
+          <div
             key={agent.id}
-            href={`/agents/${agent.id}`}
             style={{
-              display: "block",
               background: "#111",
               border: "1px solid #1a1a1a",
               borderRadius: "4px",
               padding: "20px",
-              textDecoration: "none",
-              color: "inherit",
               transition: "border-color 0.3s",
             }}
             onMouseEnter={(e) => (e.currentTarget.style.borderColor = "#333")}
@@ -75,48 +77,82 @@ export function AgentList({ agents }: { agents: Agent[] }) {
                 marginBottom: "12px",
               }}
             >
-              <span
+              <a
+                href={`/agents/${agent.id}`}
                 style={{
                   fontSize: "15px",
                   fontWeight: 700,
                   color: "#e0e0e0",
+                  textDecoration: "none",
                 }}
               >
                 {agent.name}
-              </span>
-              <span
+              </a>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <span
+                  style={{
+                    fontSize: "12px",
+                    fontWeight: 700,
+                    padding: "2px 10px",
+                    borderRadius: "2px",
+                    letterSpacing: "1px",
+                    color: s.color,
+                    background: s.bg,
+                    border: `1px solid ${s.border}`,
+                    animation:
+                      agent.status === "running" || agent.status === "waiting_hitl"
+                        ? "pulse-glow 1.5s ease-in-out infinite"
+                        : "none",
+                  }}
+                >
+                  {agent.status}
+                </span>
+                {onDelete && (
+                  <button
+                    onClick={() => onDelete(agent.id)}
+                    style={{
+                      background: "none",
+                      border: "1px solid #222",
+                      borderRadius: "2px",
+                      padding: "2px 8px",
+                      fontFamily: "inherit",
+                      fontSize: "11px",
+                      color: "#555",
+                      cursor: "pointer",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.color = "#ff3333";
+                      e.currentTarget.style.borderColor = "#ff3333";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.color = "#555";
+                      e.currentTarget.style.borderColor = "#222";
+                    }}
+                  >
+                    DEL
+                  </button>
+                )}
+              </div>
+            </div>
+            <a
+              href={`/agents/${agent.id}`}
+              style={{ textDecoration: "none", color: "inherit" }}
+            >
+              <div
                 style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: "8px",
                   fontSize: "12px",
-                  fontWeight: 700,
-                  padding: "2px 10px",
-                  borderRadius: "2px",
-                  letterSpacing: "1px",
-                  color: s.color,
-                  background: s.bg,
-                  border: `1px solid ${s.border}`,
-                  animation:
-                    agent.status === "running" || agent.status === "waiting_hitl"
-                      ? "pulse-glow 1.5s ease-in-out infinite"
-                      : "none",
                 }}
               >
-                {agent.status}
-              </span>
-            </div>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: "8px",
-                fontSize: "12px",
-              }}
-            >
-              <span style={{ color: "#555" }}>MODEL</span>
-              <span style={{ color: "#b0b0b0", textAlign: "right" }}>
-                {String(agent.config?.model ?? "default")}
-              </span>
-            </div>
-          </a>
+                <span style={{ color: "#555" }}>MODEL</span>
+                <span style={{ color: "#b0b0b0", textAlign: "right" }}>
+                  {String(agent.config?.model ?? "default")}
+                </span>
+              </div>
+            </a>
+          </div>
         );
       })}
       {agents.length === 0 && (
