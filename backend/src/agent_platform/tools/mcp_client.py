@@ -99,13 +99,23 @@ class MCPStdioClient:
         """Shut down the MCP server subprocess."""
         if self._process and self._process.returncode is None:
             logger.info("Shutting down MCP server '%s'", self._server_name)
+            # Close stdin to signal EOF
+            if self._process.stdin:
+                self._process.stdin.close()
             try:
                 self._process.terminate()
-                await asyncio.wait_for(self._process.wait(), timeout=5.0)
+                await asyncio.wait_for(self._process.wait(), timeout=3.0)
             except TimeoutError:
+                logger.warning(
+                    "MCP server '%s' didn't stop, killing",
+                    self._server_name,
+                )
                 self._process.kill()
-                await self._process.wait()
-            self._process = None
+                try:
+                    await asyncio.wait_for(self._process.wait(), timeout=2.0)
+                except TimeoutError:
+                    pass
+        self._process = None
 
     async def list_tools(self) -> list[Tool]:
         """Return discovered tools."""

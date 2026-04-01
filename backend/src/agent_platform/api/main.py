@@ -1,5 +1,6 @@
 """FastAPI application factory."""
 
+import asyncio
 import logging
 import os
 from contextlib import asynccontextmanager
@@ -33,6 +34,19 @@ logger = logging.getLogger(__name__)
 
 # Resolve project root (parent of backend/)
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent.parent
+
+
+async def _shutdown(
+    event_bus, mcp_provider, agent_repo, conv_repo, macro_repo, *, has_mcp
+):
+    """Shut down all resources. Called with a timeout wrapper."""
+    # Close event bus first to unblock WebSocket subscribers
+    await event_bus.close()
+    if has_mcp:
+        await mcp_provider.close_all()
+    await agent_repo.close()
+    await conv_repo.close()
+    await macro_repo.close()
 
 
 def create_app(
@@ -127,13 +141,22 @@ def create_app(
             default_model=platform_config.defaultModel,
         )
         yield
-        # Shutdown
-        if platform_config.mcpServers:
-            await mcp_provider.close_all()
-        await event_bus.close()
-        await agent_repo.close()
-        await conv_repo.close()
-        await macro_repo.close()
+        # Shutdown — with timeout to prevent hanging on reload
+        logger.info("Shutting down...")
+        try:
+            await asyncio.wait_for(
+                _shutdown(
+                    event_bus,
+                    mcp_provider,
+                    agent_repo,
+                    conv_repo,
+                    macro_repo,
+                    has_mcp=bool(platform_config.mcpServers),
+                ),
+                timeout=10.0,
+            )
+        except TimeoutError:
+            logger.warning("Shutdown timed out after 10s, forcing exit")
 
     app = FastAPI(title="Agent Platform", version="0.1.0", lifespan=lifespan)
 

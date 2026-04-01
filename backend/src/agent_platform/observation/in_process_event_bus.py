@@ -15,6 +15,7 @@ class _Subscription:
     queue: asyncio.Queue[Event] = field(default_factory=asyncio.Queue)
     event_types: list[EventType] | None = None
     agent_id: str | None = None
+    closed: bool = False
 
     def matches(self, event: Event) -> bool:
         """Check if an event matches this subscription's filters."""
@@ -67,7 +68,13 @@ class InProcessEventBus:
         return await self._store.query(filters)
 
     async def close(self) -> None:
-        """Close the SQLite store."""
+        """Cancel all subscriptions and close the SQLite store."""
+        # Unblock all waiting subscribers by pushing a sentinel
+        for sub in list(self._subscriptions):
+            sub.closed = True
+            await sub.queue.put(None)  # type: ignore[arg-type]
+        self._subscriptions.clear()
+
         if self._store:
             await self._store.close()
 
@@ -76,6 +83,8 @@ class InProcessEventBus:
         try:
             while True:
                 event = await sub.queue.get()
+                if event is None or sub.closed:
+                    return
                 yield event
         finally:
             if sub in self._subscriptions:
