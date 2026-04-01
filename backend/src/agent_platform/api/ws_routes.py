@@ -10,13 +10,28 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
+async def _close_ws(websocket: WebSocket) -> None:
+    """Close WebSocket if still connected."""
+    if websocket.client_state == WebSocketState.CONNECTED:
+        try:
+            await asyncio.wait_for(websocket.close(), timeout=2.0)
+        except Exception:
+            pass
+
+
 @router.websocket("/agents/{agent_id}/events/stream")
 async def agent_event_stream(websocket: WebSocket, agent_id: str):
     """Stream real-time events for a specific agent."""
     from agent_platform.api._deps import get_event_bus
 
-    await websocket.accept()
     event_bus = get_event_bus()
+
+    # Reject during shutdown
+    if event_bus.is_closed:
+        await websocket.close(code=1001, reason="Server shutting down")
+        return
+
+    await websocket.accept()
 
     try:
         async for event in event_bus.subscribe(agent_id=agent_id):
@@ -27,11 +42,7 @@ async def agent_event_stream(websocket: WebSocket, agent_id: str):
     except WebSocketDisconnect:
         pass
     finally:
-        if websocket.client_state == WebSocketState.CONNECTED:
-            try:
-                await asyncio.wait_for(websocket.close(), timeout=2.0)
-            except Exception:
-                pass
+        await _close_ws(websocket)
 
 
 @router.websocket("/events/stream")
@@ -39,8 +50,14 @@ async def global_event_stream(websocket: WebSocket):
     """Stream all real-time events (global)."""
     from agent_platform.api._deps import get_event_bus
 
-    await websocket.accept()
     event_bus = get_event_bus()
+
+    # Reject during shutdown
+    if event_bus.is_closed:
+        await websocket.close(code=1001, reason="Server shutting down")
+        return
+
+    await websocket.accept()
 
     try:
         async for event in event_bus.subscribe():
@@ -51,8 +68,4 @@ async def global_event_stream(websocket: WebSocket):
     except WebSocketDisconnect:
         pass
     finally:
-        if websocket.client_state == WebSocketState.CONNECTED:
-            try:
-                await asyncio.wait_for(websocket.close(), timeout=2.0)
-            except Exception:
-                pass
+        await _close_ws(websocket)

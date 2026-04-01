@@ -32,6 +32,7 @@ class InProcessEventBus:
     def __init__(self, db_path: str | None = None) -> None:
         self._subscriptions: list[_Subscription] = []
         self._store: SqliteEventStore | None = None
+        self._closed = False
         if db_path:
             self._store = SqliteEventStore(db_path)
 
@@ -51,13 +52,19 @@ class InProcessEventBus:
             if sub.matches(event):
                 await sub.queue.put(event)
 
+    @property
+    def is_closed(self) -> bool:
+        return self._closed
+
     def subscribe(
         self,
         event_types: list[EventType] | None = None,
         agent_id: str | None = None,
     ) -> AsyncIterator[Event]:
         """Create a new subscription that yields matching events."""
-        sub = _Subscription(event_types=event_types, agent_id=agent_id)
+        sub = _Subscription(
+            event_types=event_types, agent_id=agent_id, closed=self._closed
+        )
         self._subscriptions.append(sub)
         return self._iter_subscription(sub)
 
@@ -69,6 +76,7 @@ class InProcessEventBus:
 
     async def close(self) -> None:
         """Cancel all subscriptions and close the SQLite store."""
+        self._closed = True
         # Unblock all waiting subscribers by pushing a sentinel
         for sub in list(self._subscriptions):
             sub.closed = True
