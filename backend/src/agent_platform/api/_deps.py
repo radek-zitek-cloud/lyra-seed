@@ -4,6 +4,8 @@ These are set during app startup and accessed by routes.
 This avoids circular imports between routes and main.
 """
 
+from collections.abc import Callable
+
 from agent_platform.core.runtime import AgentRuntime
 from agent_platform.db.sqlite_agent_repo import SqliteAgentRepo
 from agent_platform.db.sqlite_conversation_repo import SqliteConversationRepo
@@ -19,6 +21,7 @@ _runtime: AgentRuntime | None = None
 _macro_repo: SqliteMacroRepo | None = None
 _macro_provider: PromptMacroProvider | None = None
 _tool_registry: ToolRegistry | None = None
+_system_prompt_resolver: Callable[[str], str] | None = None
 
 
 def configure(
@@ -29,9 +32,11 @@ def configure(
     macro_repo: SqliteMacroRepo | None = None,
     macro_provider: PromptMacroProvider | None = None,
     tool_registry: ToolRegistry | None = None,
+    system_prompt_resolver: Callable[[str], str] | None = None,
 ) -> None:
     global _agent_repo, _conversation_repo, _event_bus, _runtime
     global _macro_repo, _macro_provider, _tool_registry
+    global _system_prompt_resolver
     _agent_repo = agent_repo
     _conversation_repo = conversation_repo
     _event_bus = event_bus
@@ -39,6 +44,7 @@ def configure(
     _macro_repo = macro_repo
     _macro_provider = macro_provider
     _tool_registry = tool_registry
+    _system_prompt_resolver = system_prompt_resolver
 
 
 def get_agent_repo() -> SqliteAgentRepo:
@@ -74,3 +80,8 @@ def get_macro_provider() -> PromptMacroProvider:
 def get_tool_registry() -> ToolRegistry:
     assert _tool_registry is not None, "App not initialized"
     return _tool_registry
+
+
+def get_system_prompt_resolver() -> Callable[[str], str]:
+    assert _system_prompt_resolver is not None, "App not initialized"
+    return _system_prompt_resolver

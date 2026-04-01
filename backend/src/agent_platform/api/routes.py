@@ -10,7 +10,7 @@ router = APIRouter()
 
 class CreateAgentRequest(BaseModel):
     name: str
-    config: AgentConfig = AgentConfig()
+    config: AgentConfig | None = None
 
 
 class PromptRequest(BaseModel):
@@ -24,11 +24,19 @@ class HITLRespondRequest(BaseModel):
 
 @router.post("/agents", status_code=201)
 async def create_agent(req: CreateAgentRequest):
-    """Create a new agent."""
-    from agent_platform.api._deps import get_agent_repo
+    """Create a new agent with system prompt resolved from config."""
+    from agent_platform.api._deps import get_agent_repo, get_system_prompt_resolver
 
     repo = get_agent_repo()
-    agent = Agent(name=req.name, config=req.config)
+    resolve_prompt = get_system_prompt_resolver()
+
+    config = req.config or AgentConfig()
+
+    # If system_prompt is the default, resolve from file
+    if config.system_prompt == AgentConfig().system_prompt:
+        config.system_prompt = resolve_prompt(req.name)
+
+    agent = Agent(name=req.name, config=config)
     await repo.create(agent)
     return agent.model_dump(mode="json")
 

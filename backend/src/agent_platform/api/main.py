@@ -1,7 +1,10 @@
 """FastAPI application factory."""
 
+import logging
 import os
 from contextlib import asynccontextmanager
+from functools import partial
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -12,19 +15,30 @@ from agent_platform.api.observation_routes import router as observation_router
 from agent_platform.api.routes import router
 from agent_platform.api.ws_routes import router as ws_router
 from agent_platform.core.config import Settings
+from agent_platform.core.platform_config import (
+    load_platform_config,
+    resolve_system_prompt,
+)
 from agent_platform.core.runtime import AgentRuntime
 from agent_platform.db.sqlite_agent_repo import SqliteAgentRepo
 from agent_platform.db.sqlite_conversation_repo import SqliteConversationRepo
 from agent_platform.db.sqlite_macro_repo import SqliteMacroRepo
 from agent_platform.llm.openrouter import OpenRouterProvider
 from agent_platform.observation.in_process_event_bus import InProcessEventBus
+from agent_platform.tools.mcp_client import MCPClientProvider, MCPStdioClient
 from agent_platform.tools.prompt_macro import PromptMacroProvider
 from agent_platform.tools.registry import ToolRegistry
+
+logger = logging.getLogger(__name__)
+
+# Resolve project root (parent of backend/)
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent.parent
 
 
 def create_app(
     settings: Settings | None = None,
     db_dir: str | None = None,
+    project_root: Path | None = None,
 ) -> FastAPI:
     """Create and configure the FastAPI application."""
     if settings is None:
@@ -32,6 +46,12 @@ def create_app(
 
     if db_dir is None:
         db_dir = os.path.dirname(settings.db_path) or "."
+
+    if project_root is None:
+        project_root = _PROJECT_ROOT
+
+    # Load platform config (lyra.config.json)
+    platform_config = load_platform_config(project_root)
 
     event_bus = InProcessEventBus(db_path=os.path.join(db_dir, "events.db"))
     agent_repo = SqliteAgentRepo(os.path.join(db_dir, "agents.db"))
@@ -47,6 +67,27 @@ def create_app(
     macro_provider = PromptMacroProvider(llm_provider=llm_provider)
     tool_registry = ToolRegistry()
     tool_registry.register_provider(macro_provider)
+
+    # MCP servers from config
+    mcp_provider = MCPClientProvider()
+    for name, server_cfg in platform_config.mcpServers.items():
+        client = MCPStdioClient(
+            server_name=name,
+            command=server_cfg.command,
+            args=server_cfg.args,
+            env=server_cfg.env,
+        )
+        mcp_provider.add_client(client)
+
+    if platform_config.mcpServers:
+        tool_registry.register_provider(mcp_provider)
+
+    # System prompt resolver
+    prompt_resolver = partial(
+        resolve_system_prompt,
+        prompts_dir=platform_config.systemPromptsDir,
+        project_root=project_root,
+    )
 
     runtime = AgentRuntime(
         agent_repo=agent_repo,
@@ -69,6 +110,11 @@ def create_app(
         for macro in macros:
             macro_provider.add_macro(macro)
 
+        # Connect MCP servers
+        if platform_config.mcpServers:
+            logger.info("Connecting %d MCP servers...", len(platform_config.mcpServers))
+            await mcp_provider.connect_all()
+
         _deps.configure(
             agent_repo,
             conv_repo,
@@ -77,9 +123,12 @@ def create_app(
             macro_repo=macro_repo,
             macro_provider=macro_provider,
             tool_registry=tool_registry,
+            system_prompt_resolver=prompt_resolver,
         )
         yield
         # Shutdown
+        if platform_config.mcpServers:
+            await mcp_provider.close_all()
         await event_bus.close()
         await agent_repo.close()
         await conv_repo.close()
