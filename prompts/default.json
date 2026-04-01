@@ -1,3 +1,5 @@
 {
-  
+  "temperature": 0.7,
+  "max_iterations": 15,
+  "hitl_policy": "never"
 }
