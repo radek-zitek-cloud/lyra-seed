@@ -12,6 +12,7 @@ interface ToolEvent {
     tool_name: string;
     arguments?: Record<string, unknown>;
     success?: boolean;
+    result?: unknown;
     output?: unknown;
     error?: string;
   };
@@ -80,7 +81,7 @@ export function ToolInspector({ toolEvents }: { toolEvents: ToolEvent[] }) {
       >
         TOOL CALLS
       </h2>
-      <div ref={scrollRef} style={{ maxHeight: "400px", overflowY: "auto" }}>
+      <div ref={scrollRef} style={{ maxHeight: "600px", overflowY: "auto" }}>
       {calls.map(({ call, result }) => {
         const isSuccess = result?.payload?.success;
         const statusColor =
@@ -204,7 +205,7 @@ export function ToolInspector({ toolEvents }: { toolEvents: ToolEvent[] }) {
                         whiteSpace: "pre-wrap",
                       }}
                     >
-                      {JSON.stringify(result.payload.output, null, 2)}
+                      {JSON.stringify(result.payload.result ?? result.payload.output, null, 2)}
                     </pre>
                   </div>
                 )}
