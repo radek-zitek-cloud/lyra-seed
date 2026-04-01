@@ -200,6 +200,7 @@ class AgentRuntime:
                                     role=MessageRole.TOOL_RESULT,
                                     content=f"Tool '{tool_call.name}' "
                                     "was denied by the human.",
+                                    tool_call_id=tool_call.id,
                                 )
                             )
                             continue
@@ -251,6 +252,7 @@ class AgentRuntime:
                         Message(
                             role=MessageRole.TOOL_RESULT,
                             content=tool_result,
+                            tool_call_id=tool_call.id,
                         )
                     )
 

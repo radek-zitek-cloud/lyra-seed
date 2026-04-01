@@ -195,6 +195,9 @@ def _message_to_openrouter(msg: Message) -> dict[str, Any]:
         "role": role_map.get(msg.role, msg.role),
         "content": msg.content,
     }
+    # Tool result messages must include tool_call_id
+    if msg.role == MessageRole.TOOL_RESULT and msg.tool_call_id:
+        result["tool_call_id"] = msg.tool_call_id
     if msg.tool_calls:
         result["tool_calls"] = [
             {
