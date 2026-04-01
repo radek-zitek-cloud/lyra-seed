@@ -18,21 +18,49 @@ export function PromptInput({ onSubmit, disabled }: PromptInputProps) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="flex gap-2">
+    <form
+      onSubmit={handleSubmit}
+      style={{ display: "flex", gap: "8px", marginTop: "16px" }}
+    >
       <input
         type="text"
         value={message}
         onChange={(e) => setMessage(e.target.value)}
         placeholder="Send a message to the agent..."
         disabled={disabled}
-        className="flex-1 border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        style={{
+          flex: 1,
+          padding: "10px 12px",
+          background: "#0a0a0a",
+          border: "1px solid #222",
+          borderRadius: "2px",
+          color: "#e0e0e0",
+          fontFamily: "inherit",
+          fontSize: "14px",
+          outline: "none",
+          opacity: disabled ? 0.5 : 1,
+        }}
+        onFocus={(e) => (e.currentTarget.style.borderColor = "#00ff41")}
+        onBlur={(e) => (e.currentTarget.style.borderColor = "#222")}
       />
       <button
         type="submit"
         disabled={disabled || !message.trim()}
-        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+        style={{
+          padding: "10px 20px",
+          background: "rgba(0, 255, 65, 0.1)",
+          border: "1px solid rgba(0, 255, 65, 0.3)",
+          borderRadius: "2px",
+          color: "#00ff41",
+          fontFamily: "inherit",
+          fontSize: "14px",
+          fontWeight: 700,
+          letterSpacing: "1px",
+          cursor: disabled || !message.trim() ? "not-allowed" : "pointer",
+          opacity: disabled || !message.trim() ? 0.4 : 1,
+        }}
       >
-        Send
+        SEND
       </button>
     </form>
   );

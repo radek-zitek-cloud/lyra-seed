@@ -23,24 +23,69 @@ export function HITLPanel({ pendingActions, onRespond }: HITLPanelProps) {
   const [messages, setMessages] = useState<Record<string, string>>({});
 
   return (
-    <div className="space-y-4">
-      <h2 className="font-semibold text-lg">Pending Approvals</h2>
+    <div
+      style={{
+        background: "#111",
+        border: "1px solid #1a1a1a",
+        borderRadius: "4px",
+        padding: "20px",
+        marginTop: "16px",
+      }}
+    >
+      <h2
+        style={{
+          fontSize: "14px",
+          fontWeight: 700,
+          color: "#ffaa00",
+          letterSpacing: "1px",
+          marginBottom: "16px",
+        }}
+      >
+        PENDING APPROVALS
+      </h2>
       {pendingActions.map((action) => (
-        <div key={action.id} className="border rounded-lg p-4 bg-yellow-50">
-          <div className="flex items-center justify-between mb-2">
-            <span className="font-mono font-medium">
+        <div
+          key={action.id}
+          style={{
+            background: "rgba(255, 170, 0, 0.04)",
+            border: "1px solid rgba(255, 170, 0, 0.15)",
+            borderRadius: "4px",
+            padding: "16px",
+            marginBottom: "12px",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: "10px",
+            }}
+          >
+            <span style={{ fontWeight: 700, color: "#e0e0e0", fontSize: "13px" }}>
               {action.payload.tool_name}
             </span>
-            <span className="text-xs text-gray-500">
-              Agent: {action.agent_id}
+            <span style={{ fontSize: "11px", color: "#444" }}>
+              Agent: {action.agent_id.slice(0, 8)}...
             </span>
           </div>
           {action.payload.arguments && (
-            <pre className="text-xs bg-white p-2 rounded mb-3 overflow-x-auto">
+            <pre
+              style={{
+                fontSize: "11px",
+                color: "#555",
+                background: "#0a0a0a",
+                border: "1px solid #1a1a1a",
+                borderRadius: "2px",
+                padding: "10px",
+                marginBottom: "12px",
+                overflowX: "auto",
+              }}
+            >
               {JSON.stringify(action.payload.arguments, null, 2)}
             </pre>
           )}
-          <div className="flex items-center gap-2">
+          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
             <input
               type="text"
               placeholder="Optional message..."
@@ -48,21 +93,49 @@ export function HITLPanel({ pendingActions, onRespond }: HITLPanelProps) {
               onChange={(e) =>
                 setMessages((prev) => ({ ...prev, [action.id]: e.target.value }))
               }
-              className="flex-1 border rounded px-2 py-1 text-sm"
+              style={{
+                flex: 1,
+                padding: "6px 10px",
+                background: "#0a0a0a",
+                border: "1px solid #222",
+                borderRadius: "2px",
+                color: "#e0e0e0",
+                fontFamily: "inherit",
+                fontSize: "12px",
+                outline: "none",
+              }}
             />
             <button
-              onClick={() =>
-                onRespond(action.agent_id, true, messages[action.id])
-              }
-              className="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700"
+              onClick={() => onRespond(action.agent_id, true, messages[action.id])}
+              style={{
+                padding: "6px 14px",
+                background: "rgba(0, 255, 65, 0.1)",
+                border: "1px solid rgba(0, 255, 65, 0.3)",
+                borderRadius: "2px",
+                color: "#00ff41",
+                fontFamily: "inherit",
+                fontSize: "12px",
+                fontWeight: 700,
+                letterSpacing: "1px",
+                cursor: "pointer",
+              }}
             >
               Approve
             </button>
             <button
-              onClick={() =>
-                onRespond(action.agent_id, false, messages[action.id])
-              }
-              className="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700"
+              onClick={() => onRespond(action.agent_id, false, messages[action.id])}
+              style={{
+                padding: "6px 14px",
+                background: "rgba(255, 51, 51, 0.1)",
+                border: "1px solid rgba(255, 51, 51, 0.3)",
+                borderRadius: "2px",
+                color: "#ff3333",
+                fontFamily: "inherit",
+                fontSize: "12px",
+                fontWeight: 700,
+                letterSpacing: "1px",
+                cursor: "pointer",
+              }}
             >
               Deny
             </button>
@@ -70,9 +143,9 @@ export function HITLPanel({ pendingActions, onRespond }: HITLPanelProps) {
         </div>
       ))}
       {pendingActions.length === 0 && (
-        <p className="text-gray-400 text-center py-4">
+        <div style={{ color: "#333", textAlign: "center", padding: "16px", fontSize: "12px" }}>
           No pending approvals.
-        </p>
+        </div>
       )}
     </div>
   );

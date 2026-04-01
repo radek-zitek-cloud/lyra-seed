@@ -21,7 +21,6 @@ interface ToolEvent {
 export function ToolInspector({ toolEvents }: { toolEvents: ToolEvent[] }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
-  // Group consecutive tool_call + tool_result pairs
   const calls: { call: ToolEvent; result?: ToolEvent }[] = [];
   for (let i = 0; i < toolEvents.length; i++) {
     const evt = toolEvents[i];
@@ -46,58 +45,149 @@ export function ToolInspector({ toolEvents }: { toolEvents: ToolEvent[] }) {
   };
 
   return (
-    <div className="space-y-3">
-      <h2 className="font-semibold text-lg">Tool Calls</h2>
+    <div
+      style={{
+        background: "#111",
+        border: "1px solid #1a1a1a",
+        borderRadius: "4px",
+        padding: "20px",
+        marginTop: "16px",
+      }}
+    >
+      <h2
+        style={{
+          fontSize: "14px",
+          fontWeight: 700,
+          color: "#555",
+          letterSpacing: "1px",
+          marginBottom: "16px",
+        }}
+      >
+        TOOL CALLS
+      </h2>
       {calls.map(({ call, result }) => {
         const isSuccess = result?.payload?.success;
+        const statusColor =
+          isSuccess === true ? "#00ff41" : isSuccess === false ? "#ff3333" : "#555";
+        const statusLabel =
+          isSuccess === true ? "success" : isSuccess === false ? "failed" : "pending";
+
         return (
-          <div key={call.id} className="border rounded-lg overflow-hidden">
+          <div
+            key={call.id}
+            style={{
+              borderLeft: "3px solid #aa66ff",
+              marginBottom: "4px",
+            }}
+          >
             <button
               onClick={() => toggle(call.id)}
-              className="w-full p-3 flex items-center justify-between hover:bg-gray-50 text-left"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                width: "100%",
+                padding: "8px 10px",
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                textAlign: "left",
+                fontFamily: "inherit",
+                fontSize: "12px",
+                color: "#b0b0b0",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = "#0a0a0a")}
+              onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
             >
-              <div className="flex items-center gap-3">
-                <span className="font-mono font-medium">
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <span style={{ color: "#444", fontSize: "10px" }}>
+                  {expanded.has(call.id) ? "\u25BC" : "\u25B6"}
+                </span>
+                <span style={{ color: "#e0e0e0", fontWeight: 700 }}>
                   {call.payload.tool_name}
                 </span>
                 {call.duration_ms != null && (
-                  <span className="text-xs text-gray-400">
-                    {call.duration_ms}ms
-                  </span>
+                  <span style={{ color: "#444", fontSize: "11px" }}>{call.duration_ms}ms</span>
                 )}
               </div>
               <span
-                className={`text-sm font-medium ${
-                  isSuccess === true
-                    ? "text-green-600"
-                    : isSuccess === false
-                      ? "text-red-600"
-                      : "text-gray-400"
-                }`}
+                style={{
+                  fontSize: "11px",
+                  fontWeight: 700,
+                  padding: "1px 8px",
+                  borderRadius: "2px",
+                  letterSpacing: "1px",
+                  color: statusColor,
+                  background:
+                    isSuccess === true
+                      ? "rgba(0,255,65,0.08)"
+                      : isSuccess === false
+                        ? "rgba(255,51,51,0.08)"
+                        : "transparent",
+                  border: `1px solid ${
+                    isSuccess === true
+                      ? "rgba(0,255,65,0.2)"
+                      : isSuccess === false
+                        ? "rgba(255,51,51,0.2)"
+                        : "#222"
+                  }`,
+                }}
               >
-                {isSuccess === true
-                  ? "success"
-                  : isSuccess === false
-                    ? "failed"
-                    : "pending"}
+                {statusLabel}
               </span>
             </button>
             {expanded.has(call.id) && (
-              <div className="border-t p-3 bg-gray-50 space-y-2">
-                <div>
-                  <span className="text-xs font-medium text-gray-500">
-                    Input:
-                  </span>
-                  <pre className="text-xs mt-1 bg-white p-2 rounded overflow-x-auto">
+              <div style={{ padding: "0 10px 10px" }}>
+                <div style={{ marginBottom: "8px" }}>
+                  <div
+                    style={{
+                      fontSize: "11px",
+                      color: "#555",
+                      letterSpacing: "0.5px",
+                      marginBottom: "4px",
+                    }}
+                  >
+                    INPUT
+                  </div>
+                  <pre
+                    style={{
+                      fontSize: "11px",
+                      color: "#555",
+                      background: "#0a0a0a",
+                      border: "1px solid #1a1a1a",
+                      borderRadius: "2px",
+                      padding: "10px",
+                      overflowX: "auto",
+                      whiteSpace: "pre-wrap",
+                    }}
+                  >
                     {JSON.stringify(call.payload.arguments, null, 2)}
                   </pre>
                 </div>
                 {result && (
                   <div>
-                    <span className="text-xs font-medium text-gray-500">
-                      Output:
-                    </span>
-                    <pre className="text-xs mt-1 bg-white p-2 rounded overflow-x-auto">
+                    <div
+                      style={{
+                        fontSize: "11px",
+                        color: "#555",
+                        letterSpacing: "0.5px",
+                        marginBottom: "4px",
+                      }}
+                    >
+                      OUTPUT
+                    </div>
+                    <pre
+                      style={{
+                        fontSize: "11px",
+                        color: "#555",
+                        background: "#0a0a0a",
+                        border: "1px solid #1a1a1a",
+                        borderRadius: "2px",
+                        padding: "10px",
+                        overflowX: "auto",
+                        whiteSpace: "pre-wrap",
+                      }}
+                    >
                       {JSON.stringify(result.payload.output, null, 2)}
                     </pre>
                   </div>
@@ -108,7 +198,9 @@ export function ToolInspector({ toolEvents }: { toolEvents: ToolEvent[] }) {
         );
       })}
       {calls.length === 0 && (
-        <p className="text-gray-400 text-center py-4">No tool calls yet.</p>
+        <div style={{ color: "#333", textAlign: "center", padding: "16px", fontSize: "12px" }}>
+          No tool calls yet.
+        </div>
       )}
     </div>
   );

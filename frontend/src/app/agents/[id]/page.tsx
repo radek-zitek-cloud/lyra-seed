@@ -50,7 +50,6 @@ export default function AgentPage() {
     setSending(true);
     try {
       await sendPrompt(agentId, message);
-      // Refresh data
       const [a, evts, convos] = await Promise.all([
         fetchAgent(agentId),
         fetchAgentEvents(agentId),
@@ -75,7 +74,7 @@ export default function AgentPage() {
   };
 
   if (!agent) {
-    return <p className="text-gray-500">Loading agent...</p>;
+    return <p style={{ color: "#333", fontSize: "12px" }}>Loading...</p>;
   }
 
   const toolEvents = (events as Record<string, unknown>[]).filter(
@@ -89,10 +88,27 @@ export default function AgentPage() {
   );
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <a href="/" className="text-sm text-blue-600 hover:underline">
-          &larr; Back to agents
+    <div>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: "16px",
+        }}
+      >
+        <a
+          href="/"
+          style={{
+            fontSize: "11px",
+            color: "#555",
+            textDecoration: "none",
+            border: "1px solid #222",
+            borderRadius: "2px",
+            padding: "4px 10px",
+          }}
+        >
+          &larr; AGENTS
         </a>
         <ConnectionStatus state={connectionState} />
       </div>

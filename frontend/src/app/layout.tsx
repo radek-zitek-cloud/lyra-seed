@@ -12,20 +12,55 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="min-h-screen bg-gray-50">
-        <header className="bg-white border-b">
-          <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-            <a href="/" className="text-xl font-bold text-gray-900">
-              Lyra
+      <body>
+        <header
+          style={{
+            padding: "24px 32px 16px",
+            borderBottom: "1px solid #1a1a1a",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          <a
+            href="/"
+            style={{
+              fontSize: "18px",
+              fontWeight: 700,
+              color: "#e0e0e0",
+              letterSpacing: "2px",
+              textDecoration: "none",
+            }}
+          >
+            LYRA<span className="cursor" />
+          </a>
+          <nav style={{ display: "flex", gap: "16px", fontSize: "11px" }}>
+            <a
+              href="/"
+              style={{
+                color: "#555",
+                textDecoration: "none",
+                border: "1px solid #222",
+                borderRadius: "2px",
+                padding: "4px 10px",
+              }}
+            >
+              AGENTS
             </a>
-            <nav className="flex items-center gap-4 text-sm text-gray-600">
-              <a href="/" className="hover:text-gray-900">
-                Agents
-              </a>
-            </nav>
-          </div>
+          </nav>
         </header>
-        <main className="max-w-6xl mx-auto px-4 py-6">{children}</main>
+        <main style={{ padding: "24px 32px" }}>{children}</main>
+        <footer
+          style={{
+            padding: "16px 32px",
+            borderTop: "1px solid #1a1a1a",
+            fontSize: "11px",
+            color: "#333",
+            textAlign: "center",
+          }}
+        >
+          Lyra Agent Platform v0.1
+        </footer>
       </body>
     </html>
   );

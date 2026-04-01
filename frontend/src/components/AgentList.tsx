@@ -9,38 +9,116 @@ interface Agent {
   updated_at: string;
 }
 
-const STATUS_COLORS: Record<string, string> = {
-  idle: "bg-gray-200 text-gray-800",
-  running: "bg-green-200 text-green-800",
-  waiting_hitl: "bg-yellow-200 text-yellow-800",
-  completed: "bg-blue-200 text-blue-800",
-  failed: "bg-red-200 text-red-800",
+const STATUS_STYLES: Record<string, { color: string; bg: string; border: string }> = {
+  idle: {
+    color: "#555",
+    bg: "rgba(85, 85, 85, 0.08)",
+    border: "rgba(85, 85, 85, 0.2)",
+  },
+  running: {
+    color: "#00ff41",
+    bg: "rgba(0, 255, 65, 0.08)",
+    border: "rgba(0, 255, 65, 0.2)",
+  },
+  waiting_hitl: {
+    color: "#ffaa00",
+    bg: "rgba(255, 170, 0, 0.08)",
+    border: "rgba(255, 170, 0, 0.2)",
+  },
+  completed: {
+    color: "#00ff41",
+    bg: "rgba(0, 255, 65, 0.08)",
+    border: "rgba(0, 255, 65, 0.2)",
+  },
+  failed: {
+    color: "#ff3333",
+    bg: "rgba(255, 51, 51, 0.08)",
+    border: "rgba(255, 51, 51, 0.2)",
+  },
 };
+
+const DEFAULT_STATUS = { color: "#555", bg: "transparent", border: "#222" };
 
 export function AgentList({ agents }: { agents: Agent[] }) {
   return (
-    <div className="space-y-3">
-      {agents.map((agent) => (
-        <a
-          key={agent.id}
-          href={`/agents/${agent.id}`}
-          className="block border rounded-lg p-4 hover:bg-gray-50 transition-colors"
-        >
-          <div className="flex items-center justify-between">
-            <h3 className="font-semibold text-lg">{agent.name}</h3>
-            <span
-              className={`px-2 py-1 rounded text-sm font-medium ${STATUS_COLORS[agent.status] ?? "bg-gray-100"}`}
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fit, minmax(360px, 1fr))",
+        gap: "16px",
+      }}
+    >
+      {agents.map((agent) => {
+        const s = STATUS_STYLES[agent.status] ?? DEFAULT_STATUS;
+        return (
+          <a
+            key={agent.id}
+            href={`/agents/${agent.id}`}
+            style={{
+              display: "block",
+              background: "#111",
+              border: "1px solid #1a1a1a",
+              borderRadius: "4px",
+              padding: "20px",
+              textDecoration: "none",
+              color: "inherit",
+              transition: "border-color 0.3s",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.borderColor = "#333")}
+            onMouseLeave={(e) => (e.currentTarget.style.borderColor = "#1a1a1a")}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "12px",
+              }}
             >
-              {agent.status}
-            </span>
-          </div>
-          <p className="text-sm text-gray-500 mt-1">
-            Model: {String(agent.config?.model ?? "default")}
-          </p>
-        </a>
-      ))}
+              <span
+                style={{
+                  fontSize: "15px",
+                  fontWeight: 700,
+                  color: "#e0e0e0",
+                }}
+              >
+                {agent.name}
+              </span>
+              <span
+                style={{
+                  fontSize: "12px",
+                  fontWeight: 700,
+                  padding: "2px 10px",
+                  borderRadius: "2px",
+                  letterSpacing: "1px",
+                  color: s.color,
+                  background: s.bg,
+                  border: `1px solid ${s.border}`,
+                }}
+              >
+                {agent.status}
+              </span>
+            </div>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: "8px",
+                fontSize: "12px",
+              }}
+            >
+              <span style={{ color: "#555" }}>MODEL</span>
+              <span style={{ color: "#b0b0b0", textAlign: "right" }}>
+                {String(agent.config?.model ?? "default")}
+              </span>
+            </div>
+          </a>
+        );
+      })}
       {agents.length === 0 && (
-        <p className="text-gray-500 text-center py-8">No agents yet.</p>
+        <p style={{ color: "#333", textAlign: "center", padding: "32px", fontSize: "12px" }}>
+          No agents configured.
+        </p>
       )}
     </div>
   );
