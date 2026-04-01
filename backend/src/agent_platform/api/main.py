@@ -6,13 +6,17 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from agent_platform.api import _deps
+from agent_platform.api.macro_routes import router as macro_router
 from agent_platform.api.routes import router
 from agent_platform.core.config import Settings
 from agent_platform.core.runtime import AgentRuntime
 from agent_platform.db.sqlite_agent_repo import SqliteAgentRepo
 from agent_platform.db.sqlite_conversation_repo import SqliteConversationRepo
+from agent_platform.db.sqlite_macro_repo import SqliteMacroRepo
 from agent_platform.llm.openrouter import OpenRouterProvider
 from agent_platform.observation.in_process_event_bus import InProcessEventBus
+from agent_platform.tools.prompt_macro import PromptMacroProvider
+from agent_platform.tools.registry import ToolRegistry
 
 
 def create_app(
@@ -28,18 +32,27 @@ def create_app(
 
     event_bus = InProcessEventBus(db_path=os.path.join(db_dir, "events.db"))
     agent_repo = SqliteAgentRepo(os.path.join(db_dir, "agents.db"))
-    conv_repo = SqliteConversationRepo(os.path.join(db_dir, "conversations.db"))
+    conv_repo = SqliteConversationRepo(
+        os.path.join(db_dir, "conversations.db")
+    )
+    macro_repo = SqliteMacroRepo(os.path.join(db_dir, "macros.db"))
 
     llm_provider = OpenRouterProvider(
         api_key=settings.openrouter_api_key.get_secret_value(),
         event_bus=event_bus,
     )
 
+    # Tool system
+    macro_provider = PromptMacroProvider(llm_provider=llm_provider)
+    tool_registry = ToolRegistry()
+    tool_registry.register_provider(macro_provider)
+
     runtime = AgentRuntime(
         agent_repo=agent_repo,
         conversation_repo=conv_repo,
         llm_provider=llm_provider,
         event_bus=event_bus,
+        tool_registry=tool_registry,
     )
 
     @asynccontextmanager
@@ -48,12 +61,28 @@ def create_app(
         await event_bus.initialize()
         await agent_repo.initialize()
         await conv_repo.initialize()
-        _deps.configure(agent_repo, conv_repo, event_bus, runtime)
+        await macro_repo.initialize()
+
+        # Load macros from DB into provider
+        macros = await macro_repo.list()
+        for macro in macros:
+            macro_provider.add_macro(macro)
+
+        _deps.configure(
+            agent_repo,
+            conv_repo,
+            event_bus,
+            runtime,
+            macro_repo=macro_repo,
+            macro_provider=macro_provider,
+            tool_registry=tool_registry,
+        )
         yield
         # Shutdown
         await event_bus.close()
         await agent_repo.close()
         await conv_repo.close()
+        await macro_repo.close()
 
     app = FastAPI(title="Agent Platform", version="0.1.0", lifespan=lifespan)
 
@@ -61,8 +90,10 @@ def create_app(
     app.state.agent_repo = agent_repo
     app.state.conversation_repo = conv_repo
     app.state.runtime = runtime
+    app.state.tool_registry = tool_registry
 
     app.include_router(router)
+    app.include_router(macro_router)
 
     @app.get("/health")
     async def health():
