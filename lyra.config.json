@@ -9,6 +9,13 @@
         "MCP_SILENT_ERRORS": "true",
         "MCP_LOG_FILE": "/home/radek/Code/lyra-seed/logs/fast-fs-mcp.log"
       }
+    },
+    "shell": {
+      "command": "uvx",
+      "args": ["mcp-shell-server"],
+      "env": {
+        "ALLOW_COMMANDS": "ls,cat,pwd,grep,wc,touch,find,git,docker,python,pip,npm,node,curl"
+      }
     }
   },
   "systemPromptsDir": "./prompts",
