@@ -1,5 +1,7 @@
 """OpenRouter LLM provider implementation."""
 
+import json
+import logging
 import time
 from typing import Any
 
@@ -14,6 +16,8 @@ from agent_platform.llm.models import (
 )
 from agent_platform.observation.events import Event, EventType
 from agent_platform.observation.in_process_event_bus import InProcessEventBus
+
+logger = logging.getLogger(__name__)
 
 OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 
@@ -76,8 +80,21 @@ class OpenRouterProvider:
         # Handle HTTP errors with response body context
         if resp.status_code >= 400:
             err = data.get("error", {})
-            msg = err.get("message", str(err)) if isinstance(err, dict) else str(err)
-            raise RuntimeError(f"OpenRouter API error ({resp.status_code}): {msg}")
+            if isinstance(err, dict):
+                msg = err.get("message", "")
+                metadata = err.get("metadata", {})
+                raw = metadata.get("raw", "") if metadata else ""
+                detail = f"{msg}. {raw}".strip(". ") if raw else msg
+            else:
+                detail = str(err)
+            logger.error(
+                "OpenRouter %d for model %s: %s | body: %s",
+                resp.status_code,
+                config.model,
+                detail,
+                json.dumps(data)[:500],
+            )
+            raise RuntimeError(f"OpenRouter API error ({resp.status_code}): {detail}")
 
         # OpenRouter may return errors with 200 status
         if "error" in data:
@@ -147,8 +164,6 @@ class OpenRouterProvider:
             for tc in message["tool_calls"]:
                 args = tc.get("function", {}).get("arguments", "{}")
                 if isinstance(args, str):
-                    import json
-
                     args = json.loads(args)
                 tool_calls.append(
                     ToolCall(
@@ -187,7 +202,11 @@ def _message_to_openrouter(msg: Message) -> dict[str, Any]:
                 "type": "function",
                 "function": {
                     "name": tc.name,
-                    "arguments": tc.arguments,
+                    "arguments": (
+                        json.dumps(tc.arguments)
+                        if isinstance(tc.arguments, dict)
+                        else tc.arguments
+                    ),
                 },
             }
             for tc in msg.tool_calls
