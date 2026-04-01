@@ -113,6 +113,38 @@ export default function AgentPage() {
         <ConnectionStatus state={connectionState} />
       </div>
 
+      {sending && (
+        <div
+          style={{
+            background: "rgba(0, 255, 65, 0.04)",
+            border: "1px solid rgba(0, 255, 65, 0.15)",
+            borderRadius: "4px",
+            padding: "12px 16px",
+            marginBottom: "16px",
+            display: "flex",
+            alignItems: "center",
+            gap: "10px",
+            animation: "pulse-glow 2s ease-in-out infinite",
+          }}
+        >
+          <span
+            style={{
+              width: "8px",
+              height: "8px",
+              borderRadius: "50%",
+              background: "#00ff41",
+              animation: "blink 1s step-end infinite",
+            }}
+          />
+          <span style={{ fontSize: "12px", color: "#00ff41", fontWeight: 700, letterSpacing: "1px" }}>
+            AGENT RUNNING
+          </span>
+          <span style={{ fontSize: "11px", color: "#555" }}>
+            Processing your request...
+          </span>
+        </div>
+      )}
+
       <AgentDetail
         agent={agent as never}
         messages={messages as never}

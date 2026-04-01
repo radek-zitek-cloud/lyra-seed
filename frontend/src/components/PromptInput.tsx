@@ -48,19 +48,22 @@ export function PromptInput({ onSubmit, disabled }: PromptInputProps) {
         disabled={disabled || !message.trim()}
         style={{
           padding: "10px 20px",
-          background: "rgba(0, 255, 65, 0.1)",
-          border: "1px solid rgba(0, 255, 65, 0.3)",
+          background: disabled
+            ? "rgba(255, 170, 0, 0.1)"
+            : "rgba(0, 255, 65, 0.1)",
+          border: `1px solid ${disabled ? "rgba(255, 170, 0, 0.3)" : "rgba(0, 255, 65, 0.3)"}`,
           borderRadius: "2px",
-          color: "#00ff41",
+          color: disabled ? "#ffaa00" : "#00ff41",
           fontFamily: "inherit",
           fontSize: "14px",
           fontWeight: 700,
           letterSpacing: "1px",
           cursor: disabled || !message.trim() ? "not-allowed" : "pointer",
-          opacity: disabled || !message.trim() ? 0.4 : 1,
+          opacity: disabled && !message.trim() ? 0.4 : 1,
+          animation: disabled ? "pulse-glow 1.5s ease-in-out infinite" : "none",
         }}
       >
-        SEND
+        {disabled ? "PROCESSING..." : "SEND"}
       </button>
     </form>
   );

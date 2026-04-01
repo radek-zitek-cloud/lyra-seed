@@ -28,6 +28,7 @@ body::after {
 }
 
 @keyframes blink { 50% { opacity: 0; } }
+@keyframes pulse-glow { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
 
 .cursor {
   display: inline-block;

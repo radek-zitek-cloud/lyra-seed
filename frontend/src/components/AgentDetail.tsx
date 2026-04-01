@@ -106,6 +106,10 @@ export function AgentDetail({
             color: s.color,
             background: s.bg,
             border: `1px solid ${s.border}`,
+            animation:
+              agent.status === "running" || agent.status === "waiting_hitl"
+                ? "pulse-glow 1.5s ease-in-out infinite"
+                : "none",
           }}
         >
           {agent.status}
