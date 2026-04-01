@@ -2,8 +2,13 @@
   "mcpServers": {
     "filesystem": {
       "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"],
-      "env": {}
+      "args": ["-y", "fast-filesystem-mcp"],
+      "env": {
+        "CREATE_BACKUP_FILES": "true",
+        "DEBUG_MCP": "true",
+        "MCP_SILENT_ERRORS": "true",
+        "MCP_LOG_FILE": "/home/radek/Code/lyra-seed/logs/fast-fs-mcp.log"
+      }
     }
   },
   "systemPromptsDir": "./prompts"
