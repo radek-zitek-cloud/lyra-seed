@@ -94,6 +94,13 @@ class AgentRuntime:
             while iteration < agent.config.max_iterations:
                 iteration += 1
 
+                # Call LLM with tool list
+                llm_config = LLMConfig(
+                    model=agent.config.model,
+                    temperature=agent.config.temperature,
+                )
+                tools_schema = await self._tool_registry.get_tools_schema()
+
                 # Emit LLM_REQUEST event
                 await self._event_bus.emit(
                     Event(
@@ -102,18 +109,18 @@ class AgentRuntime:
                         module="core.runtime",
                         payload={
                             "iteration": iteration,
+                            "model": agent.config.model,
                             "message_count": len(conversation.messages),
+                            "tool_count": len(tools_schema),
                         },
                     )
                 )
                 events_emitted += 1
 
-                # Call LLM with tool list
-                llm_config = LLMConfig(
-                    model=agent.config.model,
-                    temperature=agent.config.temperature,
-                )
-                tools_schema = await self._tool_registry.get_tools_schema()
+                # Set agent_id on provider so its events are attributed correctly
+                if hasattr(self._llm, "_current_agent_id"):
+                    self._llm._current_agent_id = agent_id
+
                 response: LLMResponse = await self._llm.complete(
                     conversation.messages,
                     tools=tools_schema or None,
@@ -129,7 +136,11 @@ class AgentRuntime:
                         payload={
                             "iteration": iteration,
                             "has_content": response.content is not None,
+                            "content_preview": (
+                                response.content[:200] if response.content else None
+                            ),
                             "tool_call_count": len(response.tool_calls),
+                            "tool_calls": [tc.name for tc in response.tool_calls],
                             "usage": response.usage,
                         },
                     )
@@ -178,7 +189,7 @@ class AgentRuntime:
                                     event_type=EventType.TOOL_RESULT,
                                     module="core.runtime",
                                     payload={
-                                        "tool": tool_call.name,
+                                        "tool_name": tool_call.name,
                                         "denied": True,
                                     },
                                 )
@@ -200,7 +211,7 @@ class AgentRuntime:
                             event_type=EventType.TOOL_CALL,
                             module="core.runtime",
                             payload={
-                                "tool": tool_call.name,
+                                "tool_name": tool_call.name,
                                 "arguments": tool_call.arguments,
                             },
                         )
@@ -226,11 +237,12 @@ class AgentRuntime:
                             event_type=EventType.TOOL_RESULT,
                             module="core.runtime",
                             payload={
-                                "tool": tool_call.name,
+                                "tool_name": tool_call.name,
                                 "result": tool_result,
                                 "success": result.success,
                                 "duration_ms": result.duration_ms,
                             },
+                            duration_ms=result.duration_ms,
                         )
                     )
                     events_emitted += 1
@@ -304,7 +316,7 @@ class AgentRuntime:
                 event_type=EventType.HITL_REQUEST,
                 module="core.runtime",
                 payload={
-                    "tool": tool_name,
+                    "tool_name": tool_name,
                     "arguments": tool_args,
                 },
             )

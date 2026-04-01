@@ -32,6 +32,7 @@ class OpenRouterProvider:
         self._client = http_client or httpx.AsyncClient()
         self._event_bus = event_bus
         self._agent_id = agent_id
+        self._current_agent_id: str | None = None
 
     async def complete(
         self,
@@ -40,6 +41,7 @@ class OpenRouterProvider:
         config: LLMConfig | None = None,
     ) -> LLMResponse:
         config = config or LLMConfig()
+        agent_id = self._current_agent_id or self._agent_id
 
         # Build request
         request_body = self._build_request(messages, tools, config)
@@ -48,12 +50,13 @@ class OpenRouterProvider:
         if self._event_bus:
             await self._event_bus.emit(
                 Event(
-                    agent_id=self._agent_id,
+                    agent_id=agent_id,
                     event_type=EventType.LLM_REQUEST,
                     module="llm.openrouter",
                     payload={
                         "model": config.model,
                         "message_count": len(messages),
+                        "has_tools": bool(tools),
                     },
                 )
             )
@@ -78,13 +81,20 @@ class OpenRouterProvider:
         if self._event_bus:
             await self._event_bus.emit(
                 Event(
-                    agent_id=self._agent_id,
+                    agent_id=agent_id,
                     event_type=EventType.LLM_RESPONSE,
                     module="llm.openrouter",
                     payload={
                         "model": config.model,
                         "usage": result.usage,
                         "has_tool_calls": len(result.tool_calls) > 0,
+                        "content_preview": (
+                            result.content[:200] if result.content else None
+                        ),
+                        "tool_calls": [
+                            {"name": tc.name, "arguments": tc.arguments}
+                            for tc in result.tool_calls
+                        ],
                     },
                     duration_ms=duration_ms,
                 )
