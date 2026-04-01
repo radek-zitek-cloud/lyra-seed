@@ -27,9 +27,7 @@ class FakeEmbeddingProvider:
         while len(h) < self._dimensions * 4:
             h += hashlib.sha256(h).digest()
         # Convert to floats
-        floats = list(
-            struct.unpack(f"<{self._dimensions}f", h[: self._dimensions * 4])
-        )
+        floats = list(struct.unpack(f"<{self._dimensions}f", h[: self._dimensions * 4]))
         # Normalize to unit vector
         magnitude = math.sqrt(sum(x * x for x in floats))
         if magnitude > 0:

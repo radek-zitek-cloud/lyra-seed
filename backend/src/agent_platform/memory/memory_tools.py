@@ -99,9 +99,7 @@ class MemoryToolProvider:
             ),
         ]
 
-    async def call_tool(
-        self, name: str, arguments: dict[str, Any]
-    ) -> ToolResult:
+    async def call_tool(self, name: str, arguments: dict[str, Any]) -> ToolResult:
         start = time.monotonic()
         if name == "remember":
             return await self._remember(arguments, start)
@@ -109,16 +107,10 @@ class MemoryToolProvider:
             return await self._recall(arguments, start)
         elif name == "forget":
             return await self._forget(arguments, start)
-        return ToolResult(
-            success=False, error=f"Unknown tool: {name}"
-        )
+        return ToolResult(success=False, error=f"Unknown tool: {name}")
 
-    async def _remember(
-        self, args: dict[str, Any], start: float
-    ) -> ToolResult:
-        memory_type = MemoryType(
-            args.get("memory_type", "fact")
-        )
+    async def _remember(self, args: dict[str, Any], start: float) -> ToolResult:
+        memory_type = MemoryType(args.get("memory_type", "fact"))
         entry = MemoryEntry(
             agent_id=args["agent_id"],
             content=args["content"],
@@ -148,9 +140,7 @@ class MemoryToolProvider:
             duration_ms=duration,
         )
 
-    async def _recall(
-        self, args: dict[str, Any], start: float
-    ) -> ToolResult:
+    async def _recall(self, args: dict[str, Any], start: float) -> ToolResult:
         memory_type = None
         if "memory_type" in args and args["memory_type"]:
             memory_type = MemoryType(args["memory_type"])
@@ -195,9 +185,7 @@ class MemoryToolProvider:
             duration_ms=duration,
         )
 
-    async def _forget(
-        self, args: dict[str, Any], start: float
-    ) -> ToolResult:
+    async def _forget(self, args: dict[str, Any], start: float) -> ToolResult:
         deleted = await self._store.delete(args["memory_id"])
         duration = int((time.monotonic() - start) * 1000)
         if deleted:

@@ -49,9 +49,7 @@ class ChromaMemoryStore:
             result["metadatas"][0],  # type: ignore[index]
         )
 
-    async def list_by_agent(
-        self, agent_id: str, limit: int = 100
-    ) -> list[MemoryEntry]:
+    async def list_by_agent(self, agent_id: str, limit: int = 100) -> list[MemoryEntry]:
         """List all memories for an agent."""
         result = self._collection.get(
             where={"agent_id": agent_id},
@@ -154,9 +152,7 @@ class ChromaMemoryStore:
                 metadata.get("created_at", datetime.now(UTC).isoformat())
             ).replace(tzinfo=UTC),
             last_accessed_at=datetime.fromisoformat(
-                metadata.get(
-                    "last_accessed_at", datetime.now(UTC).isoformat()
-                )
+                metadata.get("last_accessed_at", datetime.now(UTC).isoformat())
             ).replace(tzinfo=UTC),
             access_count=metadata.get("access_count", 0),
             decay_score=metadata.get("decay_score", 1.0),
@@ -169,7 +165,5 @@ class ChromaMemoryStore:
         for i, id_ in enumerate(result["ids"]):
             doc = result["documents"][i]  # type: ignore[index]
             meta = result["metadatas"][i]  # type: ignore[index]
-            entries.append(
-                ChromaMemoryStore._result_to_entry(id_, doc, meta)
-            )
+            entries.append(ChromaMemoryStore._result_to_entry(id_, doc, meta))
         return entries

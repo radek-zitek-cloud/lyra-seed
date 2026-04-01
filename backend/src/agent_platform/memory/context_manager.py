@@ -42,13 +42,10 @@ class ContextManager:
         # Build memory injection message
         memory_lines = []
         for m in memories:
-            memory_lines.append(
-                f"- [{m.memory_type.value}] {m.content}"
-            )
+            memory_lines.append(f"- [{m.memory_type.value}] {m.content}")
 
-        memory_text = (
-            "Relevant memories from previous interactions:\n"
-            + "\n".join(memory_lines)
+        memory_text = "Relevant memories from previous interactions:\n" + "\n".join(
+            memory_lines
         )
 
         memory_msg = Message(

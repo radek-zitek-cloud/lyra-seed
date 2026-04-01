@@ -30,11 +30,7 @@ class MemoryEntry(BaseModel):
     content: str
     memory_type: MemoryType
     importance: float = 0.5
-    created_at: datetime = Field(
-        default_factory=lambda: datetime.now(UTC)
-    )
-    last_accessed_at: datetime = Field(
-        default_factory=lambda: datetime.now(UTC)
-    )
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    last_accessed_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     access_count: int = 0
     decay_score: float = 1.0

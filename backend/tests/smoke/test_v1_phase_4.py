@@ -5,7 +5,6 @@ Each test function maps to a smoke test ID from SMOKE_TESTS.md.
 All LLM and embedding calls are mocked.
 """
 
-import math
 from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock
 
@@ -116,9 +115,7 @@ class TestV1Phase4:
             top_k=5,
         )
         assert len(results) >= 1
-        assert all(
-            r.memory_type == MemoryType.PREFERENCE for r in results
-        )
+        assert all(r.memory_type == MemoryType.PREFERENCE for r in results)
 
         # Delete
         deleted = await store.delete(e1.id)
@@ -365,9 +362,7 @@ class TestV1Phase4:
         )
         from agent_platform.tools.registry import ToolRegistry
 
-        event_bus = InProcessEventBus(
-            db_path=str(tmp_path / "events.db")
-        )
+        event_bus = InProcessEventBus(db_path=str(tmp_path / "events.db"))
         await event_bus.initialize()
 
         agent_repo = SqliteAgentRepo(str(tmp_path / "agents.db"))
@@ -375,12 +370,8 @@ class TestV1Phase4:
         conv_repo = SqliteConversationRepo(str(tmp_path / "convos.db"))
         await conv_repo.initialize()
 
-        memory_store = ChromaMemoryStore(
-            persist_dir=str(tmp_path / "chroma")
-        )
-        ctx_manager = ContextManager(
-            memory_store=memory_store, top_k=3
-        )
+        memory_store = ChromaMemoryStore(persist_dir=str(tmp_path / "chroma"))
+        ctx_manager = ContextManager(memory_store=memory_store, top_k=3)
         memory_tools = MemoryToolProvider(
             memory_store=memory_store, event_bus=event_bus
         )
@@ -444,13 +435,13 @@ class TestV1Phase4:
         call_args = mock_llm.complete.call_args
         messages = call_args[0][0]
         # There should be a memory injection message
-        memory_content = " ".join(m.content for m in messages if isinstance(m.content, str))
+        memory_content = " ".join(
+            m.content for m in messages if isinstance(m.content, str)
+        )
         assert "short answers" in memory_content
 
         # Check for MEMORY_READ event
-        events = await event_bus.query(
-            EventFilter(agent_id=agent.id)
-        )
+        events = await event_bus.query(EventFilter(agent_id=agent.id))
         event_types = [e.event_type for e in events]
         assert EventType.MEMORY_READ in event_types
 
