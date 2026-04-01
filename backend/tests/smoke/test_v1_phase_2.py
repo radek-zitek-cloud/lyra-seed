@@ -537,37 +537,33 @@ class TestV1Phase2:
         )
         app = create_app(settings, db_dir=str(tmp_path))
 
-        transport = httpx_mod.ASGITransport(app=app)
-        async with httpx_mod.AsyncClient(
-            transport=transport, base_url="http://test"
-        ) as client:
-            # Trigger startup
-            await app.router.startup()
+        # Manually run lifespan
+        async with app.router.lifespan_context(app):
+            transport = httpx_mod.ASGITransport(app=app)
+            async with httpx_mod.AsyncClient(
+                transport=transport, base_url="http://test"
+            ) as client:
+                # POST /agents — create agent
+                resp = await client.post(
+                    "/agents",
+                    json={
+                        "name": "api-test-agent",
+                        "config": {"model": "test/model"},
+                    },
+                )
+                assert resp.status_code == 201
+                agent_data = resp.json()
+                assert agent_data["name"] == "api-test-agent"
+                agent_id = agent_data["id"]
 
-            # POST /agents — create agent
-            resp = await client.post(
-                "/agents",
-                json={
-                    "name": "api-test-agent",
-                    "config": {"model": "test/model"},
-                },
-            )
-            assert resp.status_code == 201
-            agent_data = resp.json()
-            assert agent_data["name"] == "api-test-agent"
-            agent_id = agent_data["id"]
+                # GET /agents/{id}
+                resp = await client.get(f"/agents/{agent_id}")
+                assert resp.status_code == 200
+                assert resp.json()["id"] == agent_id
 
-            # GET /agents/{id}
-            resp = await client.get(f"/agents/{agent_id}")
-            assert resp.status_code == 200
-            assert resp.json()["id"] == agent_id
-
-            # POST /agents/{id}/hitl-respond (no pending gate — should 404 or 409)
-            resp = await client.post(
-                f"/agents/{agent_id}/hitl-respond",
-                json={"approved": True},
-            )
-            # Accept 404 or 409 — no pending HITL
-            assert resp.status_code in (404, 409)
-
-            await app.router.shutdown()
+                # POST /agents/{id}/hitl-respond (no pending gate)
+                resp = await client.post(
+                    f"/agents/{agent_id}/hitl-respond",
+                    json={"approved": True},
+                )
+                assert resp.status_code in (404, 409)
