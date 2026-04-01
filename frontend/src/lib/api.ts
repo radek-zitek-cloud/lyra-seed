@@ -1,0 +1,85 @@
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+
+export async function fetchAgents() {
+  const res = await fetch(`${API_BASE}/agents`);
+  if (!res.ok) throw new Error("Failed to fetch agents");
+  return res.json();
+}
+
+export async function fetchAgent(id: string) {
+  const res = await fetch(`${API_BASE}/agents/${id}`);
+  if (!res.ok) throw new Error("Failed to fetch agent");
+  return res.json();
+}
+
+export async function fetchAgentEvents(
+  id: string,
+  params?: { event_type?: string; module?: string },
+) {
+  const url = new URL(`${API_BASE}/agents/${id}/events`);
+  if (params?.event_type) url.searchParams.set("event_type", params.event_type);
+  if (params?.module) url.searchParams.set("module", params.module);
+  const res = await fetch(url.toString());
+  if (!res.ok) throw new Error("Failed to fetch events");
+  return res.json();
+}
+
+export async function fetchAgentConversations(id: string) {
+  const res = await fetch(`${API_BASE}/agents/${id}/conversations`);
+  if (!res.ok) throw new Error("Failed to fetch conversations");
+  return res.json();
+}
+
+export async function fetchTools() {
+  const res = await fetch(`${API_BASE}/tools`);
+  if (!res.ok) throw new Error("Failed to fetch tools");
+  return res.json();
+}
+
+export async function fetchToolCalls(toolName: string) {
+  const res = await fetch(`${API_BASE}/tools/${toolName}/calls`);
+  if (!res.ok) throw new Error("Failed to fetch tool calls");
+  return res.json();
+}
+
+export async function createAgent(name: string, config?: Record<string, unknown>) {
+  const res = await fetch(`${API_BASE}/agents`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name, config: config ?? {} }),
+  });
+  if (!res.ok) throw new Error("Failed to create agent");
+  return res.json();
+}
+
+export async function sendPrompt(agentId: string, message: string) {
+  const res = await fetch(`${API_BASE}/agents/${agentId}/prompt`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message }),
+  });
+  if (!res.ok) throw new Error("Failed to send prompt");
+  return res.json();
+}
+
+export async function respondHITL(
+  agentId: string,
+  approved: boolean,
+  message?: string,
+) {
+  const res = await fetch(`${API_BASE}/agents/${agentId}/hitl-respond`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ approved, message }),
+  });
+  if (!res.ok) throw new Error("Failed to respond to HITL");
+  return res.json();
+}
+
+export function createEventStream(agentId?: string): WebSocket {
+  const wsBase = API_BASE.replace(/^http/, "ws");
+  const url = agentId
+    ? `${wsBase}/agents/${agentId}/events/stream`
+    : `${wsBase}/events/stream`;
+  return new WebSocket(url);
+}
