@@ -76,9 +76,7 @@ class SqliteMacroRepo:
         await self._db.commit()
         return entity
 
-    async def update(
-        self, id: str, entity: PromptMacro
-    ) -> PromptMacro:
+    async def update(self, id: str, entity: PromptMacro) -> PromptMacro:
         assert self._db is not None
         await self._db.execute(
             """
@@ -101,9 +99,7 @@ class SqliteMacroRepo:
 
     async def delete(self, id: str) -> bool:
         assert self._db is not None
-        cursor = await self._db.execute(
-            "DELETE FROM prompt_macros WHERE id = ?", (id,)
-        )
+        cursor = await self._db.execute("DELETE FROM prompt_macros WHERE id = ?", (id,))
         await self._db.commit()
         return cursor.rowcount > 0
 

@@ -28,9 +28,7 @@ class ToolRegistry:
                 self._tool_map[tool.name] = provider
         return tools
 
-    async def call_tool(
-        self, name: str, arguments: dict[str, Any]
-    ) -> ToolResult:
+    async def call_tool(self, name: str, arguments: dict[str, Any]) -> ToolResult:
         """Route a tool call to the correct provider."""
         # Rebuild map if empty
         if not self._tool_map:

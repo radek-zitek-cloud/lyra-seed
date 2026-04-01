@@ -32,9 +32,7 @@ def create_app(
 
     event_bus = InProcessEventBus(db_path=os.path.join(db_dir, "events.db"))
     agent_repo = SqliteAgentRepo(os.path.join(db_dir, "agents.db"))
-    conv_repo = SqliteConversationRepo(
-        os.path.join(db_dir, "conversations.db")
-    )
+    conv_repo = SqliteConversationRepo(os.path.join(db_dir, "conversations.db"))
     macro_repo = SqliteMacroRepo(os.path.join(db_dir, "macros.db"))
 
     llm_provider = OpenRouterProvider(

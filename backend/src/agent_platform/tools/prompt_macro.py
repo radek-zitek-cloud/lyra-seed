@@ -1,6 +1,5 @@
 """Prompt macro model and provider."""
 
-import re
 import time
 from typing import Any
 from uuid import uuid4
@@ -50,9 +49,7 @@ class PromptMacroProvider:
             for macro in self._macros.values()
         ]
 
-    async def call_tool(
-        self, name: str, arguments: dict[str, Any]
-    ) -> ToolResult:
+    async def call_tool(self, name: str, arguments: dict[str, Any]) -> ToolResult:
         """Expand template and execute as LLM sub-call."""
         macro = self._macros.get(name)
         if macro is None:

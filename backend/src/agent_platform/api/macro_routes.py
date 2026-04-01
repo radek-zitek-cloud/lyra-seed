@@ -21,7 +21,7 @@ class MacroRequest(BaseModel):
 @router.post("/macros", status_code=201)
 async def create_macro(req: MacroRequest):
     """Create a new prompt macro."""
-    from agent_platform.api._deps import get_macro_repo, get_macro_provider
+    from agent_platform.api._deps import get_macro_provider, get_macro_repo
 
     macro = PromptMacro(
         name=req.name,
@@ -65,7 +65,7 @@ async def get_macro(macro_id: str):
 @router.put("/macros/{macro_id}")
 async def update_macro(macro_id: str, req: MacroRequest):
     """Update a prompt macro."""
-    from agent_platform.api._deps import get_macro_repo, get_macro_provider
+    from agent_platform.api._deps import get_macro_provider, get_macro_repo
 
     repo = get_macro_repo()
     existing = await repo.get(macro_id)
@@ -90,7 +90,7 @@ async def update_macro(macro_id: str, req: MacroRequest):
 @router.delete("/macros/{macro_id}")
 async def delete_macro(macro_id: str):
     """Delete a prompt macro."""
-    from agent_platform.api._deps import get_macro_repo, get_macro_provider
+    from agent_platform.api._deps import get_macro_provider, get_macro_repo
 
     repo = get_macro_repo()
     existing = await repo.get(macro_id)

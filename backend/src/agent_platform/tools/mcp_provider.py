@@ -18,9 +18,7 @@ class MCPToolProvider:
     def __init__(self, server_name: str = "mcp-server") -> None:
         self._server_name = server_name
         self._tools: dict[str, Tool] = {}
-        self._handlers: dict[
-            str, Callable[[dict[str, Any]], Awaitable[str]]
-        ] = {}
+        self._handlers: dict[str, Callable[[dict[str, Any]], Awaitable[str]]] = {}
 
     def register_tool(
         self,
@@ -35,9 +33,7 @@ class MCPToolProvider:
         """Return registered tools."""
         return list(self._tools.values())
 
-    async def call_tool(
-        self, name: str, arguments: dict[str, Any]
-    ) -> ToolResult:
+    async def call_tool(self, name: str, arguments: dict[str, Any]) -> ToolResult:
         """Call a tool by name."""
         handler = self._handlers.get(name)
         if handler is None:

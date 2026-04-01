@@ -5,7 +5,6 @@ Each test function maps to a smoke test ID from SMOKE_TESTS.md.
 All LLM calls are mocked — no real API calls.
 """
 
-import asyncio
 from unittest.mock import AsyncMock
 
 import pytest
@@ -115,9 +114,7 @@ class TestV1Phase3:
         result = await registry.call_tool("search", {"q": "test"})
         assert result.success is True
         assert result.output == "search result"
-        provider_a.call_tool.assert_called_once_with(
-            "search", {"q": "test"}
-        )
+        provider_a.call_tool.assert_called_once_with("search", {"q": "test"})
 
         result = await registry.call_tool("calculate", {"expr": "1+1"})
         assert result.output == "42"
@@ -168,9 +165,7 @@ class TestV1Phase3:
         assert tools[0].name == "summarize"
 
         # Call tool — should expand template and call LLM
-        result = await provider.call_tool(
-            "summarize", {"text": "Long article here..."}
-        )
+        result = await provider.call_tool("summarize", {"text": "Long article here..."})
         assert result.success is True
         assert "summary" in result.output.lower()
         mock_llm.complete.assert_called_once()
@@ -259,9 +254,7 @@ class TestV1Phase3:
                         "template": "Say hello to {{name}}",
                         "parameters": {
                             "type": "object",
-                            "properties": {
-                                "name": {"type": "string"}
-                            },
+                            "properties": {"name": {"type": "string"}},
                         },
                     },
                 )
@@ -289,9 +282,7 @@ class TestV1Phase3:
                         "template": "Say hello to {{name}}!",
                         "parameters": {
                             "type": "object",
-                            "properties": {
-                                "name": {"type": "string"}
-                            },
+                            "properties": {"name": {"type": "string"}},
                         },
                     },
                 )
@@ -335,9 +326,7 @@ class TestV1Phase3:
         assert tools[0].name == "web_search"
 
         # Call tool
-        result = await provider.call_tool(
-            "web_search", {"q": "python"}
-        )
+        result = await provider.call_tool("web_search", {"q": "python"})
         assert result.success is True
         assert "python" in result.output
 
@@ -431,9 +420,7 @@ class TestV1Phase3:
         assert response.content == "Python is a programming language."
 
         # Verify tool was called through registry
-        mock_provider.call_tool.assert_called_once_with(
-            "lookup", {"topic": "Python"}
-        )
+        mock_provider.call_tool.assert_called_once_with("lookup", {"topic": "Python"})
 
         # Verify LLM received tool list
         first_call = mock_llm.complete.call_args_list[0]
@@ -442,15 +429,9 @@ class TestV1Phase3:
 
         # Check events include real tool output
         events = await event_bus.query(EventFilter(agent_id=agent.id))
-        tool_results = [
-            e
-            for e in events
-            if e.event_type == EventType.TOOL_RESULT
-        ]
+        tool_results = [e for e in events if e.event_type == EventType.TOOL_RESULT]
         assert len(tool_results) >= 1
-        assert "Python is a programming language" in str(
-            tool_results[0].payload
-        )
+        assert "Python is a programming language" in str(tool_results[0].payload)
 
         await event_bus.close()
         await agent_repo.close()

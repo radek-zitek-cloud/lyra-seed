@@ -193,9 +193,7 @@ class AgentRuntime:
                         tool_call.name, tool_call.arguments
                     )
                     tool_result = (
-                        result.output
-                        if result.success
-                        else f"Error: {result.error}"
+                        result.output if result.success else f"Error: {result.error}"
                     )
                     if isinstance(tool_result, dict):
                         import json
