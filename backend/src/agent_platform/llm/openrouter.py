@@ -65,6 +65,12 @@ class OpenRouterProvider:
                 )
             )
 
+        # Log the request for debugging
+        logger.debug(
+            "OpenRouter request: %s",
+            json.dumps(request_body, default=str)[:2000],
+        )
+
         start = time.monotonic()
         resp = await self._client.post(
             OPENROUTER_API_URL,
@@ -140,6 +146,9 @@ class OpenRouterProvider:
         config: LLMConfig,
     ) -> dict[str, Any]:
         """Build the OpenRouter API request body."""
+        # Repair old conversations: match tool_call_ids from assistant messages
+        _repair_tool_call_ids(messages)
+
         body: dict[str, Any] = {
             "model": config.model,
             "messages": [_message_to_openrouter(m) for m in messages],
@@ -215,3 +224,20 @@ def _message_to_openrouter(msg: Message) -> dict[str, Any]:
             for tc in msg.tool_calls
         ]
     return result
+
+
+def _repair_tool_call_ids(messages: list[Message]) -> None:
+    """Fix tool result messages missing tool_call_id.
+
+    Matches them to tool_calls from the preceding assistant message.
+    This handles conversations persisted before tool_call_id was added.
+    """
+    pending_tool_call_ids: list[str] = []
+    for msg in messages:
+        if msg.role == MessageRole.ASSISTANT and msg.tool_calls:
+            pending_tool_call_ids = [tc.id for tc in msg.tool_calls]
+        elif msg.role == MessageRole.TOOL_RESULT and not msg.tool_call_id:
+            if pending_tool_call_ids:
+                msg.tool_call_id = pending_tool_call_ids.pop(0)
+            else:
+                msg.tool_call_id = "call_unknown"
