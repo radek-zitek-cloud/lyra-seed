@@ -2,7 +2,7 @@
 
 from typing import Protocol, runtime_checkable
 
-from agent_platform.llm.models import LLMConfig, LLMResponse, Message, ToolCall
+from agent_platform.llm.models import LLMConfig, LLMResponse, Message
 
 
 @runtime_checkable

@@ -6,7 +6,6 @@ Each test function maps to a smoke test ID from SMOKE_TESTS.md.
 
 import asyncio
 from datetime import UTC, datetime, timedelta
-from uuid import uuid4
 
 import pytest
 
@@ -38,9 +37,7 @@ class TestV1Phase1:
         assert msg.role == MessageRole.HUMAN
         assert msg.content == "Hello"
 
-        tool_call = ToolCall(
-            id="tc-1", name="test_tool", arguments={"key": "value"}
-        )
+        tool_call = ToolCall(id="tc-1", name="test_tool", arguments={"key": "value"})
         assert tool_call.name == "test_tool"
 
         response = LLMResponse(
@@ -79,9 +76,7 @@ class TestV1Phase1:
         assert hasattr(VectorStore, "search")
         assert hasattr(VectorStore, "delete")
 
-        result = VectorResult(
-            id="v-1", score=0.95, metadata={"key": "value"}
-        )
+        result = VectorResult(id="v-1", score=0.95, metadata={"key": "value"})
         assert result.score == 0.95
 
     def test_st_1_5_strategy_protocol(self):
@@ -161,9 +156,7 @@ class TestV1Phase1:
         await bus.emit(llm_event)
         await bus.emit(error_event)
 
-        received = await asyncio.wait_for(
-            sub_errors.__anext__(), timeout=2.0
-        )
+        received = await asyncio.wait_for(sub_errors.__anext__(), timeout=2.0)
         assert received.event_type == EventType.ERROR
 
         # --- Filter by agent_id ---
@@ -183,9 +176,7 @@ class TestV1Phase1:
         await bus.emit(event_a1)
         await bus.emit(event_a2)
 
-        received = await asyncio.wait_for(
-            sub_agent2.__anext__(), timeout=2.0
-        )
+        received = await asyncio.wait_for(sub_agent2.__anext__(), timeout=2.0)
         assert received.agent_id == "agent-2"
 
         # --- Multiple subscribers ---
@@ -249,9 +240,7 @@ class TestV1Phase1:
         assert all(r.agent_id == "agent-1" for r in results)
 
         # Query by event_type
-        results = await bus.query(
-            EventFilter(event_types=[EventType.ERROR])
-        )
+        results = await bus.query(EventFilter(event_types=[EventType.ERROR]))
         assert len(results) == 1
         assert results[0].event_type == EventType.ERROR
 
@@ -267,9 +256,7 @@ class TestV1Phase1:
 
         # Payload roundtrip
         results = await bus.query(EventFilter(agent_id="agent-1"))
-        llm_events = [
-            r for r in results if r.event_type == EventType.LLM_REQUEST
-        ]
+        llm_events = [r for r in results if r.event_type == EventType.LLM_REQUEST]
         assert len(llm_events) == 1
         assert llm_events[0].payload == {"prompt": "hello"}
 

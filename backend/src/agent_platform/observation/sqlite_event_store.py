@@ -58,9 +58,7 @@ class SqliteEventStore:
                 event.timestamp.isoformat(),
                 event.agent_id,
                 event.event_type.value,
-                str(event.parent_event_id)
-                if event.parent_event_id
-                else None,
+                str(event.parent_event_id) if event.parent_event_id else None,
                 event.module,
                 json.dumps(event.payload),
                 event.duration_ms,

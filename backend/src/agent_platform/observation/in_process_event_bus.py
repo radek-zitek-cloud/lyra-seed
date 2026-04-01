@@ -71,9 +71,7 @@ class InProcessEventBus:
         if self._store:
             await self._store.close()
 
-    async def _iter_subscription(
-        self, sub: _Subscription
-    ) -> AsyncIterator[Event]:
+    async def _iter_subscription(self, sub: _Subscription) -> AsyncIterator[Event]:
         """Async iterator that yields events from a subscription queue."""
         try:
             while True:
