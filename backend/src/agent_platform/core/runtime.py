@@ -27,12 +27,14 @@ class AgentRuntime:
         llm_provider: object,  # LLMProvider protocol
         event_bus: InProcessEventBus,
         tool_registry: ToolRegistry | None = None,
+        context_manager: object | None = None,
     ) -> None:
         self._agent_repo = agent_repo
         self._conv_repo = conversation_repo
         self._llm = llm_provider
         self._event_bus = event_bus
         self._tool_registry = tool_registry or ToolRegistry()
+        self._context_manager = context_manager
         self._hitl_pending: dict[str, asyncio.Event] = {}
         self._hitl_responses: dict[str, dict] = {}
 
@@ -69,6 +71,23 @@ class AgentRuntime:
         )
 
         events_emitted = 0
+
+        # Inject relevant memories into context
+        if self._context_manager is not None:
+            conversation.messages = await self._context_manager.assemble(
+                agent_id=agent_id,
+                messages=conversation.messages,
+                query=human_message,
+            )
+            await self._event_bus.emit(
+                Event(
+                    agent_id=agent_id,
+                    event_type=EventType.MEMORY_READ,
+                    module="core.runtime",
+                    payload={"query": human_message},
+                )
+            )
+            events_emitted += 1
 
         try:
             iteration = 0
