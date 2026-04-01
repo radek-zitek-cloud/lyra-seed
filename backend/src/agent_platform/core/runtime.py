@@ -14,6 +14,7 @@ from agent_platform.db.sqlite_conversation_repo import SqliteConversationRepo
 from agent_platform.llm.models import LLMConfig, LLMResponse, Message, MessageRole
 from agent_platform.observation.events import Event, EventType
 from agent_platform.observation.in_process_event_bus import InProcessEventBus
+from agent_platform.tools.registry import ToolRegistry
 
 
 class AgentRuntime:
@@ -25,11 +26,13 @@ class AgentRuntime:
         conversation_repo: SqliteConversationRepo,
         llm_provider: object,  # LLMProvider protocol
         event_bus: InProcessEventBus,
+        tool_registry: ToolRegistry | None = None,
     ) -> None:
         self._agent_repo = agent_repo
         self._conv_repo = conversation_repo
         self._llm = llm_provider
         self._event_bus = event_bus
+        self._tool_registry = tool_registry or ToolRegistry()
         self._hitl_pending: dict[str, asyncio.Event] = {}
         self._hitl_responses: dict[str, dict] = {}
 
@@ -86,13 +89,16 @@ class AgentRuntime:
                 )
                 events_emitted += 1
 
-                # Call LLM
+                # Call LLM with tool list
                 llm_config = LLMConfig(
                     model=agent.config.model,
                     temperature=agent.config.temperature,
                 )
+                tools_schema = await self._tool_registry.get_tools_schema()
                 response: LLMResponse = await self._llm.complete(
-                    conversation.messages, config=llm_config
+                    conversation.messages,
+                    tools=tools_schema or None,
+                    config=llm_config,
                 )
 
                 # Emit LLM_RESPONSE event
@@ -182,8 +188,17 @@ class AgentRuntime:
                     )
                     events_emitted += 1
 
-                    # Stub tool execution (real dispatch in Phase 3)
-                    tool_result = f"Tool '{tool_call.name}' executed (stub result)."
+                    # Execute tool via registry
+                    result = await self._tool_registry.call_tool(
+                        tool_call.name, tool_call.arguments
+                    )
+                    tool_result = (
+                        result.output if result.success else f"Error: {result.error}"
+                    )
+                    if isinstance(tool_result, dict):
+                        import json
+
+                        tool_result = json.dumps(tool_result)
 
                     # Emit TOOL_RESULT event
                     await self._event_bus.emit(
@@ -194,6 +209,8 @@ class AgentRuntime:
                             payload={
                                 "tool": tool_call.name,
                                 "result": tool_result,
+                                "success": result.success,
+                                "duration_ms": result.duration_ms,
                             },
                         )
                     )
