@@ -1,11 +1,9 @@
 """Agent runtime engine — core agent loop."""
 
 import asyncio
-from datetime import UTC, datetime
 
 from agent_platform.core.models import (
     Agent,
-    AgentConfig,
     AgentResponse,
     AgentStatus,
     Conversation,
@@ -46,9 +44,7 @@ class AgentRuntime:
         await self._agent_repo.update(agent.id, agent)
 
         # Get or create conversation
-        convos = await self._conv_repo.list(
-            filters={"agent_id": agent_id}
-        )
+        convos = await self._conv_repo.list(filters={"agent_id": agent_id})
         if convos:
             conversation = convos[0]
         else:
@@ -123,9 +119,7 @@ class AgentRuntime:
                             content=response.content or "",
                         )
                     )
-                    await self._conv_repo.update(
-                        conversation.id, conversation
-                    )
+                    await self._conv_repo.update(conversation.id, conversation)
                     agent.status = AgentStatus.IDLE
                     await self._agent_repo.update(agent.id, agent)
 
@@ -168,7 +162,8 @@ class AgentRuntime:
                             conversation.messages.append(
                                 Message(
                                     role=MessageRole.TOOL_RESULT,
-                                    content=f"Tool '{tool_call.name}' was denied by the human.",
+                                    content=f"Tool '{tool_call.name}' "
+                                    "was denied by the human.",
                                 )
                             )
                             continue
@@ -188,9 +183,7 @@ class AgentRuntime:
                     events_emitted += 1
 
                     # Stub tool execution (real dispatch in Phase 3)
-                    tool_result = (
-                        f"Tool '{tool_call.name}' executed (stub result)."
-                    )
+                    tool_result = f"Tool '{tool_call.name}' executed (stub result)."
 
                     # Emit TOOL_RESULT event
                     await self._event_bus.emit(
@@ -235,7 +228,10 @@ class AgentRuntime:
 
             return AgentResponse(
                 agent_id=agent_id,
-                content=f"Stopped: maximum iterations ({agent.config.max_iterations}) reached.",
+                content=(
+                    f"Stopped: maximum iterations "
+                    f"({agent.config.max_iterations}) reached."
+                ),
                 conversation_id=conversation.id,
                 events_emitted=events_emitted,
             )

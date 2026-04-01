@@ -6,7 +6,6 @@ All LLM calls are mocked — no real API calls.
 """
 
 import asyncio
-import json
 from unittest.mock import AsyncMock
 
 import httpx
@@ -163,9 +162,7 @@ class TestV1Phase2:
         assert fetched.messages[2].tool_calls[0].name == "search"
 
         # Update with new message
-        conv.messages.append(
-            Message(role=MessageRole.HUMAN, content="Thanks!")
-        )
+        conv.messages.append(Message(role=MessageRole.HUMAN, content="Thanks!"))
         await repo.update(conv.id, conv)
         fetched = await repo.get(conv.id)
         assert fetched is not None
@@ -178,7 +175,6 @@ class TestV1Phase2:
         """ST-2.4: OpenRouter provider request/response mapping."""
         from agent_platform.llm.models import (
             LLMConfig,
-            LLMResponse,
             Message,
             MessageRole,
         )
@@ -208,9 +204,7 @@ class TestV1Phase2:
         }
 
         transport = httpx.MockTransport(
-            lambda request: httpx.Response(
-                200, json=mock_response_data
-            )
+            lambda request: httpx.Response(200, json=mock_response_data)
         )
         client = httpx.AsyncClient(transport=transport)
         event_bus = InProcessEventBus()
@@ -302,9 +296,7 @@ class TestV1Phase2:
         assert updated_agent.status == AgentStatus.IDLE
 
         # Events should have been emitted
-        events = await event_bus.query(
-            EventFilter(agent_id=agent.id)
-        )
+        events = await event_bus.query(EventFilter(agent_id=agent.id))
         event_types = [e.event_type for e in events]
         assert EventType.LLM_REQUEST in event_types
         assert EventType.LLM_RESPONSE in event_types
@@ -416,9 +408,7 @@ class TestV1Phase2:
         mock_llm = AsyncMock()
         mock_llm.complete.return_value = LLMResponse(
             content=None,
-            tool_calls=[
-                ToolCall(id="tc-x", name="loop_tool", arguments={})
-            ],
+            tool_calls=[ToolCall(id="tc-x", name="loop_tool", arguments={})],
             usage={"prompt_tokens": 5, "completion_tokens": 3},
         )
 
@@ -459,7 +449,6 @@ class TestV1Phase2:
             SqliteConversationRepo,
         )
         from agent_platform.llm.models import LLMResponse, ToolCall
-        from agent_platform.observation.events import Event, EventType
         from agent_platform.observation.in_process_event_bus import (
             InProcessEventBus,
         )
@@ -482,9 +471,7 @@ class TestV1Phase2:
         mock_llm.complete.side_effect = [
             LLMResponse(
                 content=None,
-                tool_calls=[
-                    ToolCall(id="tc-1", name="dangerous_tool", arguments={})
-                ],
+                tool_calls=[ToolCall(id="tc-1", name="dangerous_tool", arguments={})],
                 usage={},
             ),
             LLMResponse(
@@ -509,9 +496,7 @@ class TestV1Phase2:
             assert a is not None
             assert a.status == AgentStatus.WAITING_HITL
             # Send approval
-            await runtime.hitl_respond(
-                agent.id, approved=True, message="Go ahead"
-            )
+            await runtime.hitl_respond(agent.id, approved=True, message="Go ahead")
 
         response, _ = await asyncio.gather(
             runtime.run(agent.id, "Do something dangerous"),

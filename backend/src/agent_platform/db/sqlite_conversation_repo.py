@@ -65,9 +65,7 @@ class SqliteConversationRepo:
 
     async def create(self, entity: Conversation) -> Conversation:
         assert self._db is not None
-        messages_json = json.dumps(
-            [m.model_dump(mode="json") for m in entity.messages]
-        )
+        messages_json = json.dumps([m.model_dump(mode="json") for m in entity.messages])
         await self._db.execute(
             "INSERT INTO conversations (id, agent_id, messages) VALUES (?, ?, ?)",
             (entity.id, entity.agent_id, messages_json),
@@ -77,9 +75,7 @@ class SqliteConversationRepo:
 
     async def update(self, id: str, entity: Conversation) -> Conversation:
         assert self._db is not None
-        messages_json = json.dumps(
-            [m.model_dump(mode="json") for m in entity.messages]
-        )
+        messages_json = json.dumps([m.model_dump(mode="json") for m in entity.messages])
         await self._db.execute(
             "UPDATE conversations SET agent_id=?, messages=? WHERE id=?",
             (entity.agent_id, messages_json, id),
@@ -89,9 +85,7 @@ class SqliteConversationRepo:
 
     async def delete(self, id: str) -> bool:
         assert self._db is not None
-        cursor = await self._db.execute(
-            "DELETE FROM conversations WHERE id = ?", (id,)
-        )
+        cursor = await self._db.execute("DELETE FROM conversations WHERE id = ?", (id,))
         await self._db.commit()
         return cursor.rowcount > 0
 

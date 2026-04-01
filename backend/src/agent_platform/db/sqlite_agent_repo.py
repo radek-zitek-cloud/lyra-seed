@@ -1,6 +1,5 @@
 """SQLite repository for Agent entities."""
 
-import json
 from datetime import UTC, datetime
 from typing import Any
 
@@ -61,7 +60,9 @@ class SqliteAgentRepo:
         assert self._db is not None
         await self._db.execute(
             """
-            INSERT INTO agents (id, name, status, config, parent_agent_id, created_at, updated_at)
+            INSERT INTO agents
+                (id, name, status, config,
+                 parent_agent_id, created_at, updated_at)
             VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
             (
@@ -82,7 +83,9 @@ class SqliteAgentRepo:
         entity.updated_at = datetime.now(UTC)
         await self._db.execute(
             """
-            UPDATE agents SET name=?, status=?, config=?, parent_agent_id=?, updated_at=?
+            UPDATE agents
+            SET name=?, status=?, config=?,
+                parent_agent_id=?, updated_at=?
             WHERE id=?
             """,
             (
@@ -99,9 +102,7 @@ class SqliteAgentRepo:
 
     async def delete(self, id: str) -> bool:
         assert self._db is not None
-        cursor = await self._db.execute(
-            "DELETE FROM agents WHERE id = ?", (id,)
-        )
+        cursor = await self._db.execute("DELETE FROM agents WHERE id = ?", (id,))
         await self._db.commit()
         return cursor.rowcount > 0
 

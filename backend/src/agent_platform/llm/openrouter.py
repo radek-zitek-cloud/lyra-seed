@@ -101,9 +101,7 @@ class OpenRouterProvider:
         """Build the OpenRouter API request body."""
         body: dict[str, Any] = {
             "model": config.model,
-            "messages": [
-                _message_to_openrouter(m) for m in messages
-            ],
+            "messages": [_message_to_openrouter(m) for m in messages],
             "temperature": config.temperature,
         }
         if config.max_tokens is not None:

@@ -26,15 +26,9 @@ def create_app(
     if db_dir is None:
         db_dir = os.path.dirname(settings.db_path) or "."
 
-    event_bus = InProcessEventBus(
-        db_path=os.path.join(db_dir, "events.db")
-    )
-    agent_repo = SqliteAgentRepo(
-        os.path.join(db_dir, "agents.db")
-    )
-    conv_repo = SqliteConversationRepo(
-        os.path.join(db_dir, "conversations.db")
-    )
+    event_bus = InProcessEventBus(db_path=os.path.join(db_dir, "events.db"))
+    agent_repo = SqliteAgentRepo(os.path.join(db_dir, "agents.db"))
+    conv_repo = SqliteConversationRepo(os.path.join(db_dir, "conversations.db"))
 
     llm_provider = OpenRouterProvider(
         api_key=settings.openrouter_api_key.get_secret_value(),
