@@ -36,6 +36,7 @@ class MCPServerConfig(BaseModel):
 class PlatformConfig(BaseModel):
     """Platform-level configuration loaded from lyra.config.json."""
 
+    defaultModel: str = "openai/gpt-4.1-mini"
     mcpServers: dict[str, MCPServerConfig] = Field(default_factory=dict)
     systemPromptsDir: str = "./prompts"
 

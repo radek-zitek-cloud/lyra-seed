@@ -11,5 +11,6 @@
       }
     }
   },
-  "systemPromptsDir": "./prompts"
+  "systemPromptsDir": "./prompts",
+  "defaultModel": "google/gemini-3-flash-preview"
 }

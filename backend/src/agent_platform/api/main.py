@@ -124,6 +124,7 @@ def create_app(
             macro_provider=macro_provider,
             tool_registry=tool_registry,
             system_prompt_resolver=prompt_resolver,
+            default_model=platform_config.defaultModel,
         )
         yield
         # Shutdown

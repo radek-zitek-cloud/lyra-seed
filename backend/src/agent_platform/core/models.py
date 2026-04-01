@@ -30,7 +30,7 @@ class HITLPolicy(StrEnum):
 class AgentConfig(BaseModel):
     """Configuration for an agent instance."""
 
-    model: str = "minimax/minimax-m2.7"
+    model: str = "openai/gpt-4.1-mini"
     temperature: float = 0.7
     max_iterations: int = 10
     system_prompt: str = "You are a helpful assistant."

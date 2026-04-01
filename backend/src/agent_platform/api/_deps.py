@@ -22,6 +22,7 @@ _macro_repo: SqliteMacroRepo | None = None
 _macro_provider: PromptMacroProvider | None = None
 _tool_registry: ToolRegistry | None = None
 _system_prompt_resolver: Callable[[str], str] | None = None
+_default_model: str | None = None
 
 
 def configure(
@@ -33,10 +34,11 @@ def configure(
     macro_provider: PromptMacroProvider | None = None,
     tool_registry: ToolRegistry | None = None,
     system_prompt_resolver: Callable[[str], str] | None = None,
+    default_model: str | None = None,
 ) -> None:
     global _agent_repo, _conversation_repo, _event_bus, _runtime
     global _macro_repo, _macro_provider, _tool_registry
-    global _system_prompt_resolver
+    global _system_prompt_resolver, _default_model
     _agent_repo = agent_repo
     _conversation_repo = conversation_repo
     _event_bus = event_bus
@@ -45,6 +47,7 @@ def configure(
     _macro_provider = macro_provider
     _tool_registry = tool_registry
     _system_prompt_resolver = system_prompt_resolver
+    _default_model = default_model
 
 
 def get_agent_repo() -> SqliteAgentRepo:
@@ -85,3 +88,7 @@ def get_tool_registry() -> ToolRegistry:
 def get_system_prompt_resolver() -> Callable[[str], str]:
     assert _system_prompt_resolver is not None, "App not initialized"
     return _system_prompt_resolver
+
+
+def get_default_model() -> str:
+    return _default_model or "openai/gpt-4.1-mini"

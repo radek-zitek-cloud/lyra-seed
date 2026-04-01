@@ -25,14 +25,20 @@ class HITLRespondRequest(BaseModel):
 @router.post("/agents", status_code=201)
 async def create_agent(req: CreateAgentRequest):
     """Create a new agent with system prompt resolved from config."""
-    from agent_platform.api._deps import get_agent_repo, get_system_prompt_resolver
+    from agent_platform.api._deps import (
+        get_agent_repo,
+        get_default_model,
+        get_system_prompt_resolver,
+    )
 
     repo = get_agent_repo()
     resolve_prompt = get_system_prompt_resolver()
 
     config = req.config or AgentConfig()
 
-    # If system_prompt is the default, resolve from file
+    # Apply defaults from platform config
+    if config.model == AgentConfig().model:
+        config.model = get_default_model()
     if config.system_prompt == AgentConfig().system_prompt:
         config.system_prompt = resolve_prompt(req.name)
 
