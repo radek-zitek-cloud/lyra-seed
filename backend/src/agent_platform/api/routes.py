@@ -3,7 +3,7 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from agent_platform.core.models import Agent, AgentConfig
+from agent_platform.core.models import Agent, AgentConfig, HITLPolicy
 
 router = APIRouter()
 
@@ -24,8 +24,15 @@ class HITLRespondRequest(BaseModel):
 
 @router.post("/agents", status_code=201)
 async def create_agent(req: CreateAgentRequest):
-    """Create a new agent with system prompt resolved from config."""
+    """Create a new agent with config resolved from files.
+
+    Resolution:
+    1. {prompts_dir}/{name}.json for model, hitl_policy, temperature, etc.
+    2. {prompts_dir}/{name}.md for system prompt
+    3. Falls back to default.json / default.md / platform defaults
+    """
     from agent_platform.api._deps import (
+        get_agent_config_resolver,
         get_agent_repo,
         get_default_model,
         get_system_prompt_resolver,
@@ -33,12 +40,27 @@ async def create_agent(req: CreateAgentRequest):
 
     repo = get_agent_repo()
     resolve_prompt = get_system_prompt_resolver()
+    resolve_config = get_agent_config_resolver()
 
     config = req.config or AgentConfig()
+    file_config = resolve_config(req.name)
 
-    # Apply defaults from platform config
-    if config.model == AgentConfig().model:
+    # Apply file-based config overrides (name.json > default.json)
+    if file_config.model:
+        config.model = file_config.model
+    elif config.model == AgentConfig().model:
         config.model = get_default_model()
+
+    if file_config.hitl_policy:
+        config.hitl_policy = HITLPolicy(file_config.hitl_policy)
+
+    if file_config.temperature is not None:
+        config.temperature = file_config.temperature
+
+    if file_config.max_iterations is not None:
+        config.max_iterations = file_config.max_iterations
+
+    # Apply system prompt from name.md
     if config.system_prompt == AgentConfig().system_prompt:
         config.system_prompt = resolve_prompt(req.name)
 

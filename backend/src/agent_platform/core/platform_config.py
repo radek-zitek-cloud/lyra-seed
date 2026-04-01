@@ -60,6 +60,36 @@ def load_platform_config(project_root: Path) -> PlatformConfig:
     return config
 
 
+class AgentFileConfig(BaseModel):
+    """Agent configuration loaded from {name}.json in prompts dir.
+
+    Example {prompts_dir}/my-agent.json:
+    {
+      "model": "anthropic/claude-sonnet-4",
+      "hitl_policy": "always_ask",
+      "temperature": 0.5,
+      "max_iterations": 20
+    }
+    """
+
+    model: str | None = None
+    hitl_policy: str | None = None
+    temperature: float | None = None
+    max_iterations: int | None = None
+
+
+def _sanitize_name(agent_name: str) -> str:
+    """Sanitize agent name for filesystem lookup."""
+    return "".join(c if c.isalnum() or c in "-_" else "-" for c in agent_name.lower())
+
+
+def _resolve_prompts_dir(prompts_dir: str, project_root: Path) -> Path:
+    base = Path(prompts_dir)
+    if not base.is_absolute():
+        base = project_root / base
+    return base
+
+
 def resolve_system_prompt(
     agent_name: str,
     prompts_dir: str,
@@ -72,14 +102,8 @@ def resolve_system_prompt(
     2. {prompts_dir}/default.md
     3. Hardcoded fallback
     """
-    base = Path(prompts_dir)
-    if not base.is_absolute():
-        base = project_root / base
-
-    # Sanitize agent name for filesystem
-    safe_name = "".join(
-        c if c.isalnum() or c in "-_" else "-" for c in agent_name.lower()
-    )
+    base = _resolve_prompts_dir(prompts_dir, project_root)
+    safe_name = _sanitize_name(agent_name)
 
     # Try name-specific prompt
     name_path = base / f"{safe_name}.md"
@@ -96,3 +120,37 @@ def resolve_system_prompt(
     # Hardcoded fallback
     logger.info("No prompt files found, using hardcoded fallback")
     return DEFAULT_SYSTEM_PROMPT
+
+
+def resolve_agent_config(
+    agent_name: str,
+    prompts_dir: str,
+    project_root: Path,
+) -> AgentFileConfig:
+    """Load agent config overrides from {name}.json.
+
+    Resolution order:
+    1. {prompts_dir}/{agent_name}.json
+    2. {prompts_dir}/default.json
+    3. Empty config (no overrides)
+    """
+    base = _resolve_prompts_dir(prompts_dir, project_root)
+    safe_name = _sanitize_name(agent_name)
+
+    # Try name-specific config
+    name_path = base / f"{safe_name}.json"
+    if name_path.exists():
+        logger.info("Loading agent config from %s", name_path)
+        with open(name_path) as f:
+            data = json.load(f)
+        return AgentFileConfig.model_validate(data)
+
+    # Try default config
+    default_path = base / "default.json"
+    if default_path.exists():
+        logger.info("Loading default agent config from %s", default_path)
+        with open(default_path) as f:
+            data = json.load(f)
+        return AgentFileConfig.model_validate(data)
+
+    return AgentFileConfig()

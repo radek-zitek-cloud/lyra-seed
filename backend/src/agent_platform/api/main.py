@@ -18,6 +18,7 @@ from agent_platform.api.ws_routes import router as ws_router
 from agent_platform.core.config import Settings
 from agent_platform.core.platform_config import (
     load_platform_config,
+    resolve_agent_config,
     resolve_system_prompt,
 )
 from agent_platform.core.runtime import AgentRuntime
@@ -103,6 +104,12 @@ def create_app(
         project_root=project_root,
     )
 
+    config_resolver = partial(
+        resolve_agent_config,
+        prompts_dir=platform_config.systemPromptsDir,
+        project_root=project_root,
+    )
+
     runtime = AgentRuntime(
         agent_repo=agent_repo,
         conversation_repo=conv_repo,
@@ -138,6 +145,7 @@ def create_app(
             macro_provider=macro_provider,
             tool_registry=tool_registry,
             system_prompt_resolver=prompt_resolver,
+            agent_config_resolver=config_resolver,
             default_model=platform_config.defaultModel,
         )
         yield
