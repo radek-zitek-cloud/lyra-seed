@@ -6,12 +6,13 @@ lifecycle events, parent-child queries, config inheritance.
 All LLM calls are mocked.
 """
 
+import asyncio
 import json
 from unittest.mock import AsyncMock
 
 import pytest
 
-from agent_platform.core.models import Agent, AgentConfig
+from agent_platform.core.models import Agent, AgentConfig, AgentStatus
 from agent_platform.db.sqlite_agent_repo import SqliteAgentRepo
 from agent_platform.db.sqlite_conversation_repo import SqliteConversationRepo
 from agent_platform.llm.models import LLMResponse
@@ -39,16 +40,25 @@ async def deps(tmp_path):
         content="Child response.", usage={"prompt_tokens": 10, "completion_tokens": 5}
     )
 
+    from agent_platform.db.sqlite_message_repo import SqliteMessageRepo
+
+    msg_repo = SqliteMessageRepo(str(tmp_path / "msgs.db"))
+    await msg_repo.initialize()
+
     yield {
         "agent_repo": agent_repo,
         "conv_repo": conv_repo,
         "event_bus": event_bus,
         "llm": mock_llm,
+        "msg_repo": msg_repo,
         "tmp_path": tmp_path,
     }
 
+    # Wait for background tasks to finish before closing repos
+    await asyncio.sleep(0.5)
     await agent_repo.close()
     await conv_repo.close()
+    await msg_repo.close()
     await event_bus.close()
 
 
@@ -65,6 +75,7 @@ class TestV2Phase1:
             conversation_repo=deps["conv_repo"],
             llm_provider=deps["llm"],
             event_bus=deps["event_bus"],
+            message_repo=deps["msg_repo"],
         )
         tools = await provider.list_tools()
         names = [t.name for t in tools]
@@ -92,6 +103,7 @@ class TestV2Phase1:
             conversation_repo=deps["conv_repo"],
             llm_provider=deps["llm"],
             event_bus=deps["event_bus"],
+            message_repo=deps["msg_repo"],
         )
 
         result = await provider.call_tool(
@@ -122,6 +134,7 @@ class TestV2Phase1:
             conversation_repo=deps["conv_repo"],
             llm_provider=deps["llm"],
             event_bus=deps["event_bus"],
+            message_repo=deps["msg_repo"],
         )
 
         await provider.call_tool(
@@ -152,6 +165,7 @@ class TestV2Phase1:
             conversation_repo=deps["conv_repo"],
             llm_provider=deps["llm"],
             event_bus=deps["event_bus"],
+            message_repo=deps["msg_repo"],
         )
 
         result = await provider.call_tool(
@@ -160,6 +174,9 @@ class TestV2Phase1:
         )
         output = json.loads(result.output)
         child_id = output["child_agent_id"]
+
+        # Wait for async child to complete
+        await asyncio.sleep(0.5)
 
         events = await deps["event_bus"].query(
             EventFilter(
@@ -187,6 +204,7 @@ class TestV2Phase1:
             conversation_repo=deps["conv_repo"],
             llm_provider=failing_llm,
             event_bus=deps["event_bus"],
+            message_repo=deps["msg_repo"],
         )
 
         result = await provider.call_tool(
@@ -194,8 +212,17 @@ class TestV2Phase1:
             {"name": "child-fail", "task": "Do work", "agent_id": parent.id},
         )
 
-        assert result.success is False
-        assert result.error is not None
+        # Spawn returns immediately with success (async)
+        assert result.success is True
+        child_id = json.loads(result.output)["child_agent_id"]
+
+        # Wait for background task to fail
+        await asyncio.sleep(0.5)
+
+        # Child should be FAILED
+        child = await deps["agent_repo"].get(child_id)
+        assert child is not None
+        assert child.status == AgentStatus.FAILED
 
     @pytest.mark.asyncio
     async def test_st_v2_1_6_get_agent_result(self, deps):
@@ -210,6 +237,7 @@ class TestV2Phase1:
             conversation_repo=deps["conv_repo"],
             llm_provider=deps["llm"],
             event_bus=deps["event_bus"],
+            message_repo=deps["msg_repo"],
         )
 
         spawn_result = await provider.call_tool(
@@ -217,6 +245,9 @@ class TestV2Phase1:
             {"name": "child-res", "task": "Work", "agent_id": parent.id},
         )
         child_id = json.loads(spawn_result.output)["child_agent_id"]
+
+        # Wait for async child to complete
+        await asyncio.sleep(0.5)
 
         result = await provider.call_tool(
             "get_agent_result",
@@ -241,6 +272,7 @@ class TestV2Phase1:
             conversation_repo=deps["conv_repo"],
             llm_provider=deps["llm"],
             event_bus=deps["event_bus"],
+            message_repo=deps["msg_repo"],
         )
 
         # Spawn two children
@@ -333,6 +365,7 @@ class TestV2Phase1:
             conversation_repo=deps["conv_repo"],
             llm_provider=deps["llm"],
             event_bus=deps["event_bus"],
+            message_repo=deps["msg_repo"],
         )
 
         spawn_result = await provider.call_tool(
@@ -390,6 +423,7 @@ class TestV2Phase1:
             conversation_repo=deps["conv_repo"],
             llm_provider=child_llm,
             event_bus=deps["event_bus"],
+            message_repo=deps["msg_repo"],
         )
 
         registry = ToolRegistry()
@@ -427,6 +461,7 @@ class TestV2Phase1:
             conversation_repo=deps["conv_repo"],
             llm_provider=deps["llm"],
             event_bus=deps["event_bus"],
+            message_repo=deps["msg_repo"],
         )
 
         result = await provider.call_tool(

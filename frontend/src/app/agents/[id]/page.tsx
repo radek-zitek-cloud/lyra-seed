@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import { ConversationPanel, EventTimeline } from "@/components/AgentDetail";
 import { ConnectionStatus } from "@/components/ConnectionStatus";
 import { HITLPanel } from "@/components/HITLPanel";
+import { MessagePanel } from "@/components/MessagePanel";
 import { PromptInput } from "@/components/PromptInput";
 import { useEventStream } from "@/hooks/useEventStream";
 import {
@@ -14,7 +15,9 @@ import {
   fetchAgentConversations,
   fetchAgentCost,
   fetchAgentEvents,
+  fetchAgentMessages,
   respondHITL,
+  sendAgentMessage,
   sendPrompt,
 } from "@/lib/api";
 
@@ -38,6 +41,7 @@ export default function AgentPage() {
   const [events, setEvents] = useState<Record<string, unknown>[]>([]);
   const [cost, setCost] = useState<{ total_cost_usd: number; total_prompt_tokens: number; total_completion_tokens: number } | null>(null);
   const [children, setChildren] = useState<{ id: string; name: string; status: string }[]>([]);
+  const [agentMessages, setAgentMessages] = useState<Record<string, unknown>[]>([]);
   const [sending, setSending] = useState(false);
   const { events: liveEvents, connectionState, connect, disconnect } = useEventStream(agentId);
   const promptInFlight = useRef(false);
@@ -49,11 +53,13 @@ export default function AgentPage() {
       fetchAgentConversations(agentId),
       fetchAgentCost(agentId),
       fetchAgentChildren(agentId).catch(() => []),
+      fetchAgentMessages(agentId).catch(() => []),
     ]);
     setAgent(a);
     setEvents(evts);
     setCost(c);
     setChildren(ch);
+    setAgentMessages(msgs);
     if (convos.length > 0) setMessages(convos[0].messages);
   };
 
@@ -75,9 +81,17 @@ export default function AgentPage() {
     if (
       eventType === "hitl_request" ||
       eventType === "hitl_response" ||
-      eventType === "error"
+      eventType === "error" ||
+      eventType === "agent_complete"
     ) {
       fetchAgent(agentId).then(setAgent).catch(() => {});
+    }
+
+    if (
+      eventType === "message_sent" ||
+      eventType === "message_received"
+    ) {
+      fetchAgentMessages(agentId).then(setAgentMessages).catch(() => {});
     }
   }, [liveEvents, agentId]);
 
@@ -93,6 +107,12 @@ export default function AgentPage() {
         setSending(false);
         promptInFlight.current = false;
       });
+  };
+
+  const handleSendMessage = async (content: string, messageType: string) => {
+    await sendAgentMessage(agentId, content, messageType);
+    const msgs = await fetchAgentMessages(agentId);
+    setAgentMessages(msgs);
   };
 
   const handleHITLRespond = async (
@@ -235,6 +255,11 @@ export default function AgentPage() {
               onRespond={handleHITLRespond}
             />
           )}
+          <MessagePanel
+            messages={agentMessages as never}
+            currentAgentId={agentId}
+            onSend={handleSendMessage}
+          />
         </div>
 
         {/* Right column: event timeline */}

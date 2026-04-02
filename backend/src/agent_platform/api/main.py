@@ -13,6 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from agent_platform.api import _deps
 from agent_platform.api.macro_routes import router as macro_router
 from agent_platform.api.memory_routes import router as memory_router
+from agent_platform.api.message_routes import router as message_router
 from agent_platform.api.observation_routes import router as observation_router
 from agent_platform.api.routes import router
 from agent_platform.api.ws_routes import router as ws_router
@@ -27,6 +28,7 @@ from agent_platform.core.runtime import AgentRuntime
 from agent_platform.db.sqlite_agent_repo import SqliteAgentRepo
 from agent_platform.db.sqlite_conversation_repo import SqliteConversationRepo
 from agent_platform.db.sqlite_macro_repo import SqliteMacroRepo
+from agent_platform.db.sqlite_message_repo import SqliteMessageRepo
 from agent_platform.llm.openrouter import OpenRouterProvider
 from agent_platform.llm.openrouter_embeddings import OpenRouterEmbeddingProvider
 from agent_platform.memory.chroma_memory_store import ChromaMemoryStore
@@ -46,16 +48,24 @@ _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent.parent
 
 
 async def _shutdown(
-    event_bus, mcp_provider, agent_repo, conv_repo, macro_repo, *, has_mcp
+    event_bus,
+    mcp_provider,
+    agent_repo,
+    conv_repo,
+    macro_repo,
+    message_repo,
+    *,
+    has_mcp,
 ):
     """Shut down all resources. Called with a timeout wrapper."""
-    # Close event bus — unblocks SSE subscription iterators
     await event_bus.close()
     if has_mcp:
         await mcp_provider.close_all()
     await agent_repo.close()
     await conv_repo.close()
     await macro_repo.close()
+    if message_repo:
+        await message_repo.close()
 
 
 def create_app(
@@ -88,6 +98,7 @@ def create_app(
     agent_repo = SqliteAgentRepo(db_path)
     conv_repo = SqliteConversationRepo(db_path)
     macro_repo = SqliteMacroRepo(db_path)
+    message_repo = SqliteMessageRepo(db_path)
 
     # Configure retry defaults from platform config
     from agent_platform.llm.retry import configure as configure_retry
@@ -186,6 +197,7 @@ def create_app(
         system_prompt_resolver=prompt_resolver,
         agent_config_resolver=config_resolver,
         tool_registry=tool_registry,
+        message_repo=message_repo,
     )
     tool_registry.register_provider(agent_spawner)
 
@@ -197,6 +209,7 @@ def create_app(
         tool_registry=tool_registry,
         context_manager=context_manager,
         extractor=extractor,
+        message_repo=message_repo,
     )
 
     @asynccontextmanager
@@ -206,6 +219,7 @@ def create_app(
         await agent_repo.initialize()
         await conv_repo.initialize()
         await macro_repo.initialize()
+        await message_repo.initialize()
 
         # Load macros from DB into provider
         macros = await macro_repo.list()
@@ -244,8 +258,11 @@ def create_app(
             platform_config=platform_config,
             project_root=project_root,
             memory_store=memory_store,
+            message_repo=message_repo,
         )
         yield
+        # Shutdown — cancel running child agents
+        await agent_spawner.cancel_all_tasks()
         # Shutdown — with timeout to prevent hanging on reload
         logger.info("Shutting down...")
         try:
@@ -256,6 +273,7 @@ def create_app(
                     agent_repo,
                     conv_repo,
                     macro_repo,
+                    message_repo,
                     has_mcp=bool(platform_config.mcpServers),
                 ),
                 timeout=10.0,
@@ -283,6 +301,7 @@ def create_app(
     app.include_router(macro_router)
     app.include_router(observation_router)
     app.include_router(memory_router)
+    app.include_router(message_router)
     app.include_router(ws_router)
 
     @app.get("/health")
