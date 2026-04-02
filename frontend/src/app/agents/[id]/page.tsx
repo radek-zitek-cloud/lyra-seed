@@ -141,11 +141,27 @@ export default function AgentPage() {
   const agentName = String((agent as Record<string, unknown>).name ?? "Agent");
   const agentConfig = (agent as Record<string, unknown>).config as Record<string, unknown> | undefined;
   const agentModel = String(agentConfig?.model ?? "default");
+  const parentId = (agent as Record<string, unknown>).parent_agent_id as string | null;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       {/* Header row */}
       <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "4px", flexShrink: 0 }}>
+        {parentId && (
+          <a
+            href={`/agents/${parentId}`}
+            style={{
+              fontSize: "10px",
+              color: "#555",
+              textDecoration: "none",
+              border: "1px solid #222",
+              borderRadius: "2px",
+              padding: "1px 6px",
+            }}
+          >
+            &larr; PARENT
+          </a>
+        )}
         <span style={{ fontSize: "14px", fontWeight: 700, color: "#e0e0e0", letterSpacing: "1px" }}>
           {agentName}
         </span>
