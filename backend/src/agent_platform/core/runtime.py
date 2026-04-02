@@ -66,8 +66,14 @@ class AgentRuntime:
             )
 
         # Add human message
+        from datetime import UTC, datetime
+
         conversation.messages.append(
-            Message(role=MessageRole.HUMAN, content=human_message)
+            Message(
+                role=MessageRole.HUMAN,
+                content=human_message,
+                timestamp=datetime.now(UTC).isoformat(),
+            )
         )
 
         events_emitted = 0
@@ -172,6 +178,7 @@ class AgentRuntime:
                         Message(
                             role=MessageRole.ASSISTANT,
                             content=response.content or "",
+                            timestamp=datetime.now(UTC).isoformat(),
                         )
                     )
                     await self._conv_repo.update(conversation.id, conversation)
@@ -194,6 +201,7 @@ class AgentRuntime:
                         role=MessageRole.ASSISTANT,
                         content=response.content or "",
                         tool_calls=response.tool_calls,
+                        timestamp=datetime.now(UTC).isoformat(),
                     )
                 )
 
@@ -223,6 +231,7 @@ class AgentRuntime:
                                     content=f"Tool '{tool_call.name}' "
                                     "was denied by the human.",
                                     tool_call_id=tool_call.id,
+                                    timestamp=datetime.now(UTC).isoformat(),
                                 )
                             )
                             continue
@@ -281,6 +290,7 @@ class AgentRuntime:
                             role=MessageRole.TOOL_RESULT,
                             content=tool_result,
                             tool_call_id=tool_call.id,
+                            timestamp=datetime.now(UTC).isoformat(),
                         )
                     )
 

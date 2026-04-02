@@ -30,6 +30,7 @@ class Message(BaseModel):
     content: str | list[dict[str, Any]] = ""
     tool_calls: list[ToolCall] | None = None
     tool_call_id: str | None = None
+    timestamp: str | None = None
 
 
 class LLMResponse(BaseModel):
