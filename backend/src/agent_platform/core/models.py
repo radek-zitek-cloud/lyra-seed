@@ -84,3 +84,26 @@ class AgentResponse(BaseModel):
     content: str | None = None
     conversation_id: str | None = None
     events_emitted: int = 0
+
+
+class MessageType(StrEnum):
+    """Type of inter-agent message."""
+
+    TASK = "task"
+    RESULT = "result"
+    QUESTION = "question"
+    ANSWER = "answer"
+    GUIDANCE = "guidance"
+    STATUS_UPDATE = "status_update"
+
+
+class AgentMessage(BaseModel):
+    """A message between agents or from human to agent."""
+
+    id: str = Field(default_factory=lambda: str(uuid4()))
+    from_agent_id: str
+    to_agent_id: str
+    content: str
+    message_type: MessageType
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    in_reply_to: str | None = None
