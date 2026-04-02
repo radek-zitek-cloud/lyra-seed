@@ -275,9 +275,13 @@ class AgentRuntime:
                     # (always override — LLM may hallucinate the name instead of UUID)
                     call_args = dict(tool_call.arguments)
                     if tool_call.name in (
-                        "remember", "recall", "forget",
-                        "spawn_agent", "wait_for_agent",
-                        "get_agent_result", "list_child_agents",
+                        "remember",
+                        "recall",
+                        "forget",
+                        "spawn_agent",
+                        "wait_for_agent",
+                        "get_agent_result",
+                        "list_child_agents",
                     ):
                         call_args["agent_id"] = agent_id
 

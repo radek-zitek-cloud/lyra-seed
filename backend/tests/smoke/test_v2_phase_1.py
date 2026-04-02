@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from agent_platform.core.models import Agent, AgentConfig, AgentStatus
+from agent_platform.core.models import Agent, AgentConfig
 from agent_platform.db.sqlite_agent_repo import SqliteAgentRepo
 from agent_platform.db.sqlite_conversation_repo import SqliteConversationRepo
 from agent_platform.llm.models import LLMResponse
@@ -57,7 +57,7 @@ class TestV2Phase1:
 
     @pytest.mark.asyncio
     async def test_st_v2_1_1_spawn_agent_tool_schema(self, deps):
-        """ST-V2-1.1: AgentSpawnerProvider lists spawn_agent tool with correct schema."""
+        """ST-V2-1.1: AgentSpawnerProvider lists spawn_agent tool."""
         from agent_platform.tools.agent_spawner import AgentSpawnerProvider
 
         provider = AgentSpawnerProvider(
@@ -253,9 +253,7 @@ class TestV2Phase1:
             {"name": "child-b", "task": "Work B", "agent_id": parent.id},
         )
 
-        result = await provider.call_tool(
-            "list_child_agents", {"agent_id": parent.id}
-        )
+        result = await provider.call_tool("list_child_agents", {"agent_id": parent.id})
 
         assert result.success is True
         children = json.loads(result.output)
@@ -302,9 +300,7 @@ class TestV2Phase1:
                 transport=transport, base_url="http://test"
             ) as client:
                 # Create parent via API
-                resp = await client.post(
-                    "/agents", json={"name": "api-parent"}
-                )
+                resp = await client.post("/agents", json={"name": "api-parent"})
                 assert resp.status_code == 201
                 parent_id = resp.json()["id"]
 
@@ -387,9 +383,7 @@ class TestV2Phase1:
         ]
 
         child_llm = AsyncMock()
-        child_llm.complete.return_value = LLMResponse(
-            content="Child done.", usage={}
-        )
+        child_llm.complete.return_value = LLMResponse(content="Child done.", usage={})
 
         spawner = AgentSpawnerProvider(
             agent_repo=deps["agent_repo"],

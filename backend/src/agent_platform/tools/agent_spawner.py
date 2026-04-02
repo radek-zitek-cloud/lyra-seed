@@ -222,10 +222,12 @@ class AgentSpawnerProvider:
 
             return ToolResult(
                 success=True,
-                output=json.dumps({
-                    "child_agent_id": child.id,
-                    "content": response.content,
-                }),
+                output=json.dumps(
+                    {
+                        "child_agent_id": child.id,
+                        "content": response.content,
+                    }
+                ),
                 duration_ms=duration,
             )
         except Exception as e:
@@ -339,11 +341,13 @@ class AgentSpawnerProvider:
         duration = int((time.monotonic() - start) * 1000)
         return ToolResult(
             success=True,
-            output=json.dumps({
-                "child_agent_id": child.id,
-                "status": child.status.value,
-                "content": content,
-            }),
+            output=json.dumps(
+                {
+                    "child_agent_id": child.id,
+                    "status": child.status.value,
+                    "content": content,
+                }
+            ),
             duration_ms=duration,
         )
 
@@ -363,13 +367,15 @@ class AgentSpawnerProvider:
         duration = int((time.monotonic() - start) * 1000)
         return ToolResult(
             success=True,
-            output=json.dumps([
-                {
-                    "id": c.id,
-                    "name": c.name,
-                    "status": c.status.value,
-                }
-                for c in children
-            ]),
+            output=json.dumps(
+                [
+                    {
+                        "id": c.id,
+                        "name": c.name,
+                        "status": c.status.value,
+                    }
+                    for c in children
+                ]
+            ),
             duration_ms=duration,
         )

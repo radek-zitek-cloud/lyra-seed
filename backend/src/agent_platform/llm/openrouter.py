@@ -131,10 +131,7 @@ class OpenRouterProvider:
         _prompt_tok = _usage.get("prompt_tokens", 0) or 0
         _compl_tok = _usage.get("completion_tokens", 0) or 0
         _in_rate, _out_rate = _get_cost_per_million(config.model)
-        _cost = (
-            _prompt_tok / 1_000_000 * _in_rate
-            + _compl_tok / 1_000_000 * _out_rate
-        )
+        _cost = _prompt_tok / 1_000_000 * _in_rate + _compl_tok / 1_000_000 * _out_rate
 
         # Emit LLM_RESPONSE event
         if self._event_bus:

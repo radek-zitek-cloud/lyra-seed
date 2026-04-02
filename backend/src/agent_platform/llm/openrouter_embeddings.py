@@ -131,7 +131,7 @@ class OpenRouterEmbeddingProvider:
         embeddings = self._parse_embeddings(data)
         usage = data.get("usage", {})
 
-        prompt_tok = (usage.get("prompt_tokens", 0) or 0)
+        prompt_tok = usage.get("prompt_tokens", 0) or 0
         in_rate, out_rate = _get_cost_per_million(self._model)
         cost = prompt_tok / 1_000_000 * in_rate
 
@@ -210,7 +210,7 @@ class OpenRouterEmbeddingProvider:
         embeddings = self._parse_embeddings(data)
         usage = data.get("usage", {})
 
-        prompt_tok = (usage.get("prompt_tokens", 0) or 0)
+        prompt_tok = usage.get("prompt_tokens", 0) or 0
         in_rate, _out_rate = _get_cost_per_million(self._model)
         cost = prompt_tok / 1_000_000 * in_rate
 
