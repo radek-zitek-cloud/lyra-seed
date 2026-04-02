@@ -290,7 +290,7 @@ just dev-frontend     # Frontend only (port 3000)
 
 # Testing
 just test             # All backend tests
-just smoke-test       # All smoke tests (45 tests)
+just smoke-test       # All smoke tests (55 tests)
 just lint             # Ruff linter
 just format           # Ruff formatter
 
@@ -298,3 +298,87 @@ just format           # Ruff formatter
 cp .env.example .env  # Add your LYRA_OPENROUTER_API_KEY
 # Edit lyra.config.json for MCP servers, models, prompts dir
 ```
+
+---
+
+## 11. Phase 6: Pre-V2 Hardening
+
+Phase 6 was added after the initial V1 report to harden the platform before V2 multi-agent work. **55/55 smoke tests pass** (45 original + 10 new).
+
+### 11.1 LLM Retry with Exponential Backoff
+
+**Files:** `llm/retry.py` (new), `llm/openrouter.py`, `llm/openrouter_embeddings.py`
+
+- `async_retry` and `sync_retry` helpers with configurable `max_retries=3`, `base_delay=1.0`, `max_delay=30.0`
+- Retries on HTTP 429 (rate limit), 502/503/504 (gateway errors), and `httpx.TimeoutException`
+- Exponential backoff with jitter to avoid thundering herd
+- Both OpenRouterProvider and OpenRouterEmbeddingProvider now use retry
+- Timeout configuration: 60s read, 10s connect on all httpx clients
+
+### 11.2 Agent Lifecycle: HITL Timeout + Stuck Agent Cleanup
+
+**Files:** `core/models.py`, `core/runtime.py`, `api/main.py`
+
+- `AgentConfig.hitl_timeout_seconds: float = 300` — configurable per-agent HITL gate timeout
+- On timeout: agent status set to IDLE (not FAILED — human didn't respond, not a system error), HITL_RESPONSE event emitted with `timed_out: True`, tool call treated as denied
+- `AgentRuntime.cleanup_stuck_agents()` — called on startup, resets any agents stuck in RUNNING or WAITING_HITL to IDLE (crash recovery)
+
+### 11.3 Memory Garbage Collection
+
+**Files:** `memory/chroma_memory_store.py`, `core/runtime.py`
+
+- `TimeDecayStrategy` (existed since Phase 4) now wired into `ChromaMemoryStore.update_access()` — decay scores recomputed on every memory access
+- `ChromaMemoryStore.prune(agent_id, threshold=0.1, max_entries=500)`:
+  - Recomputes all decay scores for the agent
+  - Deletes entries with decay_score below threshold
+  - Enforces max_entries limit by removing lowest-scored entries
+  - Returns count of deleted entries
+- Called automatically after each successful agent run via `AgentRuntime._prune_memories()`
+- MEMORY_WRITE event emitted with `action: gc_prune` when entries are pruned
+
+### 11.4 Context Compression: Token Estimation + Truncation
+
+**Files:** `memory/token_estimator.py` (new), `memory/context_manager.py`
+
+- `estimate_tokens(text)` — heuristic `len(text) // 4` (~4 chars per token for English)
+- `estimate_messages_tokens(messages)` — sum + 4 tokens per-message overhead
+- `ContextManager.max_context_tokens = 100_000` — configurable token budget
+- Sliding window truncation: when over budget, removes oldest non-system messages while preserving system prompts and the current query
+- Inserts `[Earlier conversation history truncated for context limits]` marker when truncation occurs
+
+### 11.5 Cost Tracking
+
+**Files:** `observation/cost_tracker.py` (new), `api/observation_routes.py`
+
+- `MODEL_COSTS` lookup table with pricing for common OpenAI and Anthropic models, plus a default fallback
+- `compute_agent_cost(event_bus, agent_id)` — aggregates `prompt_tokens` and `completion_tokens` from all LLM_RESPONSE events for an agent, applies model-specific pricing
+- `compute_total_cost(event_bus)` — same across all agents
+- Returns: `total_prompt_tokens`, `total_completion_tokens`, `total_cost_usd`, `by_model` breakdown (tokens, cost, call count per model)
+- API endpoints: `GET /agents/{agent_id}/cost` and `GET /cost`
+
+### 11.6 Updated Phase Status
+
+| Phase | Title | Smoke Tests |
+|-------|-------|-------------|
+| V1 Phase 0 | Project Skeleton & Tooling | 5/5 |
+| V1 Phase 1 | Abstractions & Event System | 9/9 |
+| V1 Phase 2 | Agent Runtime | 9/9 |
+| V1 Phase 3 | Tool System | 7/7 |
+| V1 Phase 4 | Memory System | 7/7 |
+| V1 Phase 5 | Observation UI | 8/8 |
+| V1 Phase 6 | Pre-V2 Hardening | 10/10 |
+| **Total** | | **55/55** |
+
+### 11.7 Previously Missing Items — Status After Phase 6
+
+| Feature | Before Phase 6 | After Phase 6 |
+|---------|---------------|---------------|
+| LLM retry with backoff | Not implemented | Done — async + sync retry, exponential backoff |
+| Memory garbage collection | TimeDecayStrategy existed but unused | Done — wired, prune after each run |
+| Cost tracking | Usage in events but no aggregation | Done — API endpoints with model pricing |
+| HITL timeout | Could hang indefinitely | Done — configurable timeout, defaults 5min |
+| Stuck agent recovery | No crash recovery | Done — cleanup on startup |
+| Context compression | No token budget | Done — estimation + sliding window truncation |
+| Embedding caching | Not implemented | Still not implemented (low priority) |
+| Docker deployment | Not implemented | Still not implemented |
+| Database migrations | Auto-create schemas | Deferred — CREATE TABLE IF NOT EXISTS sufficient for now |
