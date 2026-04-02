@@ -84,6 +84,8 @@ class AgentRuntime:
                 agent_id=agent_id,
                 messages=conversation.messages,
                 query=human_message,
+                top_k=agent.config.memory_top_k,
+                max_context_tokens=agent.config.max_context_tokens,
             )
             await self._event_bus.emit(
                 Event(
@@ -195,7 +197,7 @@ class AgentRuntime:
                     await self._agent_repo.update(agent.id, agent)
 
                     # Prune stale memories after successful run
-                    await self._prune_memories(agent_id)
+                    await self._prune_memories(agent_id, agent.config)
 
                     return AgentResponse(
                         agent_id=agent_id,
@@ -446,15 +448,21 @@ class AgentRuntime:
         if emb_fn is not None and hasattr(emb_fn, "set_agent_id"):
             emb_fn.set_agent_id(agent_id)
 
-    async def _prune_memories(self, agent_id: str) -> None:
+    async def _prune_memories(
+        self, agent_id: str, agent_config: object | None = None
+    ) -> None:
         """Prune stale memories after a successful agent run."""
         if self._context_manager is None:
             return
         store = getattr(self._context_manager, "_store", None)
         if store is None or not hasattr(store, "prune"):
             return
+        threshold = getattr(agent_config, "prune_threshold", 0.1)
+        max_entries = getattr(agent_config, "prune_max_entries", 500)
         try:
-            deleted = await store.prune(agent_id)
+            deleted = await store.prune(
+                agent_id, threshold=threshold, max_entries=max_entries
+            )
             if deleted > 0:
                 await self._event_bus.emit(
                     Event(

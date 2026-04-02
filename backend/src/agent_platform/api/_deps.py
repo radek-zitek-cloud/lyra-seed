@@ -5,6 +5,7 @@ This avoids circular imports between routes and main.
 """
 
 from collections.abc import Callable
+from typing import Any
 
 from agent_platform.core.runtime import AgentRuntime
 from agent_platform.db.sqlite_agent_repo import SqliteAgentRepo
@@ -24,6 +25,7 @@ _tool_registry: ToolRegistry | None = None
 _system_prompt_resolver: Callable[[str], str] | None = None
 _agent_config_resolver: Callable | None = None
 _default_model: str | None = None
+_platform_config: Any = None
 
 
 def configure(
@@ -37,10 +39,12 @@ def configure(
     system_prompt_resolver: Callable[[str], str] | None = None,
     agent_config_resolver: Callable | None = None,
     default_model: str | None = None,
+    platform_config: Any = None,
 ) -> None:
     global _agent_repo, _conversation_repo, _event_bus, _runtime
     global _macro_repo, _macro_provider, _tool_registry
     global _system_prompt_resolver, _agent_config_resolver, _default_model
+    global _platform_config
     _agent_repo = agent_repo
     _conversation_repo = conversation_repo
     _event_bus = event_bus
@@ -51,6 +55,7 @@ def configure(
     _system_prompt_resolver = system_prompt_resolver
     _agent_config_resolver = agent_config_resolver
     _default_model = default_model
+    _platform_config = platform_config
 
 
 def get_agent_repo() -> SqliteAgentRepo:
@@ -100,3 +105,7 @@ def get_agent_config_resolver() -> Callable:
 
 def get_default_model() -> str:
     return _default_model or "openai/gpt-4.1-mini"
+
+
+def get_platform_config():
+    return _platform_config

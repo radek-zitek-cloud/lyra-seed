@@ -34,6 +34,26 @@ class RetryConfig(BaseModel):
     timeout: float = 60.0
 
 
+class HITLConfig(BaseModel):
+    """HITL gate configuration."""
+
+    timeout_seconds: float = 300
+
+
+class MemoryGCConfig(BaseModel):
+    """Memory garbage collection configuration."""
+
+    prune_threshold: float = 0.1
+    max_entries: int = 500
+
+
+class ContextConfig(BaseModel):
+    """Context compression configuration."""
+
+    max_tokens: int = 100_000
+    memory_top_k: int = 5
+
+
 class MCPServerConfig(BaseModel):
     """Configuration for a single MCP server."""
 
@@ -53,6 +73,9 @@ class PlatformConfig(BaseModel):
     modelCosts: dict[str, list[float]] = Field(default_factory=dict)
     defaultModelCost: list[float] = Field(default_factory=lambda: [1.0, 4.0])
     retry: RetryConfig = Field(default_factory=RetryConfig)
+    hitl: HITLConfig = Field(default_factory=HITLConfig)
+    memoryGC: MemoryGCConfig = Field(default_factory=MemoryGCConfig)
+    context: ContextConfig = Field(default_factory=ContextConfig)
 
 
 def load_platform_config(project_root: Path) -> PlatformConfig:
@@ -91,6 +114,9 @@ class AgentFileConfig(BaseModel):
     temperature: float | None = None
     max_iterations: int | None = None
     retry: RetryConfig | None = None
+    hitl: HITLConfig | None = None
+    memoryGC: MemoryGCConfig | None = None
+    context: ContextConfig | None = None
 
 
 def _sanitize_name(agent_name: str) -> str:

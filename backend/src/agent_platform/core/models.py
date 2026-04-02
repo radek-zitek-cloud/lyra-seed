@@ -47,6 +47,10 @@ class AgentConfig(BaseModel):
     hitl_policy: HITLPolicy = HITLPolicy.NEVER
     hitl_timeout_seconds: float = 300
     retry: AgentRetryConfig = Field(default_factory=AgentRetryConfig)
+    prune_threshold: float = 0.1
+    prune_max_entries: int = 500
+    max_context_tokens: int = 100_000
+    memory_top_k: int = 5
 
 
 class Agent(BaseModel):

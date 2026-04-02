@@ -35,6 +35,7 @@ async def create_agent(req: CreateAgentRequest):
         get_agent_config_resolver,
         get_agent_repo,
         get_default_model,
+        get_platform_config,
         get_system_prompt_resolver,
     )
 
@@ -69,6 +70,33 @@ async def create_agent(req: CreateAgentRequest):
             max_delay=file_config.retry.max_delay,
             timeout=file_config.retry.timeout,
         )
+
+    if file_config.hitl is not None:
+        config.hitl_timeout_seconds = file_config.hitl.timeout_seconds
+
+    if file_config.memoryGC is not None:
+        config.prune_threshold = file_config.memoryGC.prune_threshold
+        config.prune_max_entries = file_config.memoryGC.max_entries
+
+    if file_config.context is not None:
+        config.max_context_tokens = file_config.context.max_tokens
+        config.memory_top_k = file_config.context.memory_top_k
+
+    # Apply platform defaults for fields not set by file config
+    pc = get_platform_config()
+    if pc:
+        d = AgentConfig()
+        if config.hitl_timeout_seconds == d.hitl_timeout_seconds:
+            if file_config.hitl is None:
+                config.hitl_timeout_seconds = pc.hitl.timeout_seconds
+        if config.prune_threshold == d.prune_threshold:
+            if file_config.memoryGC is None:
+                config.prune_threshold = pc.memoryGC.prune_threshold
+                config.prune_max_entries = pc.memoryGC.max_entries
+        if config.max_context_tokens == d.max_context_tokens:
+            if file_config.context is None:
+                config.max_context_tokens = pc.context.max_tokens
+                config.memory_top_k = pc.context.memory_top_k
 
     # Apply system prompt from name.md
     if config.system_prompt == AgentConfig().system_prompt:

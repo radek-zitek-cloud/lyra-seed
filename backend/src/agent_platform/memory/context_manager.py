@@ -26,12 +26,23 @@ class ContextManager:
         agent_id: str,
         messages: list[Message],
         query: str,
+        top_k: int | None = None,
+        max_context_tokens: int | None = None,
     ) -> list[Message]:
-        """Assemble messages with memory injection and truncation."""
+        """Assemble messages with memory injection and truncation.
+
+        Per-call overrides take precedence over constructor defaults.
+        """
+        _top_k = top_k if top_k is not None else self._top_k
+        _max_tokens = (
+            max_context_tokens
+            if max_context_tokens is not None
+            else self._max_context_tokens
+        )
         memories = await self._store.search(
             query=query,
             agent_id=agent_id,
-            top_k=self._top_k,
+            top_k=_top_k,
         )
 
         if not memories:
@@ -66,12 +77,15 @@ class ContextManager:
             result.insert(insert_idx, memory_msg)
 
         # Truncate if over token budget
-        return self._truncate(result)
+        return self._truncate(result, _max_tokens)
 
-    def _truncate(self, messages: list[Message]) -> list[Message]:
+    def _truncate(
+        self, messages: list[Message], max_tokens: int | None = None
+    ) -> list[Message]:
         """Remove oldest non-system messages if over token budget."""
+        budget = max_tokens if max_tokens is not None else self._max_context_tokens
         tokens = estimate_messages_tokens(messages)
-        if tokens <= self._max_context_tokens:
+        if tokens <= budget:
             return messages
 
         # Keep system messages and the last message (current query)
@@ -79,10 +93,7 @@ class ContextManager:
         result = list(messages)
         truncated = False
 
-        while (
-            estimate_messages_tokens(result) > self._max_context_tokens
-            and len(result) > 2
-        ):
+        while estimate_messages_tokens(result) > budget and len(result) > 2:
             # Find the first non-system message that isn't the last
             for i in range(len(result) - 1):
                 if result[i].role != MessageRole.SYSTEM:

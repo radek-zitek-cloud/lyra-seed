@@ -478,3 +478,47 @@ For the smoke-test-driven loop to work, the codebase must satisfy these structur
 | Frontend test file       | `smoke.v{version}-phase-{number}.spec.ts`              | `smoke.v1-phase-5.spec.ts`      |
 | Justfile recipe          | `smoke-test-phase v1-phase-0`                           |                                  |
 | Status values            | `NOT STARTED`, `IN PROGRESS`, `COMPLETE`, `BLOCKED`    |                                  |
+
+---
+
+## 11. Agent Configuration Resolution Pattern
+
+All configurable agent parameters follow a **four-level resolution chain**. Most specific wins:
+
+```
+prompts/{agent-name}.json   →  per-agent override
+prompts/default.json        →  default for all agents
+lyra.config.json            →  platform-wide config
+hardcoded defaults          →  fallback in Pydantic models
+```
+
+### Resolution flow
+
+1. Agent is created via `POST /agents` with a name
+2. `resolve_agent_config(name)` checks `prompts/{name}.json`, falls back to `prompts/default.json`
+3. File config fields override `AgentConfig` defaults
+4. For fields not set by file config, `PlatformConfig` values from `lyra.config.json` are applied
+5. Any remaining fields use hardcoded Pydantic defaults
+
+### Configuration sections
+
+| Section | Platform (`lyra.config.json`) | Agent file (`{name}.json`) | `AgentConfig` field |
+|---------|-------------------------------|---------------------------|---------------------|
+| **Retry** | `retry: {max_retries, base_delay, max_delay, timeout}` | `retry: {...}` | `retry: AgentRetryConfig` |
+| **HITL** | `hitl: {timeout_seconds}` | `hitl: {timeout_seconds}` | `hitl_timeout_seconds` |
+| **Memory GC** | `memoryGC: {prune_threshold, max_entries}` | `memoryGC: {...}` | `prune_threshold`, `prune_max_entries` |
+| **Context** | `context: {max_tokens, memory_top_k}` | `context: {...}` | `max_context_tokens`, `memory_top_k` |
+| **Model** | `defaultModel` | `model` | `model` |
+| **Temperature** | — | `temperature` | `temperature` |
+| **Iterations** | — | `max_iterations` | `max_iterations` |
+| **HITL Policy** | — | `hitl_policy` | `hitl_policy` |
+
+### Adding a new configurable parameter
+
+1. Add a config model to `platform_config.py` (e.g. `class NewConfig(BaseModel)`)
+2. Add it to `PlatformConfig` with a default
+3. Add it to `AgentFileConfig` as optional (`NewConfig | None = None`)
+4. Add the resolved field to `AgentConfig` in `models.py`
+5. Apply it in `routes.py`: file override → platform fallback → hardcoded default
+6. Use it from `agent.config.field_name` in the runtime
+7. Add to `lyra.config.json`, `lyra.config.example.json`, and `prompts/default.json`

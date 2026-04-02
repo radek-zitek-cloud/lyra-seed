@@ -37,5 +37,19 @@
     "base_delay": 1.0,
     "max_delay": 30.0,
     "timeout": 60.0
+  },
+
+  "hitl": {
+    "timeout_seconds": 300
+  },
+
+  "memoryGC": {
+    "prune_threshold": 0.1,
+    "max_entries": 500
+  },
+
+  "context": {
+    "max_tokens": 100000,
+    "memory_top_k": 5
   }
 }
