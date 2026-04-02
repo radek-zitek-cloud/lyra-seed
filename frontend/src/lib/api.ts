@@ -82,6 +82,12 @@ export async function respondHITL(
   return res.json();
 }
 
+export async function fetchAgentChildren(id: string) {
+  const res = await fetch(`${API_BASE}/agents/${id}/children`);
+  if (!res.ok) throw new Error("Failed to fetch children");
+  return res.json();
+}
+
 export async function fetchAgentCost(id: string) {
   const res = await fetch(`${API_BASE}/agents/${id}/cost`);
   if (!res.ok) throw new Error("Failed to fetch agent cost");

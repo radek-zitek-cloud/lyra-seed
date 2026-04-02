@@ -10,6 +10,7 @@ import { PromptInput } from "@/components/PromptInput";
 import { useEventStream } from "@/hooks/useEventStream";
 import {
   fetchAgent,
+  fetchAgentChildren,
   fetchAgentConversations,
   fetchAgentCost,
   fetchAgentEvents,
@@ -36,20 +37,23 @@ export default function AgentPage() {
   >([]);
   const [events, setEvents] = useState<Record<string, unknown>[]>([]);
   const [cost, setCost] = useState<{ total_cost_usd: number; total_prompt_tokens: number; total_completion_tokens: number } | null>(null);
+  const [children, setChildren] = useState<{ id: string; name: string; status: string }[]>([]);
   const [sending, setSending] = useState(false);
   const { events: liveEvents, connectionState, connect, disconnect } = useEventStream(agentId);
   const promptInFlight = useRef(false);
 
   const refreshAll = async () => {
-    const [a, evts, convos, c] = await Promise.all([
+    const [a, evts, convos, c, ch] = await Promise.all([
       fetchAgent(agentId),
       fetchAgentEvents(agentId),
       fetchAgentConversations(agentId),
       fetchAgentCost(agentId),
+      fetchAgentChildren(agentId).catch(() => []),
     ]);
     setAgent(a);
     setEvents(evts);
     setCost(c);
+    setChildren(ch);
     if (convos.length > 0) setMessages(convos[0].messages);
   };
 
@@ -169,6 +173,55 @@ export default function AgentPage() {
           <ConnectionStatus state={connectionState} onConnect={connect} onDisconnect={disconnect} />
         </span>
       </div>
+
+      {/* Child agents */}
+      {children.length > 0 && (
+        <div style={{
+          background: "#111",
+          border: "1px solid #1a1a1a",
+          borderRadius: "3px",
+          padding: "6px",
+          marginBottom: "6px",
+          flexShrink: 0,
+        }}>
+          <div style={{ fontSize: "11px", fontWeight: 700, color: "#888", letterSpacing: "1px", marginBottom: "4px" }}>
+            SUB-AGENTS
+          </div>
+          <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+            {children.map((ch) => {
+              const chStatus = STATUS_STYLES[ch.status] ?? DEFAULT_STATUS;
+              return (
+                <a
+                  key={ch.id}
+                  href={`/agents/${ch.id}`}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    padding: "3px 8px",
+                    background: "#0a0a0a",
+                    border: "1px solid #222",
+                    borderRadius: "2px",
+                    textDecoration: "none",
+                    fontSize: "11px",
+                  }}
+                >
+                  <span style={{ color: "#e0e0e0", fontWeight: 700 }}>{ch.name}</span>
+                  <span style={{
+                    fontSize: "10px",
+                    fontWeight: 700,
+                    color: chStatus.color,
+                    letterSpacing: "0.5px",
+                    animation: ch.status === "running" ? "pulse-glow 1.5s ease-in-out infinite" : "none",
+                  }}>
+                    {ch.status}
+                  </span>
+                </a>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Two-column layout filling viewport */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px", flex: 1, minHeight: 0 }}>
