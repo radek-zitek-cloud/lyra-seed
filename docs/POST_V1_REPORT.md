@@ -382,3 +382,111 @@ Phase 6 was added after the initial V1 report to harden the platform before V2 m
 | Embedding caching | Not implemented | Still not implemented (low priority) |
 | Docker deployment | Not implemented | Still not implemented |
 | Database migrations | Auto-create schemas | Deferred — CREATE TABLE IF NOT EXISTS sufficient for now |
+
+---
+
+## 12. Phase 7: Memory Enhancement
+
+Phase 7 upgraded the memory system with LLM-based summarization, automatic fact extraction, and cross-agent memory sharing. **70/70 smoke tests pass** (55 previous + 15 new).
+
+### 12.1 Cross-Agent Memory with Visibility Model
+
+**Files:** `memory/models.py`, `memory/chroma_memory_store.py`, `memory/memory_tools.py`
+
+- `MemoryVisibility` enum: PRIVATE, TEAM, PUBLIC, INHERIT
+  - PRIVATE: only the owning agent can see the memory
+  - PUBLIC: visible to all agents via cross-agent search
+  - TEAM: resolves to PUBLIC until V2 adds parent-child agent hierarchy
+  - INHERIT: reserved for V2
+- `MemoryEntry.visibility` field (default PRIVATE, backward compatible with existing entries)
+- Default visibility by memory type:
+  - **PUBLIC**: FACT, PROCEDURE, TOOL_KNOWLEDGE, DOMAIN_KNOWLEDGE (shared knowledge)
+  - **PRIVATE**: EPISODIC, PREFERENCE, DECISION, OUTCOME (agent-specific)
+- `ChromaMemoryStore.search(include_public=True)` uses ChromaDB `$or` filter: `[{agent_id: own}, {visibility: public}, {visibility: team}]`
+- `remember` tool accepts explicit `visibility` parameter; `recall` tool defaults to `include_public=True`
+- Context injection (`ContextManager.assemble()`) now includes PUBLIC memories from other agents, marked as `[shared]` in the injection message
+
+### 12.2 Context Summarization (Replaces Truncation)
+
+**Files:** `memory/summarizer.py` (new), `memory/context_manager.py`, `prompts/system/summarize.md` (new)
+
+- `ContextSummarizer(llm_provider, summary_model, system_prompt)` — calls LLM to summarize messages that would otherwise be dropped
+- When the conversation exceeds the token budget:
+  1. Identifies oldest non-system messages to remove (same logic as previous truncation)
+  2. If `llm_provider` is configured: calls LLM to summarize the dropped messages
+  3. Saves the summary as an EPISODIC memory in ChromaDB (importance=0.6, visibility=PRIVATE)
+  4. Injects `[Summary of N earlier messages: ...]` as a system message
+  5. If no LLM provider: falls back to old `[Earlier conversation truncated]` marker (backward compatible)
+- Configurable `summaryModel` per agent (defaults to cheap model like `gpt-4.1-nano`)
+- System prompt loaded from `prompts/system/summarize.md` — editable without code changes
+
+### 12.3 Automatic Fact Extraction
+
+**Files:** `memory/extractor.py` (new), `core/runtime.py`, `prompts/system/extract_facts.md` (new)
+
+- `FactExtractor(llm_provider, extraction_model, memory_store, event_bus, system_prompt)` — after each agent turn, extracts facts/preferences/decisions from the response
+- Extraction flow:
+  1. After the agent produces a final response (no tool calls), if `auto_extract=True`
+  2. Sends the last 6 messages + assistant response to the extraction LLM
+  3. LLM returns JSON array: `[{content, memory_type, importance}]`
+  4. Each item is stored as a `MemoryEntry` with visibility from `memory_sharing` config
+  5. `MEMORY_WRITE` events emitted with `source: auto_extract`
+  6. Failures are silently caught — extraction never breaks the agent run
+- Configurable `extractionModel` per agent (separate from summary model)
+- System prompt loaded from `prompts/system/extract_facts.md`
+- Toggleable per agent via `auto_extract: bool` in config
+
+### 12.4 Externalized System Prompts
+
+**Files:** `prompts/system/summarize.md`, `prompts/system/extract_facts.md`, `core/platform_config.py`
+
+- All internal LLM prompts (summarization, extraction) stored as editable `.md` files in `prompts/system/`
+- `load_system_prompt(name, project_root)` helper loads `prompts/system/{name}.md`, returns `None` if missing (falls back to hardcoded default)
+- Loaded once on app startup, passed to `ContextSummarizer` and `FactExtractor` at construction
+- Version-controllable, editable without touching Python code
+
+### 12.5 Configuration
+
+All new parameters follow the standard four-level resolution chain (documented in DEVELOPMENT_METHODOLOGY.md §11):
+
+| Parameter | `lyra.config.json` | `prompts/default.json` | `prompts/{name}.json` | Hardcoded |
+|---|---|---|---|---|
+| `summaryModel` | platform default | per-agent default | per-agent override | `openai/gpt-4.1-nano` |
+| `extractionModel` | platform default | per-agent default | per-agent override | `openai/gpt-4.1-nano` |
+| `auto_extract` | — | `true` | per-agent override | `false` |
+| `memory_sharing` | — | type→visibility map | per-agent override | DEFAULT_VISIBILITY dict |
+
+### 12.6 Updated Memory Layer Definitions
+
+| Layer | Scope | Storage | Key Feature |
+|-------|-------|---------|-------------|
+| **Context** | Single conversation | In-memory messages | LLM summarization when over token budget; summaries saved as EPISODIC memories |
+| **Cross-context** | Per agent, across sessions | ChromaDB (PRIVATE) | Autobiographical: EPISODIC, PREFERENCE, DECISION, OUTCOME. Auto-extracted after each turn. |
+| **Cross-agent** | All agents | ChromaDB (PUBLIC) | Shared knowledge: FACT, PROCEDURE, TOOL_KNOWLEDGE, DOMAIN_KNOWLEDGE. Visible to all agents via `include_public` search. |
+
+### 12.7 Updated Phase Status
+
+| Phase | Title | Smoke Tests |
+|-------|-------|-------------|
+| V1 Phase 0 | Project Skeleton & Tooling | 5/5 |
+| V1 Phase 1 | Abstractions & Event System | 9/9 |
+| V1 Phase 2 | Agent Runtime | 9/9 |
+| V1 Phase 3 | Tool System | 7/7 |
+| V1 Phase 4 | Memory System | 7/7 |
+| V1 Phase 5 | Observation UI | 8/8 |
+| V1 Phase 6 | Pre-V2 Hardening | 10/10 |
+| V1 Phase 7 | Memory Enhancement | 15/15 |
+| **Total** | | **70/70** |
+
+### 12.8 Previously Missing Items — Status After Phase 7
+
+| Feature | Before Phase 7 | After Phase 7 |
+|---------|---------------|---------------|
+| Context summarization | Simple truncation (drop old messages) | Done — LLM summarization, summaries saved as memories |
+| Auto session summaries | Not implemented | Done — automatic fact extraction after each turn |
+| Cross-agent memory | All memories agent-siloed | Done — PUBLIC visibility for knowledge types |
+| Memory visibility model | No visibility concept | Done — PRIVATE/TEAM/PUBLIC/INHERIT enum |
+| Externalized prompts | Prompts hardcoded in Python | Done — `prompts/system/*.md` files |
+| Embedding caching | Not implemented | Still not implemented (low priority) |
+| Docker deployment | Not implemented | Still not implemented |
+| RAG | Not implemented | Deferred to V2/V4 |
