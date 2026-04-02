@@ -1,4 +1,5 @@
 {
+  "dataDir": "./data",
   "mcpServers": {
     "filesystem": {
       "command": "npx",

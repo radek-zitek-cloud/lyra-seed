@@ -38,6 +38,7 @@ class SqliteEventStore:
     async def initialize(self) -> None:
         """Create the events table if it doesn't exist."""
         self._db = await aiosqlite.connect(self._db_path)
+        await self._db.execute("PRAGMA journal_mode=WAL")
         await self._db.execute(CREATE_TABLE_SQL)
         for idx_sql in CREATE_INDEXES_SQL:
             await self._db.execute(idx_sql)

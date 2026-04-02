@@ -29,6 +29,7 @@ class SqliteAgentRepo:
 
     async def initialize(self) -> None:
         self._db = await aiosqlite.connect(self._db_path)
+        await self._db.execute("PRAGMA journal_mode=WAL")
         await self._db.execute(CREATE_TABLE_SQL)
         await self._db.commit()
 

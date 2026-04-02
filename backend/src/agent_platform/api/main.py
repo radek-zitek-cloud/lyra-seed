@@ -26,6 +26,9 @@ from agent_platform.db.sqlite_agent_repo import SqliteAgentRepo
 from agent_platform.db.sqlite_conversation_repo import SqliteConversationRepo
 from agent_platform.db.sqlite_macro_repo import SqliteMacroRepo
 from agent_platform.llm.openrouter import OpenRouterProvider
+from agent_platform.memory.chroma_memory_store import ChromaMemoryStore
+from agent_platform.memory.context_manager import ContextManager
+from agent_platform.memory.memory_tools import MemoryToolProvider
 from agent_platform.observation.in_process_event_bus import InProcessEventBus
 from agent_platform.tools.mcp_client import MCPClientProvider, MCPStdioClient
 from agent_platform.tools.prompt_macro import PromptMacroProvider
@@ -59,19 +62,27 @@ def create_app(
     if settings is None:
         settings = Settings()
 
-    if db_dir is None:
-        db_dir = os.path.dirname(settings.db_path) or "."
-
     if project_root is None:
         project_root = _PROJECT_ROOT
 
     # Load platform config (lyra.config.json)
     platform_config = load_platform_config(project_root)
 
-    event_bus = InProcessEventBus(db_path=os.path.join(db_dir, "events.db"))
-    agent_repo = SqliteAgentRepo(os.path.join(db_dir, "agents.db"))
-    conv_repo = SqliteConversationRepo(os.path.join(db_dir, "conversations.db"))
-    macro_repo = SqliteMacroRepo(os.path.join(db_dir, "macros.db"))
+    # Resolve data directory
+    if db_dir is None:
+        data_dir_cfg = Path(platform_config.dataDir)
+        if not data_dir_cfg.is_absolute():
+            data_dir_cfg = project_root / data_dir_cfg
+        db_dir = str(data_dir_cfg)
+    os.makedirs(db_dir, exist_ok=True)
+
+    # Single consolidated database
+    db_path = os.path.join(db_dir, "lyra.db")
+
+    event_bus = InProcessEventBus(db_path=db_path)
+    agent_repo = SqliteAgentRepo(db_path)
+    conv_repo = SqliteConversationRepo(db_path)
+    macro_repo = SqliteMacroRepo(db_path)
 
     llm_provider = OpenRouterProvider(
         api_key=settings.openrouter_api_key.get_secret_value(),
@@ -97,6 +108,14 @@ def create_app(
     if platform_config.mcpServers:
         tool_registry.register_provider(mcp_provider)
 
+    # Memory system
+    memory_dir = os.path.join(db_dir, "memory")
+    os.makedirs(memory_dir, exist_ok=True)
+    memory_store = ChromaMemoryStore(persist_dir=memory_dir)
+    memory_provider = MemoryToolProvider(memory_store=memory_store, event_bus=event_bus)
+    tool_registry.register_provider(memory_provider)
+    context_manager = ContextManager(memory_store=memory_store, top_k=5)
+
     # System prompt resolver
     prompt_resolver = partial(
         resolve_system_prompt,
@@ -116,6 +135,7 @@ def create_app(
         llm_provider=llm_provider,
         event_bus=event_bus,
         tool_registry=tool_registry,
+        context_manager=context_manager,
     )
 
     @asynccontextmanager

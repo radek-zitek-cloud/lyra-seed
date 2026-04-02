@@ -1,4 +1,5 @@
 {
+  "dataDir": "./data",
   "defaultModel": "openai/gpt-4.1-mini",
   "mcpServers": {
     "filesystem": {
