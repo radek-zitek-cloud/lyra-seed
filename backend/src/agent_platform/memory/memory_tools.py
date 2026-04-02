@@ -5,7 +5,12 @@ import time
 from typing import Any
 
 from agent_platform.memory.chroma_memory_store import ChromaMemoryStore
-from agent_platform.memory.models import MemoryEntry, MemoryType
+from agent_platform.memory.models import (
+    DEFAULT_VISIBILITY,
+    MemoryEntry,
+    MemoryType,
+    MemoryVisibility,
+)
 from agent_platform.observation.events import Event, EventType
 from agent_platform.observation.in_process_event_bus import InProcessEventBus
 from agent_platform.tools.models import Tool, ToolResult, ToolType
@@ -47,6 +52,11 @@ class MemoryToolProvider:
                             "type": "string",
                             "description": "Agent ID",
                         },
+                        "visibility": {
+                            "type": "string",
+                            "enum": [v.value for v in MemoryVisibility],
+                            "description": "Visibility: private, public, team",
+                        },
                     },
                     "required": ["content", "agent_id"],
                 },
@@ -74,6 +84,10 @@ class MemoryToolProvider:
                         "top_k": {
                             "type": "integer",
                             "description": "Number of results",
+                        },
+                        "include_public": {
+                            "type": "boolean",
+                            "description": "Include shared memories from other agents",
                         },
                     },
                     "required": ["query", "agent_id"],
@@ -111,10 +125,16 @@ class MemoryToolProvider:
 
     async def _remember(self, args: dict[str, Any], start: float) -> ToolResult:
         memory_type = MemoryType(args.get("memory_type", "fact"))
+        # Resolve visibility: explicit param > type default
+        if "visibility" in args and args["visibility"]:
+            visibility = MemoryVisibility(args["visibility"])
+        else:
+            visibility = DEFAULT_VISIBILITY.get(memory_type, MemoryVisibility.PRIVATE)
         entry = MemoryEntry(
             agent_id=args["agent_id"],
             content=args["content"],
             memory_type=memory_type,
+            visibility=visibility,
             importance=args.get("importance", 0.5),
         )
         await self._store.add(entry)
@@ -150,6 +170,7 @@ class MemoryToolProvider:
             agent_id=args.get("agent_id"),
             memory_type=memory_type,
             top_k=args.get("top_k", 5),
+            include_public=args.get("include_public", True),
         )
 
         if self._event_bus and args.get("agent_id"):

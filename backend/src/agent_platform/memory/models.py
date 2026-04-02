@@ -22,6 +22,28 @@ class MemoryType(StrEnum):
     DOMAIN_KNOWLEDGE = "domain_knowledge"
 
 
+class MemoryVisibility(StrEnum):
+    """Visibility scope for memory entries."""
+
+    PRIVATE = "private"  # Only the owning agent
+    TEAM = "team"  # Parent + children (V2, resolves to PUBLIC for now)
+    PUBLIC = "public"  # All agents
+    INHERIT = "inherit"  # Inherit from agent config (V2)
+
+
+# Default visibility by memory type
+DEFAULT_VISIBILITY: dict[MemoryType, MemoryVisibility] = {
+    MemoryType.EPISODIC: MemoryVisibility.PRIVATE,
+    MemoryType.PREFERENCE: MemoryVisibility.PRIVATE,
+    MemoryType.DECISION: MemoryVisibility.PRIVATE,
+    MemoryType.OUTCOME: MemoryVisibility.PRIVATE,
+    MemoryType.FACT: MemoryVisibility.PUBLIC,
+    MemoryType.PROCEDURE: MemoryVisibility.PUBLIC,
+    MemoryType.TOOL_KNOWLEDGE: MemoryVisibility.PUBLIC,
+    MemoryType.DOMAIN_KNOWLEDGE: MemoryVisibility.PUBLIC,
+}
+
+
 class MemoryEntry(BaseModel):
     """A single memory entry stored in the memory system."""
 
@@ -30,6 +52,7 @@ class MemoryEntry(BaseModel):
     content: str
     memory_type: MemoryType
     importance: float = 0.5
+    visibility: MemoryVisibility = MemoryVisibility.PRIVATE
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     last_accessed_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     access_count: int = 0

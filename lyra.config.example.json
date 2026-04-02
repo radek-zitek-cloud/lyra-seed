@@ -51,5 +51,8 @@
   "context": {
     "max_tokens": 100000,
     "memory_top_k": 5
-  }
+  },
+
+  "summaryModel": "openai/gpt-4.1-nano",
+  "extractionModel": "openai/gpt-4.1-nano"
 }
