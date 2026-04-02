@@ -11,6 +11,7 @@ import { useEventStream } from "@/hooks/useEventStream";
 import {
   fetchAgent,
   fetchAgentConversations,
+  fetchAgentCost,
   fetchAgentEvents,
   respondHITL,
   sendPrompt,
@@ -34,18 +35,21 @@ export default function AgentPage() {
     { role: string; content: string; timestamp?: string }[]
   >([]);
   const [events, setEvents] = useState<Record<string, unknown>[]>([]);
+  const [cost, setCost] = useState<{ total_cost_usd: number; total_prompt_tokens: number; total_completion_tokens: number } | null>(null);
   const [sending, setSending] = useState(false);
   const { events: liveEvents, connectionState } = useEventStream(agentId);
   const promptInFlight = useRef(false);
 
   const refreshAll = async () => {
-    const [a, evts, convos] = await Promise.all([
+    const [a, evts, convos, c] = await Promise.all([
       fetchAgent(agentId),
       fetchAgentEvents(agentId),
       fetchAgentConversations(agentId),
+      fetchAgentCost(agentId),
     ]);
     setAgent(a);
     setEvents(evts);
+    setCost(c);
     if (convos.length > 0) setMessages(convos[0].messages);
   };
 
@@ -121,7 +125,12 @@ export default function AgentPage() {
         <span style={{ fontSize: "14px", fontWeight: 700, color: "#e0e0e0", letterSpacing: "1px" }}>
           {agentName}
         </span>
-        <span style={{ fontSize: "11px", color: "#444" }}>{agentModel}</span>
+        <span style={{ fontSize: "11px", color: "#888" }}>{agentModel}</span>
+        {cost && cost.total_cost_usd > 0 && (
+          <span style={{ fontSize: "11px", color: "#cc9933" }}>
+            ${cost.total_cost_usd.toFixed(4)}
+          </span>
+        )}
         <span
           style={{
             fontSize: "11px",

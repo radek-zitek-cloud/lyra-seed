@@ -82,6 +82,12 @@ export async function respondHITL(
   return res.json();
 }
 
+export async function fetchAgentCost(id: string) {
+  const res = await fetch(`${API_BASE}/agents/${id}/cost`);
+  if (!res.ok) throw new Error("Failed to fetch agent cost");
+  return res.json();
+}
+
 export function createEventStream(agentId?: string): EventSource {
   const url = agentId
     ? `${API_BASE}/agents/${agentId}/events/stream`
