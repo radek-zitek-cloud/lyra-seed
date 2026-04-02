@@ -88,6 +88,26 @@ export async function fetchAgentChildren(id: string) {
   return res.json();
 }
 
+export async function fetchAgentMessages(id: string) {
+  const res = await fetch(`${API_BASE}/agents/${id}/messages`);
+  if (!res.ok) throw new Error("Failed to fetch messages");
+  return res.json();
+}
+
+export async function sendAgentMessage(
+  agentId: string,
+  content: string,
+  messageType: string = "guidance",
+) {
+  const res = await fetch(`${API_BASE}/agents/${agentId}/messages`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ content, message_type: messageType }),
+  });
+  if (!res.ok) throw new Error("Failed to send message");
+  return res.json();
+}
+
 export async function fetchAgentCost(id: string) {
   const res = await fetch(`${API_BASE}/agents/${id}/cost`);
   if (!res.ok) throw new Error("Failed to fetch agent cost");
