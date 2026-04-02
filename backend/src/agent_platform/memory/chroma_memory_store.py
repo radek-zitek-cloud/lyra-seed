@@ -1,5 +1,6 @@
 """ChromaDB-backed memory store."""
 
+import logging
 from typing import Any
 
 import chromadb
@@ -7,6 +8,8 @@ import chromadb
 from agent_platform.memory.decay import TimeDecayStrategy
 from agent_platform.memory.fake_embeddings import FakeEmbeddingProvider
 from agent_platform.memory.models import MemoryEntry, MemoryType, MemoryVisibility
+
+logger = logging.getLogger(__name__)
 
 COLLECTION_NAME = "agent_memories"
 
@@ -19,6 +22,7 @@ class ChromaMemoryStore:
         persist_dir: str | None = None,
         embedding_fn: Any = None,
         decay_strategy: TimeDecayStrategy | None = None,
+        dedup_threshold: float = 0.9,
     ) -> None:
         if persist_dir:
             self._client = chromadb.PersistentClient(path=persist_dir)
@@ -27,6 +31,7 @@ class ChromaMemoryStore:
 
         self._embedding_fn = embedding_fn or FakeEmbeddingProvider()
         self._decay = decay_strategy or TimeDecayStrategy()
+        self._dedup_threshold = dedup_threshold
         self._collection = self._client.get_or_create_collection(
             name=COLLECTION_NAME,
             embedding_function=self._embedding_fn,
@@ -38,13 +43,42 @@ class ChromaMemoryStore:
         """Access the embedding function (for setting agent_id etc)."""
         return self._embedding_fn
 
-    async def add(self, entry: MemoryEntry) -> None:
-        """Store a memory entry."""
+    async def add(self, entry: MemoryEntry) -> bool:
+        """Store a memory entry, skipping if a similar one already exists.
+
+        Returns True if stored, False if deduplicated (skipped).
+        """
+        if self._dedup_threshold < 1.0:
+            try:
+                result = self._collection.query(
+                    query_texts=[entry.content],
+                    n_results=1,
+                    where={"agent_id": entry.agent_id},
+                    include=["distances", "documents"],
+                )
+                if result["ids"] and result["ids"][0]:
+                    # ChromaDB cosine distance: 0 = identical, 2 = opposite
+                    # Similarity = 1 - (distance / 2)
+                    distance = result["distances"][0][0]  # type: ignore[index]
+                    similarity = 1.0 - (distance / 2.0)
+                    if similarity >= self._dedup_threshold:
+                        existing = result["documents"][0][0]  # type: ignore[index]
+                        logger.info(
+                            "Dedup: skipping memory (%.2f sim) '%s' ~ '%s'",
+                            similarity,
+                            entry.content[:60],
+                            existing[:60],
+                        )
+                        return False
+            except Exception:
+                pass  # On any error, proceed with the write
+
         self._collection.add(
             ids=[entry.id],
             documents=[entry.content],
             metadatas=[self._entry_to_metadata(entry)],
         )
+        return True
 
     async def get(self, id: str) -> MemoryEntry | None:
         """Get a memory entry by ID."""

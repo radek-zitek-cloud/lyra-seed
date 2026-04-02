@@ -133,9 +133,11 @@ def create_app(
         event_bus=event_bus,
         timeout=retry_cfg.timeout,
     )
+    dedup_threshold = platform_config.memoryGC.dedup_threshold
     memory_store = ChromaMemoryStore(
         persist_dir=memory_dir,
         embedding_fn=embedding_provider,
+        dedup_threshold=dedup_threshold,
     )
     memory_provider = MemoryToolProvider(memory_store=memory_store, event_bus=event_bus)
     tool_registry.register_provider(memory_provider)

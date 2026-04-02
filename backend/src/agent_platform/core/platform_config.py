@@ -45,6 +45,7 @@ class MemoryGCConfig(BaseModel):
 
     prune_threshold: float = 0.1
     max_entries: int = 500
+    dedup_threshold: float = 0.9
 
 
 class ContextConfig(BaseModel):
