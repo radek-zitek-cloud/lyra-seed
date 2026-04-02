@@ -274,11 +274,7 @@ class TestV1Phase5:
         assert resp.status_code == 200
         assert "text/event-stream" in resp.headers.get("content-type", "")
 
-        lines = [
-            ln
-            for ln in resp.text.strip().split("\n")
-            if ln.startswith("data: ")
-        ]
+        lines = [ln for ln in resp.text.strip().split("\n") if ln.startswith("data: ")]
         assert len(lines) >= 1
         data = json.loads(lines[0].removeprefix("data: "))
         assert data["agent_id"] == agent_id
@@ -328,11 +324,7 @@ class TestV1Phase5:
         )
         assert resp.status_code == 200
 
-        lines = [
-            ln
-            for ln in resp.text.strip().split("\n")
-            if ln.startswith("data: ")
-        ]
+        lines = [ln for ln in resp.text.strip().split("\n") if ln.startswith("data: ")]
         assert len(lines) >= 2
         events = [json.loads(ln.removeprefix("data: ")) for ln in lines]
         agent_ids = {e["agent_id"] for e in events}

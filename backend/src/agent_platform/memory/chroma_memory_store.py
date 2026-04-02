@@ -4,6 +4,7 @@ from typing import Any
 
 import chromadb
 
+from agent_platform.memory.decay import TimeDecayStrategy
 from agent_platform.memory.fake_embeddings import FakeEmbeddingProvider
 from agent_platform.memory.models import MemoryEntry, MemoryType
 
@@ -17,6 +18,7 @@ class ChromaMemoryStore:
         self,
         persist_dir: str | None = None,
         embedding_fn: Any = None,
+        decay_strategy: TimeDecayStrategy | None = None,
     ) -> None:
         if persist_dir:
             self._client = chromadb.PersistentClient(path=persist_dir)
@@ -24,6 +26,7 @@ class ChromaMemoryStore:
             self._client = chromadb.Client()
 
         self._embedding_fn = embedding_fn or FakeEmbeddingProvider()
+        self._decay = decay_strategy or TimeDecayStrategy()
         self._collection = self._client.get_or_create_collection(
             name=COLLECTION_NAME,
             embedding_function=self._embedding_fn,
@@ -114,7 +117,7 @@ class ChromaMemoryStore:
             return False
 
     async def update_access(self, id: str) -> None:
-        """Update last_accessed_at and increment access_count."""
+        """Update last_accessed_at, increment access_count, recompute decay."""
         entry = await self.get(id)
         if entry is None:
             return
@@ -122,10 +125,47 @@ class ChromaMemoryStore:
 
         entry.last_accessed_at = datetime.now(UTC)
         entry.access_count += 1
+        entry.decay_score = self._decay.compute(entry)
         self._collection.update(
             ids=[id],
             metadatas=[self._entry_to_metadata(entry)],
         )
+
+    async def prune(
+        self,
+        agent_id: str,
+        threshold: float = 0.1,
+        max_entries: int = 500,
+    ) -> int:
+        """Delete stale memories below decay threshold or over max count."""
+        entries = await self.list_by_agent(agent_id, limit=10000)
+        if not entries:
+            return 0
+
+        # Recompute decay scores
+        for entry in entries:
+            entry.decay_score = self._decay.compute(entry)
+
+        # Find entries to delete
+        to_delete: list[str] = []
+
+        # Below threshold
+        for entry in entries:
+            if entry.decay_score < threshold:
+                to_delete.append(entry.id)
+
+        # Over max entries — delete lowest-scored beyond limit
+        if len(entries) - len(to_delete) > max_entries:
+            surviving = [e for e in entries if e.id not in set(to_delete)]
+            surviving.sort(key=lambda e: e.decay_score)
+            excess = len(surviving) - max_entries
+            for entry in surviving[:excess]:
+                to_delete.append(entry.id)
+
+        if to_delete:
+            self._collection.delete(ids=to_delete)
+
+        return len(to_delete)
 
     @staticmethod
     def _entry_to_metadata(entry: MemoryEntry) -> dict[str, Any]:

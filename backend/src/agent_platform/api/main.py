@@ -165,6 +165,9 @@ def create_app(
             logger.info("Connecting %d MCP servers...", len(platform_config.mcpServers))
             await mcp_provider.connect_all()
 
+        # Cleanup agents stuck from previous crash
+        await runtime.cleanup_stuck_agents()
+
         _deps.configure(
             agent_repo,
             conv_repo,

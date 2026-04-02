@@ -160,6 +160,9 @@ class AgentRuntime:
                     agent.status = AgentStatus.IDLE
                     await self._agent_repo.update(agent.id, agent)
 
+                    # Prune stale memories after successful run
+                    await self._prune_memories(agent_id)
+
                     return AgentResponse(
                         agent_id=agent_id,
                         content=response.content,
@@ -331,10 +334,32 @@ class AgentRuntime:
             )
         )
 
-        # Wait for response
+        # Wait for response with timeout
         gate = asyncio.Event()
         self._hitl_pending[agent.id] = gate
-        await gate.wait()
+        try:
+            await asyncio.wait_for(
+                gate.wait(),
+                timeout=agent.config.hitl_timeout_seconds,
+            )
+        except TimeoutError:
+            # HITL timed out — treat as denial
+            self._hitl_pending.pop(agent.id, None)
+            self._hitl_responses.pop(agent.id, None)
+            agent.status = AgentStatus.IDLE
+            await self._agent_repo.update(agent.id, agent)
+            await self._event_bus.emit(
+                Event(
+                    agent_id=agent.id,
+                    event_type=EventType.HITL_RESPONSE,
+                    module="core.runtime",
+                    payload={
+                        "approved": False,
+                        "timed_out": True,
+                    },
+                )
+            )
+            return False
 
         response = self._hitl_responses.pop(agent.id, {"approved": False})
         del self._hitl_pending[agent.id]
@@ -383,3 +408,48 @@ class AgentRuntime:
         emb_fn = getattr(store, "embedding_fn", None)
         if emb_fn is not None and hasattr(emb_fn, "set_agent_id"):
             emb_fn.set_agent_id(agent_id)
+
+    async def _prune_memories(self, agent_id: str) -> None:
+        """Prune stale memories after a successful agent run."""
+        if self._context_manager is None:
+            return
+        store = getattr(self._context_manager, "_store", None)
+        if store is None or not hasattr(store, "prune"):
+            return
+        try:
+            deleted = await store.prune(agent_id)
+            if deleted > 0:
+                await self._event_bus.emit(
+                    Event(
+                        agent_id=agent_id,
+                        event_type=EventType.MEMORY_WRITE,
+                        module="core.runtime",
+                        payload={
+                            "action": "gc_prune",
+                            "deleted_count": deleted,
+                        },
+                    )
+                )
+        except Exception:
+            pass  # GC failure should not break the run
+
+    async def cleanup_stuck_agents(self) -> int:
+        """Reset agents stuck in RUNNING/WAITING_HITL to IDLE.
+
+        Called on startup to recover from crashes.
+        """
+        count = 0
+        all_agents = await self._agent_repo.list()
+        for agent in all_agents:
+            if agent.status in (
+                AgentStatus.RUNNING,
+                AgentStatus.WAITING_HITL,
+            ):
+                agent.status = AgentStatus.IDLE
+                await self._agent_repo.update(agent.id, agent)
+                count += 1
+        if count:
+            import logging
+
+            logging.getLogger(__name__).info("Cleaned up %d stuck agents", count)
+        return count
