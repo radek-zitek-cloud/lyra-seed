@@ -24,6 +24,7 @@ class ContextManager:
         max_context_tokens: int = 100_000,
         llm_provider: object | None = None,
         summary_model: str | None = None,
+        event_bus: object | None = None,
         summary_prompt: str | None = None,
     ) -> None:
         self._store = memory_store
@@ -32,6 +33,7 @@ class ContextManager:
         self._llm = llm_provider
         self._summary_model = summary_model
         self._summary_prompt = summary_prompt
+        self._event_bus = event_bus
 
     async def assemble(
         self,
@@ -138,6 +140,26 @@ class ContextManager:
                     len(to_summarize),
                     entry.id,
                 )
+                # Emit events for observability
+                if self._event_bus:
+                    from agent_platform.observation.events import (
+                        Event,
+                        EventType,
+                    )
+
+                    await self._event_bus.emit(
+                        Event(
+                            agent_id=agent_id,
+                            event_type=EventType.MEMORY_WRITE,
+                            module="memory.summarizer",
+                            payload={
+                                "source": "context_summarization",
+                                "memory_id": entry.id,
+                                "messages_summarized": len(to_summarize),
+                                "summary_preview": summary[:100],
+                            },
+                        )
+                    )
                 marker = f"[Summary of {len(to_summarize)} earlier messages: {summary}]"
             except Exception:
                 logger.exception("Summarization failed, using truncation")

@@ -147,6 +147,7 @@ def create_app(
         llm_provider=llm_provider,
         summary_model=platform_config.summaryModel,
         summary_prompt=summary_prompt,
+        event_bus=event_bus,
     )
 
     extractor = FactExtractor(
