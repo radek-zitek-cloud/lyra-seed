@@ -107,6 +107,18 @@ class SqliteAgentRepo:
         await self._db.commit()
         return cursor.rowcount > 0
 
+    async def list_children(self, parent_agent_id: str) -> list[Agent]:
+        """List all child agents of a given parent."""
+        assert self._db is not None
+        rows: list[Agent] = []
+        async with self._db.execute(
+            "SELECT * FROM agents WHERE parent_agent_id = ? ORDER BY created_at DESC",
+            (parent_agent_id,),
+        ) as cursor:
+            async for row in cursor:
+                rows.append(self._row_to_agent(row))
+        return rows
+
     async def close(self) -> None:
         if self._db:
             await self._db.close()

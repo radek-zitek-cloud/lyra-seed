@@ -288,40 +288,41 @@ class TestV2Phase1:
     @pytest.mark.asyncio
     async def test_st_v2_1_9_children_api_endpoint(self, deps):
         """ST-V2-1.9: GET /agents/{id}/children returns child agents."""
-        from httpx import ASGITransport, AsyncClient
+        import httpx
 
         from agent_platform.api.main import create_app
+        from agent_platform.core.config import Settings
 
-        app = create_app(db_dir=str(deps["tmp_path"] / "api"))
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
-            # Trigger lifespan
-            resp = await client.get("/health")
-            assert resp.status_code == 200
+        settings = Settings(openrouter_api_key="sk-test")  # type: ignore[arg-type]
+        app = create_app(settings, db_dir=str(deps["tmp_path"] / "api"))
 
-            # Create parent via API
-            resp = await client.post(
-                "/agents", json={"name": "api-parent"}
-            )
-            assert resp.status_code == 201
-            parent_id = resp.json()["id"]
+        async with app.router.lifespan_context(app):
+            transport = httpx.ASGITransport(app=app)
+            async with httpx.AsyncClient(
+                transport=transport, base_url="http://test"
+            ) as client:
+                # Create parent via API
+                resp = await client.post(
+                    "/agents", json={"name": "api-parent"}
+                )
+                assert resp.status_code == 201
+                parent_id = resp.json()["id"]
 
-            # Create child with parent_agent_id directly in DB
-            from agent_platform.api._deps import get_agent_repo
+                # Create child with parent_agent_id directly in DB
+                from agent_platform.api._deps import get_agent_repo
 
-            repo = get_agent_repo()
-            child = Agent(
-                name="api-child",
-                parent_agent_id=parent_id,
-            )
-            await repo.create(child)
+                repo = get_agent_repo()
+                child = Agent(
+                    name="api-child",
+                    parent_agent_id=parent_id,
+                )
+                await repo.create(child)
 
-            resp = await client.get(f"/agents/{parent_id}/children")
-            assert resp.status_code == 200
-            data = resp.json()
-            assert len(data) >= 1
-            assert any(c["name"] == "api-child" for c in data)
+                resp = await client.get(f"/agents/{parent_id}/children")
+                assert resp.status_code == 200
+                data = resp.json()
+                assert len(data) >= 1
+                assert any(c["name"] == "api-child" for c in data)
 
     @pytest.mark.asyncio
     async def test_st_v2_1_10_wait_for_agent(self, deps):

@@ -33,6 +33,7 @@ from agent_platform.memory.context_manager import ContextManager
 from agent_platform.memory.extractor import FactExtractor
 from agent_platform.memory.memory_tools import MemoryToolProvider
 from agent_platform.observation.in_process_event_bus import InProcessEventBus
+from agent_platform.tools.agent_spawner import AgentSpawnerProvider
 from agent_platform.tools.mcp_client import MCPClientProvider, MCPStdioClient
 from agent_platform.tools.prompt_macro import PromptMacroProvider
 from agent_platform.tools.registry import ToolRegistry
@@ -170,6 +171,17 @@ def create_app(
         prompts_dir=platform_config.systemPromptsDir,
         project_root=project_root,
     )
+
+    # Agent spawner tools (sub-agent spawning)
+    agent_spawner = AgentSpawnerProvider(
+        agent_repo=agent_repo,
+        conversation_repo=conv_repo,
+        llm_provider=llm_provider,
+        event_bus=event_bus,
+        context_manager=context_manager,
+        extractor=extractor,
+    )
+    tool_registry.register_provider(agent_spawner)
 
     runtime = AgentRuntime(
         agent_repo=agent_repo,
