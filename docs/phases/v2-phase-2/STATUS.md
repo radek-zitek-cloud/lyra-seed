@@ -42,9 +42,23 @@
 - Fixed V2P1 test regressions (3 tests assumed sync spawn)
 - All 98+6 tests pass
 
+### Post-merge fixes (from user testing)
+- Fixed conversation not showing — missing `msgs` destructuring in `refreshAll` Promise.all
+- Hide empty assistant tool-calling turns in conversation panel (intermediate turns with no content)
+- Added PARENT link in agent detail header for child→parent navigation
+- Auto-wake: idle agents auto-start a runtime turn on TASK/GUIDANCE messages
+- Auto-wake prompt instructs agent to send result back via `send_message`
+- TASK messages consumed (deleted) after auto-wake triggers
+- UI message sender resolves to parent_agent_id instead of "default"
+- Added all V2P2 tools to agent_id injection list in runtime (send_message, receive_messages, check_agent_status, stop_agent, dismiss_agent)
+- Memory browser page at /memories with semantic search, filtering, archive/delete
+
 ## Decisions Made
 - Messages stored in shared lyra.db (same as agents, conversations, events)
 - GUIDANCE messages deleted after injection (consumed once)
+- TASK messages consumed on auto-wake (agent processes the task, not left in inbox)
+- Auto-wake only triggers for TASK and GUIDANCE message types (not QUESTION, RESULT, etc.)
 - Spawn returns {"status": "running"} immediately
 - Background tasks tracked in dict, cancelled on shutdown
 - MessagePanel always visible in agent detail (not conditional on messages existing)
+- from_agent_id defaults to parent_agent_id when messages sent from UI to child agents

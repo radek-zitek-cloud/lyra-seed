@@ -490,3 +490,48 @@ All new parameters follow the standard four-level resolution chain (documented i
 | Embedding caching | Not implemented | Still not implemented (low priority) |
 | Docker deployment | Not implemented | Still not implemented |
 | RAG | Not implemented | Deferred to V2/V4 |
+
+---
+
+## 13. V2 Progress Report
+
+### V2 Phase 1: Sub-Agent Spawning — COMPLETE (14 tests)
+
+Delivered synchronous sub-agent spawning, then upgraded to full AgentRuntime execution for children (tools, memory, iteration loop). Spawn depth guard (max 3) prevents infinite recursion. Template-based config inheritance from `prompts/{name}.json`.
+
+### V2 Phase 2: Inter-Agent Communication & Async Lifecycle — COMPLETE (14+2 tests)
+
+**Async Spawning:**
+- `spawn_agent` returns immediately, child runs in background `asyncio.Task`
+- `wait_for_agent` blocks with timeout via `asyncio.Event`
+- `check_agent_status` for non-blocking status checks
+- `stop_agent` cancels running children
+- `dismiss_agent` marks children as COMPLETED
+- Background task cleanup on shutdown
+
+**Message Bus:**
+- `AgentMessage` model with 6 types: TASK, RESULT, QUESTION, ANSWER, GUIDANCE, STATUS_UPDATE
+- `SqliteMessageRepo` with inbox/sent/between queries
+- `send_message` / `receive_messages` tools
+- MESSAGE_SENT / MESSAGE_RECEIVED events
+- Auto-wake: idle agents auto-start a turn on TASK/GUIDANCE messages
+- Consumed messages deleted after processing
+- Workers auto-instructed to send results back via `send_message`
+
+**Runtime Integration:**
+- GUIDANCE messages injected into conversation context each iteration
+- All V2P2 tools get agent_id auto-injected (prevents LLM hallucinating IDs)
+
+**UI:**
+- MessagePanel: scrollable message list with type badges, direction indicators, send input
+- SUB-AGENTS bar on parent detail page with clickable child chips
+- PARENT link on child detail page for upward navigation
+- Memory browser at /memories with semantic search and filtering
+
+**Key Fixes During Testing:**
+- Empty tool-calling turns hidden from conversation display
+- Platform config reloads from disk on each agent creation
+- Memory deduplication (cosine similarity threshold)
+- Auto-wake sender resolves to parent_agent_id, not "default"
+
+### Current Test Suite: 98 backend + 6 frontend = 104 total smoke tests

@@ -134,10 +134,19 @@ This section documents what was delivered, what deviated from the original requi
 | MCP client | "MCP client" (implied stub) | Full stdio JSON-RPC transport with Windows support | Enables immediate real-world MCP server integration |
 | Embedding provider | "Behind abstract interface" | Dual sync/async implementation for ChromaDB compatibility | ChromaDB calls embeddings synchronously; needed both interfaces |
 
-### Not yet delivered (correctly out of V1 scope)
+### Post-V2P1 & V2P2 Addendum
 
-- **Multi-Agent Orchestration (Req 3):** Sub-agent spawning, parent-child hierarchy, task decomposition, orchestration patterns — all V2 scope
-- **Inter-Agent Communication (Req 4):** Message passing, typed messages, communication patterns — all V2 scope
-- **Self-Evolution (Req 2, partial):** Agents cannot create new tools at runtime — V3 scope
-- **Network Visualization (Req 8, partial):** Agent topology graph and communication flow views — V2 scope
-- **Model Case (Req 9):** Full end-to-end capability acquisition loop — V3 scope
+- **Multi-Agent Orchestration (Req 3):** Sub-agent spawning delivered in V2P1. Async spawning, lifecycle management (check_agent_status, stop_agent, wait_for_agent, dismiss_agent) delivered in V2P2. Sub-agents run with full tool access and their own iteration budgets.
+- **Inter-Agent Communication (Req 4):** Full message bus delivered in V2P2. Six message types (TASK, RESULT, QUESTION, ANSWER, GUIDANCE, STATUS_UPDATE). Message persistence in SQLite. MESSAGE_SENT/MESSAGE_RECEIVED events. Auto-wake: idle agents automatically start a runtime turn when receiving TASK or GUIDANCE messages. Consumed messages are deleted after processing.
+- **Reusable Agent Lifecycle:** Sub-agents persist after task completion (IDLE state). Parents can send new tasks via messages. Workers auto-report results back to the requesting agent. Parent-child navigation in UI (SUB-AGENTS bar + PARENT link).
+- **Message Bus Observability:** MessagePanel in agent detail UI showing messages with type badges, direction indicators, timestamps. Send message input with type selector. Auto-refresh on SSE message events.
+- **Memory Browser:** Dedicated /memories page with semantic search, type/status filtering, archive/unarchive/delete operations.
+- **Configuration:** Agent config from `{name}.json` files (model, hitl_policy, temperature, max_iterations, auto_extract). Platform config from `lyra.config.json` (dataDir, defaultModel, embeddingModel, mcpServers, retry, memoryGC, context). Config reloads from disk on each agent creation.
+- **Memory Deduplication:** Pre-write similarity check prevents duplicate memories (configurable threshold).
+
+### Not yet delivered
+
+- **Orchestration Patterns (V2P3):** Task decomposition, sequential/parallel/pipeline patterns, result synthesis
+- **Multi-Agent UI (V2P4):** Agent topology graph, communication flow visualization
+- **Self-Evolution (V3):** Agents cannot create new tools at runtime
+- **Model Case (V3):** Full end-to-end capability acquisition loop
