@@ -10,11 +10,10 @@ from agent_platform.core.models import (
     AgentConfig,
     AgentResponse,
     AgentStatus,
-    Conversation,
 )
 from agent_platform.db.sqlite_agent_repo import SqliteAgentRepo
 from agent_platform.db.sqlite_conversation_repo import SqliteConversationRepo
-from agent_platform.llm.models import LLMConfig, LLMResponse, Message, MessageRole
+from agent_platform.llm.models import MessageRole
 from agent_platform.observation.events import Event, EventType
 from agent_platform.observation.in_process_event_bus import InProcessEventBus
 from agent_platform.tools.models import Tool, ToolResult, ToolType
@@ -33,6 +32,8 @@ class AgentSpawnerProvider:
         extractor: object | None = None,
         system_prompt_resolver: Callable[[str], str] | None = None,
         agent_config_resolver: Callable | None = None,
+        tool_registry: object | None = None,
+        max_spawn_depth: int = 3,
     ) -> None:
         self._agent_repo = agent_repo
         self._conv_repo = conversation_repo
@@ -42,6 +43,8 @@ class AgentSpawnerProvider:
         self._extractor = extractor
         self._resolve_prompt = system_prompt_resolver
         self._resolve_config = agent_config_resolver
+        self._tool_registry = tool_registry
+        self._max_spawn_depth = max_spawn_depth
 
     async def list_tools(self) -> list[Tool]:
         return [
@@ -174,6 +177,18 @@ class AgentSpawnerProvider:
         child_name = args["name"]
         task = args["task"]
 
+        # Guard against infinite recursion
+        depth = await self._get_spawn_depth(parent_id)
+        if depth >= self._max_spawn_depth:
+            return ToolResult(
+                success=False,
+                error=(
+                    f"Maximum spawn depth ({self._max_spawn_depth}) reached. "
+                    f"Cannot spawn '{child_name}' at depth {depth + 1}."
+                ),
+                duration_ms=int((time.monotonic() - start) * 1000),
+            )
+
         # Resolve child config
         parent = await self._agent_repo.get(parent_id) if parent_id else None
         child_config = AgentConfig()
@@ -190,6 +205,12 @@ class AgentSpawnerProvider:
                     child_config.temperature = file_config.temperature
                 if file_config.max_iterations is not None:
                     child_config.max_iterations = file_config.max_iterations
+                if file_config.hitl_policy is not None:
+                    from agent_platform.core.models import HITLPolicy
+
+                    child_config.hitl_policy = HITLPolicy(file_config.hitl_policy)
+                if file_config.auto_extract is not None:
+                    child_config.auto_extract = file_config.auto_extract
             # Fall back to parent for fields not set by template
             if parent:
                 if child_config.model == AgentConfig().model:
@@ -208,9 +229,6 @@ class AgentSpawnerProvider:
             child_config.model = args["model"]
         if "temperature" in args and args["temperature"] is not None:
             child_config.temperature = args["temperature"]
-
-        # Disable auto_extract for sub-agents (keep it lightweight)
-        child_config.auto_extract = False
 
         # Create child agent
         child = Agent(
@@ -293,50 +311,33 @@ class AgentSpawnerProvider:
                 duration_ms=duration,
             )
 
+    async def _get_spawn_depth(self, agent_id: str | None) -> int:
+        """Count the parent chain depth for an agent."""
+        depth = 0
+        current_id = agent_id
+        while current_id:
+            agent = await self._agent_repo.get(current_id)
+            if agent is None or agent.parent_agent_id is None:
+                break
+            depth += 1
+            current_id = agent.parent_agent_id
+        return depth
+
     async def _run_child(self, child: Agent, task: str) -> AgentResponse:
-        """Run a child agent's core loop inline."""
-        # Minimal agent loop — no tool registry for children in Phase 1
-        child.status = AgentStatus.RUNNING
-        await self._agent_repo.update(child.id, child)
+        """Run a child agent using the full AgentRuntime loop."""
+        from agent_platform.core.runtime import AgentRuntime
+        from agent_platform.tools.registry import ToolRegistry
 
-        conversation = Conversation(agent_id=child.id)
-        await self._conv_repo.create(conversation)
-
-        conversation.messages = [
-            Message(role=MessageRole.SYSTEM, content=child.config.system_prompt),
-            Message(role=MessageRole.HUMAN, content=task),
-        ]
-
-        llm_config = LLMConfig(
-            model=child.config.model,
-            temperature=child.config.temperature,
+        runtime = AgentRuntime(
+            agent_repo=self._agent_repo,
+            conversation_repo=self._conv_repo,
+            llm_provider=self._llm,
+            event_bus=self._event_bus,
+            tool_registry=self._tool_registry or ToolRegistry(),
+            context_manager=self._context_manager,
+            extractor=self._extractor,
         )
-
-        response: LLMResponse = await self._llm.complete(
-            conversation.messages,
-            tools=None,
-            config=llm_config,
-        )
-
-        from datetime import UTC, datetime
-
-        conversation.messages.append(
-            Message(
-                role=MessageRole.ASSISTANT,
-                content=response.content or "",
-                timestamp=datetime.now(UTC).isoformat(),
-            )
-        )
-        await self._conv_repo.update(conversation.id, conversation)
-
-        child.status = AgentStatus.IDLE
-        await self._agent_repo.update(child.id, child)
-
-        return AgentResponse(
-            agent_id=child.id,
-            content=response.content,
-            conversation_id=conversation.id,
-        )
+        return await runtime.run(child.id, task)
 
     async def _wait_for_agent(self, args: dict[str, Any], start: float) -> ToolResult:
         """Wait for a child agent to complete and return its result."""

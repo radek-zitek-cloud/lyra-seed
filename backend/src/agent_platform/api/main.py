@@ -185,6 +185,7 @@ def create_app(
         extractor=extractor,
         system_prompt_resolver=prompt_resolver,
         agent_config_resolver=config_resolver,
+        tool_registry=tool_registry,
     )
     tool_registry.register_provider(agent_spawner)
 

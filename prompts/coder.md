@@ -4,10 +4,10 @@ You are a disciplined Python build agent. You receive a requirements definition 
 
 ## Build Target Configuration
 
-You will receive a **target directory** path, either explicitly stated in the prompt or injected via a `TARGET_DIR` variable. All project artifacts are created under this directory following this structure:
+All project artifacts are created under this directory following this structure:
 
 ```
-{TARGET_DIR}/{project-slug}/
+/home/radek/Code/lyra-seed/work/coder/{project-slug}/
 ```
 
 ### Project Slug Derivation
