@@ -33,6 +33,11 @@ def _get_cost_per_million(model: str) -> tuple[float, float]:
     return (_default_cost[0], _default_cost[1])
 
 
+# Only count provider-level events to avoid double-counting
+# (core.runtime also emits LLM_RESPONSE for the same call)
+_COST_MODULES = {"llm.openrouter", "embedding.openrouter"}
+
+
 async def compute_agent_cost(
     event_bus: InProcessEventBus,
     agent_id: str,
@@ -44,6 +49,7 @@ async def compute_agent_cost(
             event_types=[EventType.LLM_RESPONSE],
         )
     )
+    events = [e for e in events if e.module in _COST_MODULES]
     return _aggregate_costs(events)
 
 
@@ -52,6 +58,7 @@ async def compute_total_cost(
 ) -> dict:
     """Compute cost summary across all agents."""
     events = await event_bus.query(EventFilter(event_types=[EventType.LLM_RESPONSE]))
+    events = [e for e in events if e.module in _COST_MODULES]
     return _aggregate_costs(events)
 
 

@@ -14,6 +14,7 @@ from agent_platform.llm.models import (
     MessageRole,
     ToolCall,
 )
+from agent_platform.observation.cost_tracker import _get_cost_per_million
 from agent_platform.observation.events import Event, EventType
 from agent_platform.observation.in_process_event_bus import InProcessEventBus
 
@@ -125,6 +126,16 @@ class OpenRouterProvider:
         # Parse response
         result = self._parse_response(data)
 
+        # Compute cost
+        _usage = result.usage or {}
+        _prompt_tok = _usage.get("prompt_tokens", 0) or 0
+        _compl_tok = _usage.get("completion_tokens", 0) or 0
+        _in_rate, _out_rate = _get_cost_per_million(config.model)
+        _cost = (
+            _prompt_tok / 1_000_000 * _in_rate
+            + _compl_tok / 1_000_000 * _out_rate
+        )
+
         # Emit LLM_RESPONSE event
         if self._event_bus:
             await self._event_bus.emit(
@@ -143,6 +154,7 @@ class OpenRouterProvider:
                             {"name": tc.name, "arguments": tc.arguments}
                             for tc in result.tool_calls
                         ],
+                        "cost_usd": round(_cost, 6),
                     },
                     duration_ms=duration_ms,
                 )

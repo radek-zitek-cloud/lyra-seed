@@ -53,7 +53,7 @@ class AgentConfig(BaseModel):
     memory_top_k: int = 5
     summary_model: str | None = None
     extraction_model: str | None = None
-    auto_extract: bool = False
+    auto_extract: bool = True
     memory_sharing: dict[str, str] | None = None
 
 

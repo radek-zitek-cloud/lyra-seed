@@ -56,6 +56,7 @@ class TestV1Phase1:
         from agent_platform.llm.embeddings import EmbeddingProvider
 
         assert hasattr(EmbeddingProvider, "embed")
+        assert hasattr(EmbeddingProvider, "embed_single")
         assert hasattr(EmbeddingProvider, "embed_query")
 
     def test_st_1_3_repository_protocol(self):

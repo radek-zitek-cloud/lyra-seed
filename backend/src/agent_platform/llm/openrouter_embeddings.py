@@ -9,6 +9,7 @@ import time
 
 import httpx
 
+from agent_platform.observation.cost_tracker import _get_cost_per_million
 from agent_platform.observation.events import Event, EventType
 from agent_platform.observation.in_process_event_bus import InProcessEventBus
 
@@ -57,7 +58,7 @@ class OpenRouterEmbeddingProvider:
         """Embed a batch of texts (async)."""
         return await self._call_api_async(texts)
 
-    async def embed_query(self, text: str) -> list[float]:
+    async def embed_single(self, text: str) -> list[float]:
         """Embed a single query text (async)."""
         results = await self._call_api_async([text])
         return results[0]
@@ -65,11 +66,15 @@ class OpenRouterEmbeddingProvider:
     # ── ChromaDB EmbeddingFunction interface (sync) ─────
 
     def __call__(self, input: list[str]) -> list[list[float]]:
-        """ChromaDB calls this synchronously."""
+        """ChromaDB calls this synchronously for document embedding."""
         return self._call_api_sync(input)
 
     def embed_documents(self, input: list[str]) -> list[list[float]]:
         """ChromaDB 1.x: embed documents for storage."""
+        return self._call_api_sync(input)
+
+    def embed_query(self, input: list[str]) -> list[list[float]]:
+        """ChromaDB 1.x: embed query texts for search (sync)."""
         return self._call_api_sync(input)
 
     @staticmethod
@@ -126,6 +131,10 @@ class OpenRouterEmbeddingProvider:
         embeddings = self._parse_embeddings(data)
         usage = data.get("usage", {})
 
+        prompt_tok = (usage.get("prompt_tokens", 0) or 0)
+        in_rate, out_rate = _get_cost_per_million(self._model)
+        cost = prompt_tok / 1_000_000 * in_rate
+
         self._fire_event_sync(
             EventType.LLM_RESPONSE,
             {
@@ -133,6 +142,7 @@ class OpenRouterEmbeddingProvider:
                 "text_count": len(texts),
                 "dimensions": self._dimensions,
                 "usage": usage,
+                "cost_usd": round(cost, 6),
             },
             duration_ms=duration_ms,
         )
@@ -200,6 +210,10 @@ class OpenRouterEmbeddingProvider:
         embeddings = self._parse_embeddings(data)
         usage = data.get("usage", {})
 
+        prompt_tok = (usage.get("prompt_tokens", 0) or 0)
+        in_rate, _out_rate = _get_cost_per_million(self._model)
+        cost = prompt_tok / 1_000_000 * in_rate
+
         if self._event_bus:
             await self._event_bus.emit(
                 Event(
@@ -211,6 +225,7 @@ class OpenRouterEmbeddingProvider:
                         "text_count": len(texts),
                         "dimensions": self._dimensions,
                         "usage": usage,
+                        "cost_usd": round(cost, 6),
                     },
                     duration_ms=duration_ms,
                 )

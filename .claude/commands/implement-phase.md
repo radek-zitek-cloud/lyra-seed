@@ -13,6 +13,7 @@ Read these files before doing anything else:
 1. `METHODOLOGY.md` — The development workflow you must follow
 2. `ROADMAP.md` — Find the section for phase `$ARGUMENTS`, extract deliverables and exit criteria
 3. `REQUIREMENTS.md` — Understand the overall project requirements
+4. Any other `*.md` files in the docs directory
 
 ### Step 2: Check Prerequisites
 
