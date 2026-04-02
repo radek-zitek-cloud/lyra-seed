@@ -108,3 +108,36 @@ The end-to-end scenario the platform is designed to support:
 - **Single-user model:** The system serves one human; no multi-tenancy in scope
 - **Cross-platform:** All tooling and runtime must work on both Linux and Windows
 - **Smoke-test-driven development:** Every phase defines automated smoke tests before implementation; phase completion gated by test results
+
+---
+
+## Post-V1 Addendum
+
+This section documents what was delivered, what deviated from the original requirements, and what remains incomplete after V1 implementation.
+
+### Delivered (all V1 requirements met)
+
+- **Agent Runtime (Req 1):** Full core loop implemented. Agent receives prompts, assembles context with memory injection, calls LLM, handles tool calls in a loop, returns responses. Configurable behavior (model, temperature, max_iterations, system_prompt, allowed_tools, hitl_policy). Lifecycle management with status transitions (IDLE, RUNNING, WAITING_HITL, COMPLETED, FAILED).
+- **Tool System (Req 2):** Both tool types implemented. Prompt macros with `{{parameter}}` template expansion and LLM sub-calls. MCP server tools via real stdio JSON-RPC transport (not just stub). Unified ToolProvider protocol, ToolRegistry for aggregation and routing. Agents cannot yet create tools at runtime (V3 scope).
+- **Layered Memory (Req 5):** Three tiers implemented. Context memory via ContextManager (memory injection before LLM calls). Cross-context semantic memory (EPISODIC, PREFERENCE, DECISION, OUTCOME types). Long-term semantic memory (FACT, PROCEDURE, TOOL_KNOWLEDGE, DOMAIN_KNOWLEDGE types). Memory exposed as tools (remember, recall, forget). TimeDecayStrategy with configurable half-life. ChromaDB for vector storage (deviation from sqlite-vec — see below).
+- **Observability (Req 6):** Event system is foundational, built from Phase 1. All 13 event types implemented. Events are nested (parent_event_id), grouped by module, include timing data. Real-time streaming via SSE (deviation from WebSocket — see below).
+- **HITL (Req 7):** Permission gates with configurable policies (ALWAYS_ASK, DANGEROUS_ONLY, NEVER). Agent execution pauses at gates until human responds. Approval/denial via API endpoint and frontend panel.
+- **Observation UI (Req 8):** Full web dashboard. Agent management (create, view, delete). Event timeline with expandable details and inline summaries. Tool call inspector with input/output display. HITL approval panel. Real-time updates via SSE. Connection status indicator.
+
+### Deviations from original requirements
+
+| Aspect | Original | Implemented | Rationale |
+|--------|----------|-------------|-----------|
+| Vector storage | sqlite-vec | ChromaDB | More mature, better metadata filtering, handles embeddings natively |
+| Real-time streaming | WebSocket | SSE (Server-Sent Events) | Simpler lifecycle, no shutdown issues, native browser EventSource |
+| Configuration | Env vars only | Env vars + `lyra.config.json` + per-agent file-based config | Better separation of secrets (env) vs platform config (JSON) vs agent config (prompts dir) |
+| MCP client | "MCP client" (implied stub) | Full stdio JSON-RPC transport with Windows support | Enables immediate real-world MCP server integration |
+| Embedding provider | "Behind abstract interface" | Dual sync/async implementation for ChromaDB compatibility | ChromaDB calls embeddings synchronously; needed both interfaces |
+
+### Not yet delivered (correctly out of V1 scope)
+
+- **Multi-Agent Orchestration (Req 3):** Sub-agent spawning, parent-child hierarchy, task decomposition, orchestration patterns — all V2 scope
+- **Inter-Agent Communication (Req 4):** Message passing, typed messages, communication patterns — all V2 scope
+- **Self-Evolution (Req 2, partial):** Agents cannot create new tools at runtime — V3 scope
+- **Network Visualization (Req 8, partial):** Agent topology graph and communication flow views — V2 scope
+- **Model Case (Req 9):** Full end-to-end capability acquisition loop — V3 scope

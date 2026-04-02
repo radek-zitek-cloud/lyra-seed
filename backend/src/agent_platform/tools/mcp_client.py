@@ -8,12 +8,129 @@ import asyncio
 import json
 import logging
 import os
+import subprocess
+import sys
 import time
 from typing import Any
 
 from agent_platform.tools.models import Tool, ToolResult, ToolType
 
 logger = logging.getLogger(__name__)
+
+
+def _resolve_command(command: str) -> str:
+    """Resolve command for the current platform.
+
+    On Windows, commands like 'npx' and 'uvx' need the '.cmd' extension
+    when invoked via subprocess (not through a shell).
+    """
+    if sys.platform != "win32":
+        return command
+    # If already has an extension, leave it
+    if os.path.splitext(command)[1]:
+        return command
+    # Try appending .cmd (npm/npx/uvx wrappers on Windows)
+    import shutil
+
+    resolved = shutil.which(command)
+    if resolved:
+        return resolved
+    return command
+
+
+async def _create_subprocess(
+    command: str,
+    args: list[str],
+    env: dict[str, str],
+) -> asyncio.subprocess.Process:
+    """Create a subprocess cross-platform.
+
+    On Windows, asyncio.create_subprocess_exec requires the ProactorEventLoop
+    which may not be active under uvicorn. Falls back to subprocess.Popen
+    wrapped in asyncio if needed.
+    """
+    resolved_cmd = _resolve_command(command)
+
+    try:
+        return await asyncio.create_subprocess_exec(
+            resolved_cmd,
+            *args,
+            stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            env=env,
+        )
+    except NotImplementedError:
+        if sys.platform != "win32":
+            raise
+        # Windows fallback: use subprocess.Popen and wrap streams
+        logger.info(
+            "asyncio subprocess not available, using Popen fallback"
+        )
+        proc = subprocess.Popen(
+            [resolved_cmd, *args],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            env=env,
+        )
+        return _PopenWrapper(proc)
+
+
+class _PopenWrapper:
+    """Wraps subprocess.Popen to look like asyncio.subprocess.Process."""
+
+    def __init__(self, proc: subprocess.Popen) -> None:  # type: ignore[type-arg]
+        self._proc = proc
+        self.stdin = _AsyncWriteStream(proc.stdin) if proc.stdin else None
+        self.stdout = _AsyncReadStream(proc.stdout) if proc.stdout else None
+        self.stderr = _AsyncReadStream(proc.stderr) if proc.stderr else None
+
+    @property
+    def returncode(self) -> int | None:
+        return self._proc.returncode
+
+    def terminate(self) -> None:
+        self._proc.terminate()
+
+    def kill(self) -> None:
+        self._proc.kill()
+
+    async def wait(self) -> int:
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, self._proc.wait)
+
+
+class _AsyncWriteStream:
+    """Wraps a synchronous write stream for async usage."""
+
+    def __init__(self, stream: Any) -> None:
+        self._stream = stream
+
+    def write(self, data: bytes) -> None:
+        self._stream.write(data)
+
+    async def drain(self) -> None:
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(None, self._stream.flush)
+
+    def close(self) -> None:
+        self._stream.close()
+
+
+class _AsyncReadStream:
+    """Wraps a synchronous read stream for async usage."""
+
+    def __init__(self, stream: Any) -> None:
+        self._stream = stream
+
+    async def readline(self) -> bytes:
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, self._stream.readline)
+
+    async def read(self, n: int = -1) -> bytes:
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, self._stream.read, n)
 
 
 class MCPStdioClient:
@@ -47,13 +164,8 @@ class MCPStdioClient:
             " ".join(self._args),
         )
 
-        self._process = await asyncio.create_subprocess_exec(
-            self._command,
-            *self._args,
-            stdin=asyncio.subprocess.PIPE,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            env=proc_env,
+        self._process = await _create_subprocess(
+            self._command, self._args, proc_env
         )
 
         # Send initialize request

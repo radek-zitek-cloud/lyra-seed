@@ -7,12 +7,15 @@ from dataclasses import dataclass, field
 from agent_platform.observation.events import Event, EventFilter, EventType
 from agent_platform.observation.sqlite_event_store import SqliteEventStore
 
+# Sentinel object to signal subscription shutdown
+_SHUTDOWN = object()
+
 
 @dataclass
 class _Subscription:
     """Internal subscription state."""
 
-    queue: asyncio.Queue[Event] = field(default_factory=asyncio.Queue)
+    queue: asyncio.Queue = field(default_factory=asyncio.Queue)
     event_types: list[EventType] | None = None
     agent_id: str | None = None
     closed: bool = False
@@ -43,6 +46,8 @@ class InProcessEventBus:
 
     async def emit(self, event: Event) -> None:
         """Emit an event to all matching subscribers and persist to SQLite."""
+        if self._closed:
+            return
         # Persist first
         if self._store:
             await self._store.insert(event)
@@ -50,7 +55,7 @@ class InProcessEventBus:
         # Deliver to subscribers
         for sub in self._subscriptions:
             if sub.matches(event):
-                await sub.queue.put(event)
+                sub.queue.put_nowait(event)
 
     @property
     def is_closed(self) -> bool:
@@ -77,26 +82,25 @@ class InProcessEventBus:
     async def close(self) -> None:
         """Cancel all subscriptions and close the SQLite store."""
         self._closed = True
-        # Unblock all waiting subscribers by pushing a sentinel
+        # Unblock all waiting subscribers immediately
         for sub in list(self._subscriptions):
             sub.closed = True
-            await sub.queue.put(None)  # type: ignore[arg-type]
+            sub.queue.put_nowait(_SHUTDOWN)
         self._subscriptions.clear()
 
         if self._store:
             await self._store.close()
 
-    async def _iter_subscription(self, sub: _Subscription) -> AsyncIterator[Event]:
+    async def _iter_subscription(
+        self, sub: _Subscription
+    ) -> AsyncIterator[Event]:
         """Async iterator that yields events from a subscription queue."""
         try:
             while not sub.closed:
-                try:
-                    event = await asyncio.wait_for(sub.queue.get(), timeout=1.0)
-                except TimeoutError:
-                    continue
-                if event is None or sub.closed:
+                item = await sub.queue.get()
+                if item is _SHUTDOWN or item is None or sub.closed:
                     return
-                yield event
+                yield item
         finally:
             if sub in self._subscriptions:
                 self._subscriptions.remove(sub)

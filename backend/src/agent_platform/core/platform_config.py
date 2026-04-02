@@ -38,6 +38,7 @@ class PlatformConfig(BaseModel):
 
     dataDir: str = "./data"
     defaultModel: str = "openai/gpt-4.1-mini"
+    embeddingModel: str = "openai/text-embedding-3-large"
     mcpServers: dict[str, MCPServerConfig] = Field(default_factory=dict)
     systemPromptsDir: str = "./prompts"
 

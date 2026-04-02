@@ -117,9 +117,10 @@ class AgentRuntime:
                 )
                 events_emitted += 1
 
-                # Set agent_id on provider so its events are attributed correctly
+                # Set agent_id on providers so events are attributed correctly
                 if hasattr(self._llm, "_current_agent_id"):
                     self._llm._current_agent_id = agent_id
+                self._set_embedding_agent_id(agent_id)
 
                 response: LLMResponse = await self._llm.complete(
                     conversation.messages,
@@ -219,10 +220,11 @@ class AgentRuntime:
                     )
                     events_emitted += 1
 
-                    # Inject agent_id for memory tools
+                    # Inject agent_id for memory tools (always override —
+                    # LLM may hallucinate the name instead of UUID)
                     call_args = dict(tool_call.arguments)
                     if tool_call.name in ("remember", "recall", "forget"):
-                        call_args.setdefault("agent_id", agent_id)
+                        call_args["agent_id"] = agent_id
 
                     # Execute tool via registry
                     result = await self._tool_registry.call_tool(
@@ -370,3 +372,14 @@ class AgentRuntime:
         }
         gate.set()
         return True
+
+    def _set_embedding_agent_id(self, agent_id: str) -> None:
+        """Propagate agent_id to the embedding provider for event attribution."""
+        if self._context_manager is None:
+            return
+        store = getattr(self._context_manager, "_store", None)
+        if store is None:
+            return
+        emb_fn = getattr(store, "embedding_fn", None)
+        if emb_fn is not None and hasattr(emb_fn, "set_agent_id"):
+            emb_fn.set_agent_id(agent_id)

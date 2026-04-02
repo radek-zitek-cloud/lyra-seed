@@ -30,6 +30,11 @@ class ChromaMemoryStore:
             metadata={"hnsw:space": "cosine"},
         )
 
+    @property
+    def embedding_fn(self):
+        """Access the embedding function (for setting agent_id etc)."""
+        return self._embedding_fn
+
     async def add(self, entry: MemoryEntry) -> None:
         """Store a memory entry."""
         self._collection.add(

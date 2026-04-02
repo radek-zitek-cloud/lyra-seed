@@ -1,20 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 function fmtTime(ts?: string | null): string {
   if (!ts) return "";
   const d = new Date(ts);
   return d.toISOString().slice(11, 19);
-}
-
-interface Agent {
-  id: string;
-  name: string;
-  status: string;
-  config: Record<string, unknown>;
-  created_at: string;
-  updated_at: string;
 }
 
 interface Message {
@@ -35,14 +26,6 @@ interface EventItem {
   parent_event_id?: string | null;
 }
 
-const STATUS_STYLES: Record<string, { color: string; bg: string; border: string }> = {
-  idle: { color: "#555", bg: "rgba(85,85,85,0.08)", border: "rgba(85,85,85,0.2)" },
-  running: { color: "#00ff41", bg: "rgba(0,255,65,0.08)", border: "rgba(0,255,65,0.2)" },
-  waiting_hitl: { color: "#ffaa00", bg: "rgba(255,170,0,0.08)", border: "rgba(255,170,0,0.2)" },
-  completed: { color: "#00ff41", bg: "rgba(0,255,65,0.08)", border: "rgba(0,255,65,0.2)" },
-  failed: { color: "#ff3333", bg: "rgba(255,51,51,0.08)", border: "rgba(255,51,51,0.2)" },
-};
-
 const EVENT_COLORS: Record<string, string> = {
   llm_request: "#6688ff",
   llm_response: "#4466dd",
@@ -57,254 +40,221 @@ const EVENT_COLORS: Record<string, string> = {
   agent_complete: "#0099cc",
 };
 
-const DEFAULT_STATUS = { color: "#555", bg: "transparent", border: "#222" };
+const ROLE_COLORS: Record<string, string> = {
+  human: "#6688ff",
+  assistant: "#00ff41",
+  system: "#555",
+  tool_result: "#8844cc",
+};
 
-export function AgentDetail({
-  agent,
-  messages,
-  events,
-}: {
-  agent: Agent;
-  messages: Message[];
-  events: EventItem[];
-}) {
+/** Extract key info from event payload for inline display. */
+function eventSummary(evt: EventItem): string {
+  const p = evt.payload;
+  switch (evt.event_type) {
+    case "llm_request":
+      if (p.model) return `model=${p.model} msgs=${p.message_count ?? "?"}`;
+      if (p.iteration) return `iter=${p.iteration} msgs=${p.message_count ?? "?"}`;
+      return "";
+    case "llm_response":
+      if (p.usage && typeof p.usage === "object") {
+        const u = p.usage as Record<string, unknown>;
+        const inTok = u.prompt_tokens ?? u.input_tokens ?? "?";
+        const outTok = u.completion_tokens ?? u.output_tokens ?? "?";
+        return `in=${inTok} out=${outTok}`;
+      }
+      if (p.tool_call_count) return `tools=${p.tool_call_count}`;
+      return "";
+    case "tool_call":
+      return (p.tool_name ?? p.tool) ? String(p.tool_name ?? p.tool) : "";
+    case "tool_result": {
+      const name = (p.tool_name ?? p.tool) ? String(p.tool_name ?? p.tool) : "";
+      const ok = p.success !== undefined ? (p.success ? "ok" : "fail") : "";
+      const dur = p.duration_ms ? `${p.duration_ms}ms` : "";
+      return [name, ok, dur].filter(Boolean).join(" ");
+    }
+    case "memory_read":
+      if (p.query) return `"${String(p.query).slice(0, 40)}"`;
+      if (p.results_count !== undefined) return `${p.results_count} results`;
+      return "";
+    case "memory_write":
+      return p.memory_type
+        ? `${p.memory_type} ${p.content_preview ? String(p.content_preview).slice(0, 30) + "…" : ""}`
+        : "";
+    case "error":
+      return p.error ? String(p.error).slice(0, 50) : "";
+    case "hitl_request":
+      return (p.tool_name ?? p.tool) ? `tool=${p.tool_name ?? p.tool}` : "";
+    case "hitl_response":
+      return p.approved !== undefined ? (p.approved ? "approved" : "denied") : "";
+    default:
+      return "";
+  }
+}
+
+function isNearBottom(el: HTMLElement, threshold = 30): boolean {
+  return el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
+}
+
+/* ── Conversation Panel ─────────────────────────────── */
+
+export function ConversationPanel({ messages }: { messages: Message[] }) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const wasAtBottom = useRef(true);
+
+  const handleScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (el) wasAtBottom.current = isNearBottom(el);
+  }, []);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el && wasAtBottom.current) el.scrollTop = el.scrollHeight;
+  }, [messages]);
+
+  return (
+    <div style={{ background: "#111", border: "1px solid #1a1a1a", borderRadius: "3px", padding: "6px" }}>
+      <h2 style={{ fontSize: "11px", fontWeight: 700, color: "#555", letterSpacing: "1px", marginBottom: "4px" }}>
+        CONVERSATION
+      </h2>
+      <div ref={scrollRef} onScroll={handleScroll} style={{ maxHeight: "500px", overflowY: "auto" }}>
+        {messages.map((msg, i) => {
+          const roleColor = ROLE_COLORS[msg.role] ?? "#555";
+          return (
+            <div
+              key={i}
+              style={{
+                padding: "2px 4px",
+                marginBottom: "1px",
+                borderLeft: `2px solid ${roleColor}`,
+                background: "#0a0a0a",
+                fontSize: "12px",
+                lineHeight: "1.4",
+              }}
+            >
+              <span style={{ color: roleColor, fontWeight: 700, fontSize: "10px", letterSpacing: "0.5px", textTransform: "uppercase", marginRight: "6px" }}>
+                {msg.role}:
+              </span>
+              <span style={{ color: "#b0b0b0", whiteSpace: msg.role === "tool_result" ? "nowrap" : "pre-wrap", overflow: msg.role === "tool_result" ? "hidden" : undefined, textOverflow: msg.role === "tool_result" ? "ellipsis" : undefined }}>
+                {msg.role === "tool_result" ? msg.content.slice(0, 80) + (msg.content.length > 80 ? "…" : "") : msg.content}
+              </span>
+              {msg.timestamp && (
+                <span style={{ color: "#333", fontSize: "10px", marginLeft: "6px" }}>{fmtTime(msg.timestamp)}</span>
+              )}
+            </div>
+          );
+        })}
+        {messages.length === 0 && (
+          <div style={{ color: "#333", textAlign: "center", padding: "8px", fontSize: "11px" }}>
+            No messages yet.
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ── Event Timeline ──────────────────────────────────── */
+
+export function EventTimeline({ events }: { events: EventItem[] }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const convoScrollRef = useRef<HTMLDivElement>(null);
-  const eventsScrollRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const wasAtBottom = useRef(true);
 
-  const scrollConvoToBottom = () => {
-    const el = convoScrollRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  };
-
-  const scrollEventsToBottom = () => {
-    const el = eventsScrollRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  };
+  const handleScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (el) wasAtBottom.current = isNearBottom(el);
+  }, []);
 
   const toggle = (id: string) => {
     setExpanded((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-        setTimeout(scrollEventsToBottom, 50);
-      }
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
   };
 
-  const s = STATUS_STYLES[agent.status] ?? DEFAULT_STATUS;
-
   useEffect(() => {
-    scrollConvoToBottom();
-  }, [messages]);
-
-  useEffect(() => {
-    scrollEventsToBottom();
+    const el = scrollRef.current;
+    if (el && wasAtBottom.current) el.scrollTop = el.scrollHeight;
   }, [events]);
 
   return (
-    <div>
-      {/* Header */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          paddingBottom: "16px",
-          marginBottom: "24px",
-          borderBottom: "1px solid #1a1a1a",
-        }}
-      >
-        <div>
-          <h1 style={{ fontSize: "18px", fontWeight: 700, color: "#e0e0e0", letterSpacing: "2px" }}>
-            {agent.name}
-          </h1>
-          <div style={{ fontSize: "12px", color: "#555", marginTop: "4px" }}>
-            MODEL: {String(agent.config?.model ?? "default")}
-          </div>
-        </div>
-        <span
-          style={{
-            fontSize: "12px",
-            fontWeight: 700,
-            padding: "2px 10px",
-            borderRadius: "2px",
-            letterSpacing: "1px",
-            color: s.color,
-            background: s.bg,
-            border: `1px solid ${s.border}`,
-            animation:
-              agent.status === "running" || agent.status === "waiting_hitl"
-                ? "pulse-glow 1.5s ease-in-out infinite"
-                : "none",
-          }}
-        >
-          {agent.status}
-        </span>
-      </div>
-
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
-        {/* Conversation Panel */}
-        <div
-          style={{
-            background: "#111",
-            border: "1px solid #1a1a1a",
-            borderRadius: "4px",
-            padding: "20px",
-          }}
-        >
-          <h2
-            style={{
-              fontSize: "14px",
-              fontWeight: 700,
-              color: "#555",
-              letterSpacing: "1px",
-              marginBottom: "16px",
-            }}
-          >
-            CONVERSATION
-          </h2>
-          <div ref={convoScrollRef} style={{ maxHeight: "400px", overflowY: "auto" }}>
-            {messages.map((msg, i) => (
-              <div
-                key={i}
+    <div style={{ background: "#111", border: "1px solid #1a1a1a", borderRadius: "3px", padding: "6px" }}>
+      <h2 style={{ fontSize: "11px", fontWeight: 700, color: "#555", letterSpacing: "1px", marginBottom: "4px" }}>
+        EVENTS
+      </h2>
+      <div ref={scrollRef} onScroll={handleScroll} style={{ maxHeight: "500px", overflowY: "auto" }}>
+        {events.map((evt) => {
+          const color = EVENT_COLORS[evt.event_type] ?? "#555";
+          return (
+            <div key={evt.id} style={{ borderLeft: `2px solid ${color}`, marginBottom: "1px" }}>
+              <button
+                onClick={() => toggle(evt.id)}
                 style={{
-                  padding: "10px 12px",
-                  marginBottom: "8px",
-                  borderLeft: `3px solid ${
-                    msg.role === "human"
-                      ? "#6688ff"
-                      : msg.role === "assistant"
-                        ? "#00ff41"
-                        : "#555"
-                  }`,
-                  background: "#0a0a0a",
-                  borderRadius: "0 2px 2px 0",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  width: "100%",
+                  padding: "2px 4px",
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  textAlign: "left",
+                  fontFamily: "inherit",
+                  fontSize: "11px",
+                  color: "#b0b0b0",
                 }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = "#0a0a0a")}
+                onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
               >
-                <div
-                  style={{
-                    fontSize: "11px",
-                    fontWeight: 700,
-                    color: "#555",
-                    letterSpacing: "1px",
-                    marginBottom: "6px",
-                    textTransform: "uppercase",
-                    display: "flex",
-                    justifyContent: "space-between",
-                  }}
-                >
-                  <span>{msg.role}</span>
-                  {msg.timestamp && (
-                    <span style={{ fontWeight: 400, color: "#333" }}>
-                      {fmtTime(msg.timestamp)}
+                <div style={{ display: "flex", alignItems: "center", gap: "4px", minWidth: 0, flex: 1 }}>
+                  <span style={{ color: "#444", fontSize: "9px" }}>
+                    {expanded.has(evt.id) ? "\u25BC" : "\u25B6"}
+                  </span>
+                  <span style={{ color, fontWeight: 700, letterSpacing: "0.5px", flexShrink: 0, fontSize: "11px" }}>
+                    {evt.event_type}
+                  </span>
+                  {eventSummary(evt) && (
+                    <span style={{ color: "#666", fontSize: "10px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {eventSummary(evt)}
                     </span>
                   )}
                 </div>
-                <div style={{ color: "#b0b0b0", fontSize: "13px", whiteSpace: "pre-wrap" }}>
-                  {msg.content}
-                </div>
-              </div>
-            ))}
-            {messages.length === 0 && (
-              <div style={{ color: "#333", textAlign: "center", padding: "16px", fontSize: "12px" }}>
-                No messages yet.
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Event Timeline */}
-        <div
-          style={{
-            background: "#111",
-            border: "1px solid #1a1a1a",
-            borderRadius: "4px",
-            padding: "20px",
-          }}
-        >
-          <h2
-            style={{
-              fontSize: "14px",
-              fontWeight: 700,
-              color: "#555",
-              letterSpacing: "1px",
-              marginBottom: "16px",
-            }}
-          >
-            EVENTS
-          </h2>
-          <div ref={eventsScrollRef} style={{ maxHeight: "400px", overflowY: "auto" }}>
-            {events.map((evt) => {
-              const color = EVENT_COLORS[evt.event_type] ?? "#555";
-              return (
-                <div key={evt.id} style={{ borderLeft: `3px solid ${color}`, marginBottom: "4px" }}>
-                  <button
-                    onClick={() => toggle(evt.id)}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      width: "100%",
-                      padding: "6px 10px",
-                      background: "none",
-                      border: "none",
-                      cursor: "pointer",
-                      textAlign: "left",
-                      fontFamily: "inherit",
-                      fontSize: "12px",
-                      color: "#b0b0b0",
-                    }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = "#0a0a0a")}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
-                  >
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                      <span style={{ color: "#444", fontSize: "10px" }}>
-                        {expanded.has(evt.id) ? "\u25BC" : "\u25B6"}
-                      </span>
-                      <span style={{ color, fontWeight: 700, letterSpacing: "0.5px" }}>
-                        {evt.event_type}
-                      </span>
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                      {evt.duration_ms != null && (
-                        <span style={{ color: "#444", fontSize: "11px" }}>{evt.duration_ms}ms</span>
-                      )}
-                      <span style={{ color: "#333", fontSize: "11px" }}>{evt.module}</span>
-                      <span style={{ color: "#333", fontSize: "11px" }}>{fmtTime(evt.timestamp)}</span>
-                    </div>
-                  </button>
-                  {expanded.has(evt.id) && (
-                    <div style={{ padding: "0 10px 8px" }}>
-                      <pre
-                        style={{
-                          fontSize: "11px",
-                          color: "#555",
-                          background: "#0a0a0a",
-                          border: "1px solid #1a1a1a",
-                          borderRadius: "2px",
-                          padding: "10px",
-                          overflowX: "auto",
-                          whiteSpace: "pre-wrap",
-                        }}
-                      >
-                        {JSON.stringify(evt.payload, null, 2)}
-                      </pre>
-                    </div>
+                <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
+                  {evt.duration_ms != null && (
+                    <span style={{ color: "#444", fontSize: "10px" }}>{evt.duration_ms}ms</span>
                   )}
+                  <span style={{ color: "#686", fontSize: "10px" }}>{evt.module}</span>
+                  <span style={{ color: "#333", fontSize: "10px" }}>{fmtTime(evt.timestamp)}</span>
                 </div>
-              );
-            })}
-            {events.length === 0 && (
-              <div style={{ color: "#333", textAlign: "center", padding: "16px", fontSize: "12px" }}>
-                No events yet.
-              </div>
-            )}
+              </button>
+              {expanded.has(evt.id) && (
+                <div style={{ padding: "0 4px 4px" }}>
+                  <pre
+                    style={{
+                      fontSize: "10px",
+                      color: "#555",
+                      background: "#0a0a0a",
+                      border: "1px solid #1a1a1a",
+                      borderRadius: "2px",
+                      padding: "4px",
+                      overflowX: "auto",
+                      whiteSpace: "pre-wrap",
+                    }}
+                  >
+                    {JSON.stringify(evt.payload, null, 2)}
+                  </pre>
+                </div>
+              )}
+            </div>
+          );
+        })}
+        {events.length === 0 && (
+          <div style={{ color: "#333", textAlign: "center", padding: "8px", fontSize: "11px" }}>
+            No events yet.
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

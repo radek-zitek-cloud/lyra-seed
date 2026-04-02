@@ -240,29 +240,16 @@ class TestV1Phase5:
             assert call["payload"]["tool_name"] == "search"
 
     @pytest.mark.asyncio
-    async def test_st_5_6_ws_agent_event_stream(self, app_client):
-        """ST-5.6: WebSocket agent event stream."""
-        _, app = app_client
+    async def test_st_5_6_sse_agent_event_stream(self, app_client):
+        """ST-5.6: SSE agent event stream."""
+        client, app = app_client
 
-        from unittest.mock import AsyncMock as _AsyncMock
+        import json
 
-        from fastapi import WebSocketDisconnect
-
-        from agent_platform.api.ws_routes import agent_event_stream
         from agent_platform.observation.events import Event, EventType
 
         event_bus = app.state.event_bus
-        agent_id = "ws-test-agent"
-
-        # Mock WebSocket — capture sent data, disconnect after first event
-        mock_ws = _AsyncMock()
-        received: list[dict] = []
-
-        async def capture_and_disconnect(data):
-            received.append(data)
-            raise WebSocketDisconnect()
-
-        mock_ws.send_json = capture_and_disconnect
+        agent_id = "sse-test-agent"
 
         event = Event(
             agent_id=agent_id,
@@ -271,48 +258,48 @@ class TestV1Phase5:
             payload={"model": "test"},
         )
 
-        async def emit_after_delay():
+        # Emit event, then close bus so SSE generator ends
+        async def emit_and_close():
             await asyncio.sleep(0.05)
             await event_bus.emit(event)
+            await asyncio.sleep(0.05)
+            await event_bus.close()
 
-        await asyncio.gather(
-            agent_event_stream(mock_ws, agent_id),
-            emit_after_delay(),
+        emit_task = asyncio.create_task(emit_and_close())
+
+        resp = await client.get(
+            f"/agents/{agent_id}/events/stream",
+            headers={"Accept": "text/event-stream"},
         )
+        assert resp.status_code == 200
+        assert "text/event-stream" in resp.headers.get("content-type", "")
 
-        mock_ws.accept.assert_called_once()
-        assert len(received) == 1
-        assert received[0]["agent_id"] == agent_id
-        assert received[0]["event_type"] == "llm_request"
+        lines = [
+            ln
+            for ln in resp.text.strip().split("\n")
+            if ln.startswith("data: ")
+        ]
+        assert len(lines) >= 1
+        data = json.loads(lines[0].removeprefix("data: "))
+        assert data["agent_id"] == agent_id
+        assert data["event_type"] == "llm_request"
+
+        await emit_task
+        # Re-initialize bus for other tests
+        event_bus._closed = False
 
     @pytest.mark.asyncio
-    async def test_st_5_7_ws_global_event_stream(self, app_client):
-        """ST-5.7: WebSocket global event stream."""
-        _, app = app_client
+    async def test_st_5_7_sse_global_event_stream(self, app_client):
+        """ST-5.7: SSE global event stream."""
+        client, app = app_client
 
-        from unittest.mock import AsyncMock as _AsyncMock2
+        import json
 
-        from fastapi import WebSocketDisconnect
-
-        from agent_platform.api.ws_routes import global_event_stream
         from agent_platform.observation.events import Event, EventType
 
         event_bus = app.state.event_bus
 
-        mock_ws = _AsyncMock2()
-        received: list[dict] = []
-        call_count = 0
-
-        async def capture_send(data):
-            nonlocal call_count
-            received.append(data)
-            call_count += 1
-            if call_count >= 2:
-                raise WebSocketDisconnect()
-
-        mock_ws.send_json = capture_send
-
-        async def emit_events():
+        async def emit_and_close():
             await asyncio.sleep(0.05)
             await event_bus.emit(
                 Event(
@@ -330,17 +317,30 @@ class TestV1Phase5:
                     payload={},
                 )
             )
+            await asyncio.sleep(0.05)
+            await event_bus.close()
 
-        await asyncio.gather(
-            global_event_stream(mock_ws),
-            emit_events(),
+        emit_task = asyncio.create_task(emit_and_close())
+
+        resp = await client.get(
+            "/events/stream",
+            headers={"Accept": "text/event-stream"},
         )
+        assert resp.status_code == 200
 
-        mock_ws.accept.assert_called_once()
-        assert len(received) == 2
-        agent_ids = {r["agent_id"] for r in received}
+        lines = [
+            ln
+            for ln in resp.text.strip().split("\n")
+            if ln.startswith("data: ")
+        ]
+        assert len(lines) >= 2
+        events = [json.loads(ln.removeprefix("data: ")) for ln in lines]
+        agent_ids = {e["agent_id"] for e in events}
         assert "agent-x" in agent_ids
         assert "agent-y" in agent_ids
+
+        await emit_task
+        event_bus._closed = False
 
     @pytest.mark.asyncio
     async def test_st_5_8_cors_headers(self, app_client):

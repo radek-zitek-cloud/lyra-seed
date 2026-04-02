@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 interface PromptInputProps {
   onSubmit: (message: string) => void;
@@ -9,20 +9,23 @@ interface PromptInputProps {
 
 export function PromptInput({ onSubmit, disabled }: PromptInputProps) {
   const [message, setMessage] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!message.trim()) return;
     onSubmit(message.trim());
     setMessage("");
+    setTimeout(() => inputRef.current?.focus(), 0);
   };
 
   return (
     <form
       onSubmit={handleSubmit}
-      style={{ display: "flex", gap: "8px", marginTop: "16px" }}
+      style={{ display: "flex", gap: "4px" }}
     >
       <input
+        ref={inputRef}
         type="text"
         value={message}
         onChange={(e) => setMessage(e.target.value)}
@@ -30,13 +33,13 @@ export function PromptInput({ onSubmit, disabled }: PromptInputProps) {
         disabled={disabled}
         style={{
           flex: 1,
-          padding: "10px 12px",
+          padding: "4px 8px",
           background: "#0a0a0a",
           border: "1px solid #222",
           borderRadius: "2px",
           color: "#e0e0e0",
           fontFamily: "inherit",
-          fontSize: "14px",
+          fontSize: "12px",
           outline: "none",
           opacity: disabled ? 0.5 : 1,
         }}
@@ -47,7 +50,7 @@ export function PromptInput({ onSubmit, disabled }: PromptInputProps) {
         type="submit"
         disabled={disabled || !message.trim()}
         style={{
-          padding: "10px 20px",
+          padding: "4px 12px",
           background: disabled
             ? "rgba(255, 170, 0, 0.1)"
             : "rgba(0, 255, 65, 0.1)",
@@ -55,7 +58,7 @@ export function PromptInput({ onSubmit, disabled }: PromptInputProps) {
           borderRadius: "2px",
           color: disabled ? "#ffaa00" : "#00ff41",
           fontFamily: "inherit",
-          fontSize: "14px",
+          fontSize: "11px",
           fontWeight: 700,
           letterSpacing: "1px",
           cursor: disabled || !message.trim() ? "not-allowed" : "pointer",
@@ -63,7 +66,7 @@ export function PromptInput({ onSubmit, disabled }: PromptInputProps) {
           animation: disabled ? "pulse-glow 1.5s ease-in-out infinite" : "none",
         }}
       >
-        {disabled ? "PROCESSING..." : "SEND"}
+        {disabled ? "PROCESSING" : "SEND"}
       </button>
     </form>
   );

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 
-import { AgentDetail } from "@/components/AgentDetail";
+import { ConversationPanel, EventTimeline } from "@/components/AgentDetail";
 import { ConnectionStatus } from "@/components/ConnectionStatus";
 import { HITLPanel } from "@/components/HITLPanel";
 import { PromptInput } from "@/components/PromptInput";
@@ -16,6 +16,15 @@ import {
   respondHITL,
   sendPrompt,
 } from "@/lib/api";
+
+const STATUS_STYLES: Record<string, { color: string; bg: string; border: string }> = {
+  idle: { color: "#555", bg: "rgba(85,85,85,0.08)", border: "rgba(85,85,85,0.2)" },
+  running: { color: "#00ff41", bg: "rgba(0,255,65,0.08)", border: "rgba(0,255,65,0.2)" },
+  waiting_hitl: { color: "#ffaa00", bg: "rgba(255,170,0,0.08)", border: "rgba(255,170,0,0.2)" },
+  completed: { color: "#00ff41", bg: "rgba(0,255,65,0.08)", border: "rgba(0,255,65,0.2)" },
+  failed: { color: "#ff3333", bg: "rgba(255,51,51,0.08)", border: "rgba(255,51,51,0.2)" },
+};
+const DEFAULT_STATUS = { color: "#555", bg: "transparent", border: "#222" };
 
 export default function AgentPage() {
   const params = useParams();
@@ -45,20 +54,17 @@ export default function AgentPage() {
     refreshAll().catch(() => {});
   }, [agentId]);
 
-  // React to live events — refresh agent status on HITL and completion events
   useEffect(() => {
     if (liveEvents.length === 0) return;
     const latest = liveEvents[liveEvents.length - 1];
     const eventType = latest.event_type as string;
 
-    // Merge into events list
     setEvents((prev) => {
       const ids = new Set(prev.map((e) => (e as Record<string, unknown>).id));
       const newEvents = liveEvents.filter((e) => !ids.has(e.id));
       return newEvents.length > 0 ? [...prev, ...newEvents] : prev;
     });
 
-    // On HITL request or response, refresh agent to get updated status
     if (
       eventType === "hitl_request" ||
       eventType === "hitl_response" ||
@@ -71,8 +77,9 @@ export default function AgentPage() {
   const handlePrompt = async (message: string) => {
     setSending(true);
     promptInFlight.current = true;
+    // Show the human message immediately in the conversation
+    setMessages((prev) => [...prev, { role: "human", content: message }]);
 
-    // Fire prompt in background — don't block UI
     sendPrompt(agentId, message)
       .then(() => refreshAll())
       .catch(() => {})
@@ -88,7 +95,6 @@ export default function AgentPage() {
     message?: string,
   ) => {
     await respondHITL(id, approved, message);
-    // Agent will resume — refresh status
     fetchAgent(agentId).then(setAgent).catch(() => {});
   };
 
@@ -100,104 +106,97 @@ export default function AgentPage() {
     (e) => e.event_type === "tool_call" || e.event_type === "tool_result",
   );
 
-  // Show HITL panel when agent is waiting, based on live status
   const isWaitingHITL = (agent as Record<string, unknown>).status === "waiting_hitl";
   const hitlEvents = isWaitingHITL
     ? (events as Record<string, unknown>[]).filter(
         (e) => e.event_type === "hitl_request",
       )
     : [];
-  // Only show the most recent HITL request
   const pendingHITL = hitlEvents.length > 0 ? [hitlEvents[hitlEvents.length - 1]] : [];
+
+  const agentStatus = String((agent as Record<string, unknown>).status ?? "idle");
+  const s = STATUS_STYLES[agentStatus] ?? DEFAULT_STATUS;
+  const agentName = String((agent as Record<string, unknown>).name ?? "Agent");
+  const agentConfig = (agent as Record<string, unknown>).config as Record<string, unknown> | undefined;
+  const agentModel = String(agentConfig?.model ?? "default");
 
   return (
     <div>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: "16px",
-        }}
-      >
-        <a
-          href="/"
+      {/* Header row */}
+      <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "6px" }}>
+        <span style={{ fontSize: "14px", fontWeight: 700, color: "#e0e0e0", letterSpacing: "1px" }}>
+          {agentName}
+        </span>
+        <span style={{ fontSize: "11px", color: "#444" }}>{agentModel}</span>
+        <span
           style={{
             fontSize: "11px",
-            color: "#555",
-            textDecoration: "none",
-            border: "1px solid #222",
+            fontWeight: 700,
+            padding: "1px 8px",
             borderRadius: "2px",
-            padding: "4px 10px",
+            letterSpacing: "1px",
+            color: s.color,
+            background: s.bg,
+            border: `1px solid ${s.border}`,
+            animation:
+              agentStatus === "running" || agentStatus === "waiting_hitl"
+                ? "pulse-glow 1.5s ease-in-out infinite"
+                : "none",
           }}
         >
-          &larr; AGENTS
-        </a>
-        <ConnectionStatus state={connectionState} />
+          {agentStatus}
+        </span>
+        <span style={{ marginLeft: "auto" }}>
+          <ConnectionStatus state={connectionState} />
+        </span>
       </div>
 
+      {/* Status banner */}
       {sending && (
         <div
           style={{
-            background: isWaitingHITL
-              ? "rgba(255, 170, 0, 0.04)"
-              : "rgba(0, 255, 65, 0.04)",
-            border: `1px solid ${
-              isWaitingHITL
-                ? "rgba(255, 170, 0, 0.15)"
-                : "rgba(0, 255, 65, 0.15)"
-            }`,
-            borderRadius: "4px",
-            padding: "12px 16px",
-            marginBottom: "16px",
+            background: isWaitingHITL ? "rgba(255,170,0,0.04)" : "rgba(0,255,65,0.04)",
+            border: `1px solid ${isWaitingHITL ? "rgba(255,170,0,0.15)" : "rgba(0,255,65,0.15)"}`,
+            borderRadius: "3px",
+            padding: "4px 8px",
+            marginBottom: "6px",
             display: "flex",
             alignItems: "center",
-            gap: "10px",
+            gap: "6px",
             animation: "pulse-glow 2s ease-in-out infinite",
           }}
         >
           <span
             style={{
-              width: "8px",
-              height: "8px",
+              width: "6px",
+              height: "6px",
               borderRadius: "50%",
               background: isWaitingHITL ? "#ffaa00" : "#00ff41",
               animation: "blink 1s step-end infinite",
             }}
           />
-          <span
-            style={{
-              fontSize: "12px",
-              color: isWaitingHITL ? "#ffaa00" : "#00ff41",
-              fontWeight: 700,
-              letterSpacing: "1px",
-            }}
-          >
+          <span style={{ fontSize: "11px", color: isWaitingHITL ? "#ffaa00" : "#00ff41", fontWeight: 700, letterSpacing: "1px" }}>
             {isWaitingHITL ? "WAITING FOR APPROVAL" : "AGENT RUNNING"}
-          </span>
-          <span style={{ fontSize: "11px", color: "#555" }}>
-            {isWaitingHITL
-              ? "Approve or deny the pending tool call below"
-              : "Processing your request..."}
           </span>
         </div>
       )}
 
-      {pendingHITL.length > 0 && (
-        <HITLPanel
-          pendingActions={pendingHITL as never}
-          onRespond={handleHITLRespond}
-        />
-      )}
+      {/* Main row: left = conversation + prompt + HITL, right = events */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+          <ConversationPanel messages={messages as never} />
+          <PromptInput onSubmit={handlePrompt} disabled={sending} />
+          {pendingHITL.length > 0 && (
+            <HITLPanel
+              pendingActions={pendingHITL as never}
+              onRespond={handleHITLRespond}
+            />
+          )}
+        </div>
+        <EventTimeline events={events as never} />
+      </div>
 
-      <AgentDetail
-        agent={agent as never}
-        messages={messages as never}
-        events={events as never}
-      />
-
-      <PromptInput onSubmit={handlePrompt} disabled={sending} />
-
+      {/* Tool inspector below */}
       {toolEvents.length > 0 && (
         <ToolInspector toolEvents={toolEvents as never} />
       )}

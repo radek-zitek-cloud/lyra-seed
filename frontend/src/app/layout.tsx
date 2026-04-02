@@ -15,7 +15,7 @@ export default function RootLayout({
       <body>
         <header
           style={{
-            padding: "24px 32px 16px",
+            padding: "12px 20px",
             borderBottom: "1px solid #1a1a1a",
             display: "flex",
             justifyContent: "space-between",
@@ -49,10 +49,10 @@ export default function RootLayout({
             </a>
           </nav>
         </header>
-        <main style={{ padding: "24px 32px" }}>{children}</main>
+        <main style={{ padding: "12px 20px" }}>{children}</main>
         <footer
           style={{
-            padding: "16px 32px",
+            padding: "8px 20px",
             borderTop: "1px solid #1a1a1a",
             fontSize: "11px",
             color: "#333",

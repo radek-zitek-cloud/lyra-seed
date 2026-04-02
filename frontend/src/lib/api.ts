@@ -82,10 +82,9 @@ export async function respondHITL(
   return res.json();
 }
 
-export function createEventStream(agentId?: string): WebSocket {
-  const wsBase = API_BASE.replace(/^http/, "ws");
+export function createEventStream(agentId?: string): EventSource {
   const url = agentId
-    ? `${wsBase}/agents/${agentId}/events/stream`
-    : `${wsBase}/events/stream`;
-  return new WebSocket(url);
+    ? `${API_BASE}/agents/${agentId}/events/stream`
+    : `${API_BASE}/events/stream`;
+  return new EventSource(url);
 }

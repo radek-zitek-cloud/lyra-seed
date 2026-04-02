@@ -18,42 +18,37 @@ export function useEventStream(agentId?: string) {
   const [events, setEvents] = useState<EventItem[]>([]);
   const [connectionState, setConnectionState] =
     useState<ConnectionState>("disconnected");
-  const wsRef = useRef<WebSocket | null>(null);
+  const sourceRef = useRef<EventSource | null>(null);
 
   const connect = useCallback(() => {
-    const wsBase = (
-      process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"
-    ).replace(/^http/, "ws");
+    const base = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
     const url = agentId
-      ? `${wsBase}/agents/${agentId}/events/stream`
-      : `${wsBase}/events/stream`;
+      ? `${base}/agents/${agentId}/events/stream`
+      : `${base}/events/stream`;
 
     setConnectionState("connecting");
-    const ws = new WebSocket(url);
-    wsRef.current = ws;
+    const source = new EventSource(url);
+    sourceRef.current = source;
 
-    ws.onopen = () => setConnectionState("connected");
+    source.onopen = () => setConnectionState("connected");
 
-    ws.onmessage = (msg) => {
+    source.onmessage = (msg) => {
       const event: EventItem = JSON.parse(msg.data);
       setEvents((prev) => [...prev, event]);
     };
 
-    ws.onclose = () => {
+    source.onerror = () => {
       setConnectionState("disconnected");
+      source.close();
       // Reconnect after 3 seconds
       setTimeout(connect, 3000);
-    };
-
-    ws.onerror = () => {
-      ws.close();
     };
   }, [agentId]);
 
   useEffect(() => {
     connect();
     return () => {
-      wsRef.current?.close();
+      sourceRef.current?.close();
     };
   }, [connect]);
 

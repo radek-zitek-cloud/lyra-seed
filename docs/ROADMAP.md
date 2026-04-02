@@ -729,3 +729,45 @@ Human Prompt
 - **Audit trail:** The event system provides a full audit trail. Should there be an immutable export/archive feature?
 - **Plugin ecosystem:** Could third-party prompt macros or MCP server templates be shared/imported?
 - **Multi-human:** Currently single-user. If this ever expands, what changes? (Auth, memory isolation, HITL routing.)
+
+---
+
+## Post-V1 Addendum
+
+### V1 Completion Status
+
+All six V1 phases (0–5) are **COMPLETE** with 45 smoke tests passing. The platform delivers a working single-agent system with observability, memory, tool calling, and a web UI.
+
+### Technology Deviations
+
+| Roadmap | Delivered | Rationale |
+|---------|-----------|-----------|
+| sqlite-vec for vector storage | ChromaDB (PersistentClient) | More mature, handles embeddings + metadata filtering natively, cross-platform |
+| WebSocket for real-time events | SSE (Server-Sent Events) | WebSocket caused shutdown hangs on Windows/uvicorn; SSE has cleaner lifecycle, native browser EventSource |
+| Env-only config | `.env` + `lyra.config.json` + per-agent files | Secrets in env, platform config in JSON, agent prompts/config on filesystem |
+| MCP stub provider | Real stdio JSON-RPC MCP client | Enables immediate integration with MCP ecosystem (filesystem, shell servers) |
+| Alembic migrations | Auto-created schemas | Sufficient for V1 single-dev use; Alembic warranted if schema evolution becomes complex |
+
+### Features Added Beyond Roadmap
+
+1. **Platform config system** (`lyra.config.json`): MCP servers, data dir, default model, embedding model, prompts dir — all configurable without code changes
+2. **Agent file-based config**: `prompts/{agent-name}.md` for system prompts, `prompts/{agent-name}.json` for model/temperature/hitl_policy overrides. Falls back to `default.md`/`default.json`
+3. **Real MCP stdio transport**: JSON-RPC over subprocess stdin/stdout with Windows .cmd resolution and Popen fallback for asyncio compatibility
+4. **OpenRouter embedding provider**: Dual sync/async implementation — sync for ChromaDB's internal calls, async for protocol methods. Event emission from both paths
+5. **Event inline summaries**: UI shows key payload info (tokens, tool names, queries) without expanding event details
+6. **Smart auto-scroll**: Conversation and event panes only auto-scroll if user is already at the bottom
+
+### V2 Readiness Assessment
+
+The architecture is ready for V2 multi-agent work:
+- `Agent.parent_agent_id` field exists (unused in V1)
+- `AGENT_SPAWN` and `AGENT_COMPLETE` event types defined
+- `ToolRegistry` pattern allows adding a `spawn_agent` tool
+- Event bus supports agent_id filtering for per-agent streams
+- Frontend agent detail page can be reused for child agents
+
+**Recommended before starting V2:**
+- Add explicit retry with backoff to OpenRouterProvider (currently try/except only)
+- Consider cost tracking (OpenRouter provides cost data in usage)
+- Evaluate whether agent persistence model needs revision (long-lived vs task-scoped)
+- Add database migration tooling (Alembic) if V2 schemas grow complex

@@ -26,6 +26,7 @@ from agent_platform.db.sqlite_agent_repo import SqliteAgentRepo
 from agent_platform.db.sqlite_conversation_repo import SqliteConversationRepo
 from agent_platform.db.sqlite_macro_repo import SqliteMacroRepo
 from agent_platform.llm.openrouter import OpenRouterProvider
+from agent_platform.llm.openrouter_embeddings import OpenRouterEmbeddingProvider
 from agent_platform.memory.chroma_memory_store import ChromaMemoryStore
 from agent_platform.memory.context_manager import ContextManager
 from agent_platform.memory.memory_tools import MemoryToolProvider
@@ -44,7 +45,7 @@ async def _shutdown(
     event_bus, mcp_provider, agent_repo, conv_repo, macro_repo, *, has_mcp
 ):
     """Shut down all resources. Called with a timeout wrapper."""
-    # Close event bus first to unblock WebSocket subscribers
+    # Close event bus — unblocks SSE subscription iterators
     await event_bus.close()
     if has_mcp:
         await mcp_provider.close_all()
@@ -108,10 +109,18 @@ def create_app(
     if platform_config.mcpServers:
         tool_registry.register_provider(mcp_provider)
 
-    # Memory system
+    # Memory system with real embeddings
     memory_dir = os.path.join(db_dir, "memory")
     os.makedirs(memory_dir, exist_ok=True)
-    memory_store = ChromaMemoryStore(persist_dir=memory_dir)
+    embedding_provider = OpenRouterEmbeddingProvider(
+        api_key=settings.openrouter_api_key.get_secret_value(),
+        model=platform_config.embeddingModel,
+        event_bus=event_bus,
+    )
+    memory_store = ChromaMemoryStore(
+        persist_dir=memory_dir,
+        embedding_fn=embedding_provider,
+    )
     memory_provider = MemoryToolProvider(memory_store=memory_store, event_bus=event_bus)
     tool_registry.register_provider(memory_provider)
     context_manager = ContextManager(memory_store=memory_store, top_k=5)

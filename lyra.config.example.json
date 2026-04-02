@@ -1,11 +1,24 @@
 {
   "dataDir": "./data",
   "defaultModel": "openai/gpt-4.1-mini",
+  "embeddingModel": "openai/text-embedding-3-large",
   "mcpServers": {
     "filesystem": {
       "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"],
-      "env": {}
+      "args": ["-y", "fast-filesystem-mcp"],
+      "env": {
+        "CREATE_BACKUP_FILES": "true",
+        "DEBUG_MCP": "true",
+        "MCP_SILENT_ERRORS": "true",
+        "MCP_LOG_FILE": "/home/radek/Code/lyra-seed/logs/fast-fs-mcp.log"
+      }
+    },
+    "shell": {
+      "command": "uvx",
+      "args": ["mcp-shell-server"],
+      "env": {
+        "ALLOW_COMMANDS": "powershell,pwsh,Get-ChildItem,Get-Content,Get-Location,Select-String,Measure-Object,New-Item,Set-Content,Add-Content,Remove-Item,Copy-Item,Move-Item,Test-Path,Resolve-Path,Get-ItemProperty,Set-Location,Write-Output,Out-File,ConvertTo-Json,ConvertFrom-Json,Get-Process,Stop-Process,Get-Service,Invoke-WebRequest,Invoke-RestMethod,git,docker,python,pip,npm,node,curl,dotnet,where.exe,Get-Command,Get-Help,Get-Date,Get-Host,Format-Table,Format-List,Sort-Object,Where-Object,ForEach-Object,Select-Object,Group-Object,Compare-Object,Out-String"
+      }
     }
   },
   "systemPromptsDir": "./prompts"
