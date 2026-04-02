@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 interface PromptInputProps {
   onSubmit: (message: string) => void;
@@ -10,6 +10,14 @@ interface PromptInputProps {
 export function PromptInput({ onSubmit, disabled }: PromptInputProps) {
   const [message, setMessage] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const prevDisabled = useRef(disabled);
+  useEffect(() => {
+    if (prevDisabled.current && !disabled) {
+      inputRef.current?.focus();
+    }
+    prevDisabled.current = disabled;
+  }, [disabled]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
