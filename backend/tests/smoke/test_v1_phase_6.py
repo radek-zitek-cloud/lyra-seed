@@ -325,6 +325,8 @@ class TestV1Phase6:
         """ST-6.9: Cost aggregation from events."""
         from agent_platform.observation.cost_tracker import (
             compute_agent_cost,
+        )
+        from agent_platform.observation.cost_tracker import (
             configure as configure_costs,
         )
         from agent_platform.observation.events import Event, EventType

@@ -30,5 +30,12 @@
     "anthropic/claude-sonnet-4": [3.0, 15.0],
     "anthropic/claude-haiku-4": [0.8, 4.0]
   },
-  "defaultModelCost": [1.0, 4.0]
+  "defaultModelCost": [1.0, 4.0],
+
+  "retry": {
+    "max_retries": 3,
+    "base_delay": 1.0,
+    "max_delay": 30.0,
+    "timeout": 60.0
+  }
 }

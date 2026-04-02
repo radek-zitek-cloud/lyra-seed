@@ -31,13 +31,14 @@ class OpenRouterEmbeddingProvider:
         http_client: httpx.AsyncClient | None = None,
         event_bus: InProcessEventBus | None = None,
         agent_id: str = "system",
+        timeout: float = 60.0,
     ) -> None:
         self._api_key = api_key
         self._model = model
         self._async_client = http_client or httpx.AsyncClient(
-            timeout=httpx.Timeout(60.0, connect=10.0)
+            timeout=httpx.Timeout(timeout, connect=10.0)
         )
-        self._sync_client = httpx.Client(timeout=httpx.Timeout(60.0, connect=10.0))
+        self._sync_client = httpx.Client(timeout=httpx.Timeout(timeout, connect=10.0))
         self._event_bus = event_bus
         self._agent_id = agent_id
         self._dimensions: int | None = None

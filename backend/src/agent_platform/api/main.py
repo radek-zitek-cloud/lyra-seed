@@ -85,9 +85,20 @@ def create_app(
     conv_repo = SqliteConversationRepo(db_path)
     macro_repo = SqliteMacroRepo(db_path)
 
+    # Configure retry defaults from platform config
+    from agent_platform.llm.retry import configure as configure_retry
+
+    retry_cfg = platform_config.retry
+    configure_retry(
+        max_retries=retry_cfg.max_retries,
+        base_delay=retry_cfg.base_delay,
+        max_delay=retry_cfg.max_delay,
+    )
+
     llm_provider = OpenRouterProvider(
         api_key=settings.openrouter_api_key.get_secret_value(),
         event_bus=event_bus,
+        timeout=retry_cfg.timeout,
     )
 
     # Tool system
@@ -116,6 +127,7 @@ def create_app(
         api_key=settings.openrouter_api_key.get_secret_value(),
         model=platform_config.embeddingModel,
         event_bus=event_bus,
+        timeout=retry_cfg.timeout,
     )
     memory_store = ChromaMemoryStore(
         persist_dir=memory_dir,

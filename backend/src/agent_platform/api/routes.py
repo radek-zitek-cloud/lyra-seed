@@ -60,6 +60,16 @@ async def create_agent(req: CreateAgentRequest):
     if file_config.max_iterations is not None:
         config.max_iterations = file_config.max_iterations
 
+    if file_config.retry is not None:
+        from agent_platform.core.models import AgentRetryConfig
+
+        config.retry = AgentRetryConfig(
+            max_retries=file_config.retry.max_retries,
+            base_delay=file_config.retry.base_delay,
+            max_delay=file_config.retry.max_delay,
+            timeout=file_config.retry.timeout,
+        )
+
     # Apply system prompt from name.md
     if config.system_prompt == AgentConfig().system_prompt:
         config.system_prompt = resolve_prompt(req.name)

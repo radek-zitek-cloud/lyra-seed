@@ -31,14 +31,16 @@ class OpenRouterProvider:
         http_client: httpx.AsyncClient | None = None,
         event_bus: InProcessEventBus | None = None,
         agent_id: str = "system",
+        timeout: float = 60.0,
     ) -> None:
         self._api_key = api_key
         self._client = http_client or httpx.AsyncClient(
-            timeout=httpx.Timeout(60.0, connect=10.0)
+            timeout=httpx.Timeout(timeout, connect=10.0)
         )
         self._event_bus = event_bus
         self._agent_id = agent_id
         self._current_agent_id: str | None = None
+        self._current_retry: dict | None = None  # per-agent override
 
     async def complete(
         self,
@@ -75,6 +77,8 @@ class OpenRouterProvider:
 
         from agent_platform.llm.retry import async_retry
 
+        retry_kw = self._current_retry or {}
+
         start = time.monotonic()
         resp = await async_retry(
             lambda: self._client.post(
@@ -84,7 +88,8 @@ class OpenRouterProvider:
                     "Authorization": f"Bearer {self._api_key}",
                     "Content-Type": "application/json",
                 },
-            )
+            ),
+            **retry_kw,
         )
         duration_ms = int((time.monotonic() - start) * 1000)
         data = resp.json()

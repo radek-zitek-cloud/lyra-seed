@@ -123,9 +123,20 @@ class AgentRuntime:
                 )
                 events_emitted += 1
 
-                # Set agent_id on providers so events are attributed correctly
+                # Set agent_id and retry config on providers
                 if hasattr(self._llm, "_current_agent_id"):
                     self._llm._current_agent_id = agent_id
+                if hasattr(self._llm, "_current_retry"):
+                    rc = agent.config.retry
+                    self._llm._current_retry = {
+                        k: v
+                        for k, v in {
+                            "max_retries": rc.max_retries,
+                            "base_delay": rc.base_delay,
+                            "max_delay": rc.max_delay,
+                        }.items()
+                        if v is not None
+                    } or None
                 self._set_embedding_agent_id(agent_id)
 
                 response: LLMResponse = await self._llm.complete(
@@ -142,9 +153,7 @@ class AgentRuntime:
                 _usage = response.usage or {}
                 _prompt_tok = _usage.get("prompt_tokens", 0) or 0
                 _compl_tok = _usage.get("completion_tokens", 0) or 0
-                _in_rate, _out_rate = _get_cost_per_million(
-                    llm_config.model
-                )
+                _in_rate, _out_rate = _get_cost_per_million(llm_config.model)
                 _cost = (
                     _prompt_tok / 1_000_000 * _in_rate
                     + _compl_tok / 1_000_000 * _out_rate

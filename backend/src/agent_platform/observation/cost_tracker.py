@@ -51,9 +51,7 @@ async def compute_total_cost(
     event_bus: InProcessEventBus,
 ) -> dict:
     """Compute cost summary across all agents."""
-    events = await event_bus.query(
-        EventFilter(event_types=[EventType.LLM_RESPONSE])
-    )
+    events = await event_bus.query(EventFilter(event_types=[EventType.LLM_RESPONSE]))
     return _aggregate_costs(events)
 
 
@@ -97,7 +95,6 @@ def _aggregate_costs(events: list) -> dict:
         "total_completion_tokens": total_completion,
         "total_cost_usd": round(total_cost, 6),
         "by_model": {
-            k: {**v, "cost_usd": round(v["cost_usd"], 6)}
-            for k, v in by_model.items()
+            k: {**v, "cost_usd": round(v["cost_usd"], 6)} for k, v in by_model.items()
         },
     }

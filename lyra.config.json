@@ -1,5 +1,4 @@
 {
-  "dataDir": "./data",
   "mcpServers": {
     "filesystem": {
       "command": "npx",
@@ -18,9 +17,13 @@
       }
     }
   },
+
+  "dataDir": "./data",
   "systemPromptsDir": "./prompts",
+
   "defaultModel": "openai/gpt-5.4",
   "embeddingModel": "openai/text-embedding-3-large",
+
   "modelCosts": {
     "openai/gpt-5-mini": [0.25, 2.0],
     "openai/gpt-5.4-mini": [0.75, 4.5],
@@ -35,5 +38,12 @@
     "anthropic/claude-haiku-4.5": [1.0, 5.0],
     "google/gemini-3-flash-preview": [0.5, 3.0]
   },
-  "defaultModelCost": [1.0, 5.0]
+  "defaultModelCost": [1.0, 5.0],
+
+  "retry": {
+    "max_retries": 3,
+    "base_delay": 1.0,
+    "max_delay": 30.0,
+    "timeout": 60.0
+  }
 }

@@ -27,6 +27,15 @@ class HITLPolicy(StrEnum):
     NEVER = "never"
 
 
+class AgentRetryConfig(BaseModel):
+    """Per-agent retry override. None fields fall back to platform defaults."""
+
+    max_retries: int | None = None
+    base_delay: float | None = None
+    max_delay: float | None = None
+    timeout: float | None = None
+
+
 class AgentConfig(BaseModel):
     """Configuration for an agent instance."""
 
@@ -37,6 +46,7 @@ class AgentConfig(BaseModel):
     allowed_tools: list[str] = Field(default_factory=list)
     hitl_policy: HITLPolicy = HITLPolicy.NEVER
     hitl_timeout_seconds: float = 300
+    retry: AgentRetryConfig = Field(default_factory=AgentRetryConfig)
 
 
 class Agent(BaseModel):

@@ -25,6 +25,15 @@ logger = logging.getLogger(__name__)
 DEFAULT_SYSTEM_PROMPT = "You are a helpful assistant."
 
 
+class RetryConfig(BaseModel):
+    """Retry configuration for LLM API calls."""
+
+    max_retries: int = 3
+    base_delay: float = 1.0
+    max_delay: float = 30.0
+    timeout: float = 60.0
+
+
 class MCPServerConfig(BaseModel):
     """Configuration for a single MCP server."""
 
@@ -43,6 +52,7 @@ class PlatformConfig(BaseModel):
     systemPromptsDir: str = "./prompts"
     modelCosts: dict[str, list[float]] = Field(default_factory=dict)
     defaultModelCost: list[float] = Field(default_factory=lambda: [1.0, 4.0])
+    retry: RetryConfig = Field(default_factory=RetryConfig)
 
 
 def load_platform_config(project_root: Path) -> PlatformConfig:
@@ -80,6 +90,7 @@ class AgentFileConfig(BaseModel):
     hitl_policy: str | None = None
     temperature: float | None = None
     max_iterations: int | None = None
+    retry: RetryConfig | None = None
 
 
 def _sanitize_name(agent_name: str) -> str:
