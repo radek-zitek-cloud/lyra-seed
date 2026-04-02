@@ -41,9 +41,11 @@ const DEFAULT_STATUS = { color: "#555", bg: "transparent", border: "#222" };
 
 export function AgentList({
   agents,
+  agentCosts,
   onDelete,
 }: {
   agents: Agent[];
+  agentCosts?: Record<string, number>;
   onDelete?: (id: string) => void;
 }) {
   return (
@@ -142,14 +144,22 @@ export function AgentList({
                 style={{
                   display: "grid",
                   gridTemplateColumns: "1fr 1fr",
-                  gap: "8px",
+                  gap: "4px 8px",
                   fontSize: "12px",
                 }}
               >
-                <span style={{ color: "#555" }}>MODEL</span>
+                <span style={{ color: "#888" }}>MODEL</span>
                 <span style={{ color: "#b0b0b0", textAlign: "right" }}>
                   {String(agent.config?.model ?? "default")}
                 </span>
+                {agentCosts && (agentCosts[agent.id] ?? 0) > 0 && (
+                  <>
+                    <span style={{ color: "#888" }}>COST</span>
+                    <span style={{ color: "#cc9933", textAlign: "right" }}>
+                      ${agentCosts[agent.id].toFixed(4)}
+                    </span>
+                  </>
+                )}
               </div>
             </a>
           </div>

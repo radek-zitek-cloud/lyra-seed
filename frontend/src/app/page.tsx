@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { AgentList } from "@/components/AgentList";
 import { ConnectionStatus } from "@/components/ConnectionStatus";
 import { useEventStream } from "@/hooks/useEventStream";
-import { createAgent, deleteAgent, fetchAgents } from "@/lib/api";
+import { createAgent, deleteAgent, fetchAgentCost, fetchAgents } from "@/lib/api";
 
 export default function HomePage() {
   const [agents, setAgents] = useState<
@@ -18,13 +18,30 @@ export default function HomePage() {
       updated_at: string;
     }[]
   >([]);
+  const [agentCosts, setAgentCosts] = useState<Record<string, number>>({});
   const [newName, setNewName] = useState("");
   const { connectionState } = useEventStream();
 
+  const refreshAll = async () => {
+    const agentList = await fetchAgents();
+    setAgents(agentList);
+    // Fetch cost for each agent
+    const costs: Record<string, number> = {};
+    await Promise.all(
+      agentList.map(async (a: { id: string }) => {
+        try {
+          const c = await fetchAgentCost(a.id);
+          costs[a.id] = c.total_cost_usd ?? 0;
+        } catch {
+          costs[a.id] = 0;
+        }
+      }),
+    );
+    setAgentCosts(costs);
+  };
+
   useEffect(() => {
-    fetchAgents()
-      .then(setAgents)
-      .catch(() => {});
+    refreshAll().catch(() => {});
   }, []);
 
   const handleCreate = async (e: React.FormEvent) => {
@@ -32,15 +49,15 @@ export default function HomePage() {
     if (!newName.trim()) return;
     await createAgent(newName.trim());
     setNewName("");
-    const updated = await fetchAgents();
-    setAgents(updated);
+    await refreshAll();
   };
 
   const handleDelete = async (id: string) => {
     await deleteAgent(id);
-    const updated = await fetchAgents();
-    setAgents(updated);
+    await refreshAll();
   };
+
+  const totalCost = Object.values(agentCosts).reduce((s, c) => s + c, 0);
 
   return (
     <div>
@@ -52,16 +69,23 @@ export default function HomePage() {
           marginBottom: "24px",
         }}
       >
-        <h1
-          style={{
-            fontSize: "14px",
-            fontWeight: 700,
-            color: "#555",
-            letterSpacing: "1px",
-          }}
-        >
-          AGENTS
-        </h1>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <h1
+            style={{
+              fontSize: "14px",
+              fontWeight: 700,
+              color: "#888",
+              letterSpacing: "1px",
+            }}
+          >
+            AGENTS
+          </h1>
+          {totalCost > 0 && (
+            <span style={{ fontSize: "12px", color: "#cc9933" }}>
+              total ${totalCost.toFixed(4)}
+            </span>
+          )}
+        </div>
         <ConnectionStatus state={connectionState} />
       </div>
 
@@ -109,7 +133,7 @@ export default function HomePage() {
         </button>
       </form>
 
-      <AgentList agents={agents} onDelete={handleDelete} />
+      <AgentList agents={agents} agentCosts={agentCosts} onDelete={handleDelete} />
     </div>
   );
 }
