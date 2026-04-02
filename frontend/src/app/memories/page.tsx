@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 
+import { ConnectionStatus } from "@/components/ConnectionStatus";
+import { useEventStream } from "@/hooks/useEventStream";
 import { deleteMemory, fetchMemories, updateMemory } from "@/lib/api";
 
 const TYPE_COLORS: Record<string, string> = {
@@ -50,6 +52,8 @@ export default function MemoriesPage() {
   const [typeFilter, setTypeFilter] = useState("");
   const [archivedFilter, setArchivedFilter] = useState<string>("");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+
+  const { connectionState, connect, disconnect } = useEventStream();
 
   const load = async () => {
     const params: Record<string, unknown> = { limit: 100 };
@@ -113,6 +117,7 @@ export default function MemoriesPage() {
             {memories.length}
           </span>
         </h1>
+        <ConnectionStatus state={connectionState} onConnect={connect} onDisconnect={disconnect} />
       </div>
 
       {/* Search + Filters */}

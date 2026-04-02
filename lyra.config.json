@@ -11,9 +11,10 @@
       }
     },
     "shell": {
-      "command": "npx",
-      "args": ["-y", "@simonb97/server-win-cli"],
+      "command": "uvx",
+      "args": ["mcp-shell-server"],
       "env": {
+        "ALLOW_COMMANDS": "ls,cat,pwd,grep,wc,touch,find,git,docker,python,pip,npm,node"
       }
     }
   },
