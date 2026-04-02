@@ -1,0 +1,15 @@
+# prime-cli-writer
+
+CLI tool that generates the first N prime numbers and writes them to a file.
+
+## Setup
+
+```bash
+uv sync
+just check
+```
+
+## Documentation
+
+- `docs/requirements.md`
+- `docs/implementation-plan.md`

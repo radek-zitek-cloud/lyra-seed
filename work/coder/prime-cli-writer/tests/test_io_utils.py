@@ -1,0 +1,30 @@
+"""Tests for file output helpers."""
+
+from pathlib import Path
+
+import pytest
+
+from prime_cli_writer.exceptions import OutputWriteError
+from prime_cli_writer.io_utils import format_primes, write_primes_to_file
+
+
+def test_format_primes_with_values_returns_one_per_line() -> None:
+    assert format_primes([2, 3, 5]) == "2\n3\n5\n"
+
+
+def test_format_primes_empty_list_returns_empty_string() -> None:
+    assert format_primes([]) == ""
+
+
+def test_write_primes_to_file_writes_one_prime_per_line(tmp_path: Path) -> None:
+    output_path = tmp_path / "primes.txt"
+    write_primes_to_file([2, 3, 5], str(output_path))
+    assert output_path.read_text(encoding="utf-8") == "2\n3\n5\n"
+
+
+def test_write_primes_to_file_invalid_parent_raises_output_error(
+    tmp_path: Path,
+) -> None:
+    output_path = tmp_path / "missing" / "primes.txt"
+    with pytest.raises(OutputWriteError):
+        write_primes_to_file([2], str(output_path))

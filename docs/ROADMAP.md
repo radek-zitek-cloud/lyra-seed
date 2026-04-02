@@ -499,22 +499,68 @@ Human Prompt
 
 ---
 
-### V2 Phase 2: Inter-Agent Communication
+### V2 Phase 2: Inter-Agent Communication & Async Lifecycle
+
+**Objective:** Enable parent-child agent communication, make sub-agent spawning asynchronous, and support long-lived reusable sub-agents.
+
+**Background (from V2P1 testing):**
+
+V2P1 proved that sub-agents can spawn and execute with full tool access. However, testing revealed critical limitations:
+
+1. **Synchronous spawn blocks the parent.** `spawn_agent` blocks until the child completes all iterations (potentially minutes). The parent can't do anything else — no monitoring, no guidance, no parallel work.
+2. **Sub-agents are one-shot throwaway.** Once a child completes its task and goes idle, there's no way to give it another task. A "coder" agent that built a project can't be reused to extend it — a fresh agent must be spawned.
+3. **No mid-execution guidance.** If a child agent goes down the wrong path or needs clarification, the parent can't intervene. The only option is to wait for completion and then spawn a new child.
+4. **Human can interact with idle children via UI** (navigating to the child agent and sending prompts), but the parent agent cannot.
 
 **Deliverables:**
 
-- Message passing protocol:
-  - `send_message(target_agent_id, content, message_type)` tool
-  - `receive_messages(since?, message_type?)` tool
-  - Message types: TASK, RESULT, QUESTION, ANSWER, STATUS_UPDATE, INFORMATION
+**2.1 — Asynchronous Sub-Agent Spawning**
+
+- `spawn_agent` returns immediately with child agent ID (does not block)
+- Child runs in a background asyncio task
+- Parent continues its own tool loop after spawning
+- New tools for lifecycle management:
+  - `wait_for_agent(child_agent_id, timeout?)` — block until child completes or times out
+  - `check_agent_status(child_agent_id)` — non-blocking status check
+  - `stop_agent(child_agent_id)` — request graceful stop of a running child
+- Background task cleanup on shutdown
+
+**2.2 — Message Passing Protocol**
+
+- `send_message(target_agent_id, content, message_type)` tool
+- `receive_messages(since?, message_type?)` tool — checks inbox, non-blocking
+- Message types: TASK, RESULT, QUESTION, ANSWER, GUIDANCE, STATUS_UPDATE
 - `AgentMessage` model:
   - `id, from_agent_id, to_agent_id, content, message_type, timestamp, in_reply_to`
 - Communication patterns:
-  - Direct messaging (agent-to-agent)
+  - Direct messaging (parent ↔ child, agent ↔ agent)
   - Parent broadcast (to all children)
   - Result aggregation (parent collects all child results)
 - Communication events in the event stream: MESSAGE_SENT, MESSAGE_RECEIVED
 - Message persistence in SQLite
+
+**2.3 — Reusable Sub-Agent Lifecycle**
+
+- Parent can send a TASK message to an idle child to give it a new assignment
+- Child's `receive_messages` tool picks up the task and enters a new work cycle
+- Child retains full conversation history and memory from previous tasks
+- The agent lifecycle becomes: spawn → task 1 → idle → task 2 → idle → ... → eventual cleanup
+- Parent decides when to reuse vs spawn fresh based on context
+- New tool: `dismiss_agent(child_agent_id)` — marks child as COMPLETED (no longer reusable)
+
+**2.4 — Message Inbox Integration in Runtime**
+
+- At the start of each agent iteration, check for pending messages
+- Inject new GUIDANCE/TASK messages into the conversation context
+- This allows mid-execution course correction without waiting for completion
+
+**2.5 — UI Updates**
+
+- Agent detail page: message history panel showing inter-agent messages
+- Parent agent view: sub-agent status with "send message" input
+- Agent list: visual indicator for agents with unread messages
+
+**Exit Criteria:** Parent can spawn a child async, send it multiple tasks over its lifetime, provide mid-execution guidance, and observe the full message flow in the UI. Child agents persist and accumulate context across tasks.
 
 ---
 
