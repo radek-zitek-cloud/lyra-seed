@@ -36,6 +36,7 @@ class AgentConfig(BaseModel):
     system_prompt: str = "You are a helpful assistant."
     allowed_tools: list[str] = Field(default_factory=list)
     hitl_policy: HITLPolicy = HITLPolicy.NEVER
+    hitl_timeout_seconds: float = 300
 
 
 class Agent(BaseModel):

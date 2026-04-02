@@ -64,9 +64,7 @@ async def _create_subprocess(
         if sys.platform != "win32":
             raise
         # Windows fallback: use subprocess.Popen and wrap streams
-        logger.info(
-            "asyncio subprocess not available, using Popen fallback"
-        )
+        logger.info("asyncio subprocess not available, using Popen fallback")
         proc = subprocess.Popen(
             [resolved_cmd, *args],
             stdin=subprocess.PIPE,
@@ -164,9 +162,7 @@ class MCPStdioClient:
             " ".join(self._args),
         )
 
-        self._process = await _create_subprocess(
-            self._command, self._args, proc_env
-        )
+        self._process = await _create_subprocess(self._command, self._args, proc_env)
 
         # Send initialize request
         init_result = await self._send_request(

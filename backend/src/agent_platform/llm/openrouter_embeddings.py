@@ -34,8 +34,10 @@ class OpenRouterEmbeddingProvider:
     ) -> None:
         self._api_key = api_key
         self._model = model
-        self._async_client = http_client or httpx.AsyncClient()
-        self._sync_client = httpx.Client()
+        self._async_client = http_client or httpx.AsyncClient(
+            timeout=httpx.Timeout(60.0, connect=10.0)
+        )
+        self._sync_client = httpx.Client(timeout=httpx.Timeout(60.0, connect=10.0))
         self._event_bus = event_bus
         self._agent_id = agent_id
         self._dimensions: int | None = None
@@ -87,12 +89,16 @@ class OpenRouterEmbeddingProvider:
             },
         )
 
+        from agent_platform.llm.retry import sync_retry
+
         start = time.monotonic()
 
-        resp = self._sync_client.post(
-            OPENROUTER_EMBEDDING_URL,
-            json={"model": self._model, "input": texts},
-            headers=self._headers,
+        resp = sync_retry(
+            lambda: self._sync_client.post(
+                OPENROUTER_EMBEDDING_URL,
+                json={"model": self._model, "input": texts},
+                headers=self._headers,
+            )
         )
         duration_ms = int((time.monotonic() - start) * 1000)
 
@@ -149,12 +155,16 @@ class OpenRouterEmbeddingProvider:
                 )
             )
 
+        from agent_platform.llm.retry import async_retry
+
         start = time.monotonic()
 
-        resp = await self._async_client.post(
-            OPENROUTER_EMBEDDING_URL,
-            json={"model": self._model, "input": texts},
-            headers=self._headers,
+        resp = await async_retry(
+            lambda: self._async_client.post(
+                OPENROUTER_EMBEDDING_URL,
+                json={"model": self._model, "input": texts},
+                headers=self._headers,
+            )
         )
         duration_ms = int((time.monotonic() - start) * 1000)
 
@@ -212,9 +222,7 @@ class OpenRouterEmbeddingProvider:
     def _parse_embeddings(self, data: dict) -> list[list[float]]:
         """Parse OpenAI-format embedding response."""
         embeddings: list[list[float]] = []
-        for item in sorted(
-            data.get("data", []), key=lambda x: x["index"]
-        ):
+        for item in sorted(data.get("data", []), key=lambda x: x["index"]):
             embeddings.append(item["embedding"])
         if embeddings and self._dimensions is None:
             self._dimensions = len(embeddings[0])
@@ -246,9 +254,7 @@ class OpenRouterEmbeddingProvider:
         try:
             loop = asyncio.get_running_loop()
             loop.call_soon_threadsafe(
-                lambda: asyncio.ensure_future(
-                    self._event_bus.emit(event)
-                )
+                lambda: asyncio.ensure_future(self._event_bus.emit(event))
             )
         except RuntimeError:
             # No running loop — skip event emission

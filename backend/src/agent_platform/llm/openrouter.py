@@ -33,7 +33,9 @@ class OpenRouterProvider:
         agent_id: str = "system",
     ) -> None:
         self._api_key = api_key
-        self._client = http_client or httpx.AsyncClient()
+        self._client = http_client or httpx.AsyncClient(
+            timeout=httpx.Timeout(60.0, connect=10.0)
+        )
         self._event_bus = event_bus
         self._agent_id = agent_id
         self._current_agent_id: str | None = None
@@ -71,14 +73,18 @@ class OpenRouterProvider:
             json.dumps(request_body, default=str)[:2000],
         )
 
+        from agent_platform.llm.retry import async_retry
+
         start = time.monotonic()
-        resp = await self._client.post(
-            OPENROUTER_API_URL,
-            json=request_body,
-            headers={
-                "Authorization": f"Bearer {self._api_key}",
-                "Content-Type": "application/json",
-            },
+        resp = await async_retry(
+            lambda: self._client.post(
+                OPENROUTER_API_URL,
+                json=request_body,
+                headers={
+                    "Authorization": f"Bearer {self._api_key}",
+                    "Content-Type": "application/json",
+                },
+            )
         )
         duration_ms = int((time.monotonic() - start) * 1000)
         data = resp.json()

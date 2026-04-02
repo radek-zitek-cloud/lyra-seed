@@ -70,3 +70,23 @@ async def get_tool_calls(tool_name: str):
     # Filter by tool_name in payload
     filtered = [e for e in call_events if e.payload.get("tool_name") == tool_name]
     return [e.model_dump(mode="json") for e in filtered]
+
+
+@router.get("/agents/{agent_id}/cost")
+async def get_agent_cost(agent_id: str):
+    """Get cost summary for a specific agent."""
+    from agent_platform.api._deps import get_event_bus
+    from agent_platform.observation.cost_tracker import compute_agent_cost
+
+    event_bus = get_event_bus()
+    return await compute_agent_cost(event_bus, agent_id)
+
+
+@router.get("/cost")
+async def get_total_cost():
+    """Get total cost summary across all agents."""
+    from agent_platform.api._deps import get_event_bus
+    from agent_platform.observation.cost_tracker import compute_total_cost
+
+    event_bus = get_event_bus()
+    return await compute_total_cost(event_bus)

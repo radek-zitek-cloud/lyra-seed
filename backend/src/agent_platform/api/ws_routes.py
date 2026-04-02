@@ -11,8 +11,6 @@ import logging
 from fastapi import APIRouter, Request
 from starlette.responses import StreamingResponse
 
-from agent_platform.observation.events import Event
-
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
