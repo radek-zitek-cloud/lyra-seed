@@ -438,3 +438,131 @@ class TestV2Phase1:
         child = await deps["agent_repo"].get(child_id)
         assert child.config.model == "custom/parent-model"
         assert child.config.temperature == 0.3
+
+    @pytest.mark.asyncio
+    async def test_st_v2_1_13_template_loads_prompt(self, deps, tmp_path):
+        """ST-V2-1.13: Template spawning loads prompt from file."""
+        from functools import partial
+
+        from agent_platform.core.platform_config import (
+            resolve_agent_config,
+            resolve_system_prompt,
+        )
+        from agent_platform.tools.agent_spawner import AgentSpawnerProvider
+
+        # Create a template prompt file
+        prompts_dir = tmp_path / "prompts"
+        prompts_dir.mkdir()
+        (prompts_dir / "coder.md").write_text(
+            "You are an expert coder.", encoding="utf-8"
+        )
+
+        prompt_resolver = partial(
+            resolve_system_prompt,
+            prompts_dir=str(prompts_dir),
+            project_root=tmp_path,
+        )
+        config_resolver = partial(
+            resolve_agent_config,
+            prompts_dir=str(prompts_dir),
+            project_root=tmp_path,
+        )
+
+        parent = Agent(
+            name="parent",
+            config=AgentConfig(model="test/model"),
+        )
+        await deps["agent_repo"].create(parent)
+
+        provider = AgentSpawnerProvider(
+            agent_repo=deps["agent_repo"],
+            conversation_repo=deps["conv_repo"],
+            llm_provider=deps["llm"],
+            event_bus=deps["event_bus"],
+            system_prompt_resolver=prompt_resolver,
+            agent_config_resolver=config_resolver,
+        )
+
+        result = await provider.call_tool(
+            "spawn_agent",
+            {
+                "name": "my-coder",
+                "task": "Write hello world",
+                "template": "coder",
+                "agent_id": parent.id,
+            },
+        )
+
+        assert result.success is True
+        child_id = json.loads(result.output)["child_agent_id"]
+        child = await deps["agent_repo"].get(child_id)
+        assert child.config.system_prompt == "You are an expert coder."
+
+    @pytest.mark.asyncio
+    async def test_st_v2_1_14_template_override_wins(self, deps, tmp_path):
+        """ST-V2-1.14: Explicit args override template config."""
+        from functools import partial
+
+        from agent_platform.core.platform_config import (
+            resolve_agent_config,
+            resolve_system_prompt,
+        )
+        from agent_platform.tools.agent_spawner import AgentSpawnerProvider
+
+        # Create template files
+        prompts_dir = tmp_path / "prompts"
+        prompts_dir.mkdir()
+        (prompts_dir / "tpl.md").write_text(
+            "Template prompt.", encoding="utf-8"
+        )
+        (prompts_dir / "tpl.json").write_text(
+            json.dumps({"model": "template/model", "temperature": 0.1}),
+            encoding="utf-8",
+        )
+
+        prompt_resolver = partial(
+            resolve_system_prompt,
+            prompts_dir=str(prompts_dir),
+            project_root=tmp_path,
+        )
+        config_resolver = partial(
+            resolve_agent_config,
+            prompts_dir=str(prompts_dir),
+            project_root=tmp_path,
+        )
+
+        parent = Agent(
+            name="parent",
+            config=AgentConfig(model="parent/model"),
+        )
+        await deps["agent_repo"].create(parent)
+
+        provider = AgentSpawnerProvider(
+            agent_repo=deps["agent_repo"],
+            conversation_repo=deps["conv_repo"],
+            llm_provider=deps["llm"],
+            event_bus=deps["event_bus"],
+            system_prompt_resolver=prompt_resolver,
+            agent_config_resolver=config_resolver,
+        )
+
+        result = await provider.call_tool(
+            "spawn_agent",
+            {
+                "name": "child-override",
+                "task": "Work",
+                "template": "tpl",
+                "model": "override/model",
+                "agent_id": parent.id,
+            },
+        )
+
+        assert result.success is True
+        child_id = json.loads(result.output)["child_agent_id"]
+        child = await deps["agent_repo"].get(child_id)
+        # Template prompt loaded
+        assert child.config.system_prompt == "Template prompt."
+        # Explicit model override wins over template
+        assert child.config.model == "override/model"
+        # Template temperature used (no explicit override)
+        assert child.config.temperature == 0.1

@@ -2,6 +2,7 @@
 
 import json
 import time
+from collections.abc import Callable
 from typing import Any
 
 from agent_platform.core.models import (
@@ -30,6 +31,8 @@ class AgentSpawnerProvider:
         event_bus: InProcessEventBus,
         context_manager: object | None = None,
         extractor: object | None = None,
+        system_prompt_resolver: Callable[[str], str] | None = None,
+        agent_config_resolver: Callable | None = None,
     ) -> None:
         self._agent_repo = agent_repo
         self._conv_repo = conversation_repo
@@ -37,6 +40,8 @@ class AgentSpawnerProvider:
         self._event_bus = event_bus
         self._context_manager = context_manager
         self._extractor = extractor
+        self._resolve_prompt = system_prompt_resolver
+        self._resolve_config = agent_config_resolver
 
     async def list_tools(self) -> list[Tool]:
         return [
@@ -57,9 +62,20 @@ class AgentSpawnerProvider:
                             "type": "string",
                             "description": "The task/prompt to give the sub-agent",
                         },
+                        "template": {
+                            "type": "string",
+                            "description": (
+                                "Template name to load prompt and config "
+                                "from prompts/{template}.md and "
+                                "prompts/{template}.json (optional)"
+                            ),
+                        },
                         "system_prompt": {
                             "type": "string",
-                            "description": "Custom system prompt (optional)",
+                            "description": (
+                                "Custom system prompt — overrides template "
+                                "prompt if both provided (optional)"
+                            ),
                         },
                         "model": {
                             "type": "string",
@@ -158,14 +174,34 @@ class AgentSpawnerProvider:
         child_name = args["name"]
         task = args["task"]
 
-        # Resolve child config from parent
+        # Resolve child config
         parent = await self._agent_repo.get(parent_id) if parent_id else None
         child_config = AgentConfig()
-        if parent:
+        template = args.get("template")
+
+        if template and self._resolve_prompt:
+            # Templated spawn: load from prompts/{template}.md/.json
+            child_config.system_prompt = self._resolve_prompt(template)
+            if self._resolve_config:
+                file_config = self._resolve_config(template)
+                if file_config.model:
+                    child_config.model = file_config.model
+                if file_config.temperature is not None:
+                    child_config.temperature = file_config.temperature
+                if file_config.max_iterations is not None:
+                    child_config.max_iterations = file_config.max_iterations
+            # Fall back to parent for fields not set by template
+            if parent:
+                if child_config.model == AgentConfig().model:
+                    child_config.model = parent.config.model
+                if child_config.temperature == AgentConfig().temperature:
+                    child_config.temperature = parent.config.temperature
+        elif parent:
+            # Ad-hoc spawn: inherit from parent
             child_config.model = parent.config.model
             child_config.temperature = parent.config.temperature
 
-        # Apply overrides from spawn call
+        # Explicit overrides from spawn call always win
         if "system_prompt" in args and args["system_prompt"]:
             child_config.system_prompt = args["system_prompt"]
         if "model" in args and args["model"]:
