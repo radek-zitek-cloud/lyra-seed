@@ -276,8 +276,8 @@ class AgentRuntime:
                     )
                     events_emitted += 1
 
-                    # Inject agent_id for memory and spawner tools
-                    # (always override — LLM may hallucinate the name instead of UUID)
+                    # Inject agent_id for all agent-aware tools
+                    # (always override — LLM may hallucinate the name)
                     call_args = dict(tool_call.arguments)
                     if tool_call.name in (
                         "remember",
@@ -287,6 +287,11 @@ class AgentRuntime:
                         "wait_for_agent",
                         "get_agent_result",
                         "list_child_agents",
+                        "send_message",
+                        "receive_messages",
+                        "check_agent_status",
+                        "stop_agent",
+                        "dismiss_agent",
                     ):
                         call_args["agent_id"] = agent_id
 
