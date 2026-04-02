@@ -20,7 +20,5 @@ class Settings(BaseSettings):
     }
 
     openrouter_api_key: SecretStr = SecretStr("")
-    default_model: str = "minimax/minimax-m2.7"
-    db_path: str = "lyra.db"
     host: str = "0.0.0.0"
     port: int = 8000

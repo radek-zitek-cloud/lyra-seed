@@ -518,7 +518,6 @@ class TestV1Phase2:
 
         settings = Settings(
             openrouter_api_key="sk-test",  # type: ignore[arg-type]
-            db_path=str(tmp_path / "api_test.db"),
         )
         app = create_app(settings, db_dir=str(tmp_path))
 

@@ -24,7 +24,6 @@ async def app_client(tmp_path):
 
     settings = Settings(
         openrouter_api_key="sk-test",  # type: ignore[arg-type]
-        db_path=str(tmp_path / "test.db"),
     )
     app = create_app(settings, db_dir=str(tmp_path))
 

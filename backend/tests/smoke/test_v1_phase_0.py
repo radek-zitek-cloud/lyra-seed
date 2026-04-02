@@ -117,8 +117,6 @@ class TestV1Phase0:
 
         # Defaults exist for optional fields
         assert settings.host is not None
-        assert settings.db_path is not None
-        assert settings.default_model is not None
 
     def test_st_0_5_smoke_harness(self, request: pytest.FixtureRequest):
         """ST-0.5: Pytest smoke test harness works."""
