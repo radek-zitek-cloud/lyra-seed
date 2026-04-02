@@ -264,7 +264,8 @@ class TestV1Phase6:
         assert len(remaining) == 1
         assert remaining[0].content == "Critical knowledge"
 
-    def test_st_6_8_context_truncation(self):
+    @pytest.mark.asyncio
+    async def test_st_6_8_context_truncation(self):
         """ST-6.8: Context truncation under token budget."""
         from agent_platform.llm.models import Message, MessageRole
         from agent_platform.memory.token_estimator import (
@@ -299,7 +300,7 @@ class TestV1Phase6:
             max_context_tokens=1000,
         )
 
-        truncated = ctx._truncate(messages)
+        truncated = await ctx._compress(messages, 1000, "agent-1")
 
         # Should be under budget
         truncated_tokens = estimate_messages_tokens(truncated)

@@ -76,6 +76,8 @@ class PlatformConfig(BaseModel):
     hitl: HITLConfig = Field(default_factory=HITLConfig)
     memoryGC: MemoryGCConfig = Field(default_factory=MemoryGCConfig)
     context: ContextConfig = Field(default_factory=ContextConfig)
+    summaryModel: str = "openai/gpt-4.1-nano"
+    extractionModel: str = "openai/gpt-4.1-nano"
 
 
 def load_platform_config(project_root: Path) -> PlatformConfig:
@@ -95,6 +97,18 @@ def load_platform_config(project_root: Path) -> PlatformConfig:
         config.systemPromptsDir,
     )
     return config
+
+
+def load_system_prompt(name: str, project_root: Path) -> str | None:
+    """Load a system prompt from prompts/system/{name}.md.
+
+    Returns None if the file doesn't exist.
+    """
+    prompt_path = project_root / "prompts" / "system" / f"{name}.md"
+    if prompt_path.exists():
+        logger.info("Loaded system prompt: %s", prompt_path)
+        return prompt_path.read_text(encoding="utf-8").strip()
+    return None
 
 
 class AgentFileConfig(BaseModel):
@@ -117,6 +131,10 @@ class AgentFileConfig(BaseModel):
     hitl: HITLConfig | None = None
     memoryGC: MemoryGCConfig | None = None
     context: ContextConfig | None = None
+    summary_model: str | None = None
+    extraction_model: str | None = None
+    auto_extract: bool | None = None
+    memory_sharing: dict[str, str] | None = None
 
 
 def _sanitize_name(agent_name: str) -> str:

@@ -18,6 +18,7 @@ from agent_platform.api.ws_routes import router as ws_router
 from agent_platform.core.config import Settings
 from agent_platform.core.platform_config import (
     load_platform_config,
+    load_system_prompt,
     resolve_agent_config,
     resolve_system_prompt,
 )
@@ -29,6 +30,7 @@ from agent_platform.llm.openrouter import OpenRouterProvider
 from agent_platform.llm.openrouter_embeddings import OpenRouterEmbeddingProvider
 from agent_platform.memory.chroma_memory_store import ChromaMemoryStore
 from agent_platform.memory.context_manager import ContextManager
+from agent_platform.memory.extractor import FactExtractor
 from agent_platform.memory.memory_tools import MemoryToolProvider
 from agent_platform.observation.in_process_event_bus import InProcessEventBus
 from agent_platform.tools.mcp_client import MCPClientProvider, MCPStdioClient
@@ -135,7 +137,25 @@ def create_app(
     )
     memory_provider = MemoryToolProvider(memory_store=memory_store, event_bus=event_bus)
     tool_registry.register_provider(memory_provider)
-    context_manager = ContextManager(memory_store=memory_store, top_k=5)
+    # Load system prompts for summarization and extraction
+    summary_prompt = load_system_prompt("summarize", project_root)
+    extraction_prompt = load_system_prompt("extract_facts", project_root)
+
+    context_manager = ContextManager(
+        memory_store=memory_store,
+        top_k=5,
+        llm_provider=llm_provider,
+        summary_model=platform_config.summaryModel,
+        summary_prompt=summary_prompt,
+    )
+
+    extractor = FactExtractor(
+        llm_provider=llm_provider,
+        extraction_model=platform_config.extractionModel,
+        memory_store=memory_store,
+        event_bus=event_bus,
+        system_prompt=extraction_prompt,
+    )
 
     # System prompt resolver
     prompt_resolver = partial(
@@ -157,6 +177,7 @@ def create_app(
         event_bus=event_bus,
         tool_registry=tool_registry,
         context_manager=context_manager,
+        extractor=extractor,
     )
 
     @asynccontextmanager

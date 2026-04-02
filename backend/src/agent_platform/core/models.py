@@ -51,6 +51,10 @@ class AgentConfig(BaseModel):
     prune_max_entries: int = 500
     max_context_tokens: int = 100_000
     memory_top_k: int = 5
+    summary_model: str | None = None
+    extraction_model: str | None = None
+    auto_extract: bool = False
+    memory_sharing: dict[str, str] | None = None
 
 
 class Agent(BaseModel):

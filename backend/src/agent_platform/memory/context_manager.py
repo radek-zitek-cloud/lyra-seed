@@ -1,14 +1,20 @@
-"""Context manager — assembles messages with memory injection and truncation."""
+"""Context manager — assembles messages with memory injection and summarization."""
+
+import logging
 
 from agent_platform.llm.models import Message, MessageRole
 from agent_platform.memory.chroma_memory_store import ChromaMemoryStore
+from agent_platform.memory.models import MemoryEntry, MemoryType, MemoryVisibility
 from agent_platform.memory.token_estimator import estimate_messages_tokens
+
+logger = logging.getLogger(__name__)
 
 
 class ContextManager:
     """Retrieves relevant memories and injects them into the conversation.
 
-    Also enforces a token budget by truncating old messages when needed.
+    When over token budget, summarizes old messages via LLM (if available)
+    instead of just dropping them. Summaries are saved as EPISODIC memories.
     """
 
     def __init__(
@@ -16,10 +22,16 @@ class ContextManager:
         memory_store: ChromaMemoryStore,
         top_k: int = 5,
         max_context_tokens: int = 100_000,
+        llm_provider: object | None = None,
+        summary_model: str | None = None,
+        summary_prompt: str | None = None,
     ) -> None:
         self._store = memory_store
         self._top_k = top_k
         self._max_context_tokens = max_context_tokens
+        self._llm = llm_provider
+        self._summary_model = summary_model
+        self._summary_prompt = summary_prompt
 
     async def assemble(
         self,
@@ -29,33 +41,33 @@ class ContextManager:
         top_k: int | None = None,
         max_context_tokens: int | None = None,
     ) -> list[Message]:
-        """Assemble messages with memory injection and truncation.
-
-        Per-call overrides take precedence over constructor defaults.
-        """
+        """Assemble messages with memory injection and compression."""
         _top_k = top_k if top_k is not None else self._top_k
         _max_tokens = (
             max_context_tokens
             if max_context_tokens is not None
             else self._max_context_tokens
         )
+
         memories = await self._store.search(
             query=query,
             agent_id=agent_id,
             top_k=_top_k,
+            include_public=True,
         )
 
         if not memories:
             result = list(messages)
         else:
-            # Update access timestamps
             for m in memories:
                 await self._store.update_access(m.id)
 
-            # Build memory injection message
             memory_lines = []
             for m in memories:
-                memory_lines.append(f"- [{m.memory_type.value}] {m.content}")
+                prefix = f"[{m.memory_type.value}]"
+                if m.agent_id != agent_id:
+                    prefix += " [shared]"
+                memory_lines.append(f"- {prefix} {m.content}")
 
             memory_text = "Relevant memories from previous interactions:\n" + "\n".join(
                 memory_lines
@@ -66,7 +78,6 @@ class ContextManager:
                 content=memory_text,
             )
 
-            # Insert after the first system message (if any)
             result = list(messages)
             insert_idx = 0
             for i, msg in enumerate(result):
@@ -76,49 +87,85 @@ class ContextManager:
 
             result.insert(insert_idx, memory_msg)
 
-        # Truncate if over token budget
-        return self._truncate(result, _max_tokens)
+        # Compress if over token budget
+        return await self._compress(result, _max_tokens, agent_id)
 
-    def _truncate(
-        self, messages: list[Message], max_tokens: int | None = None
+    async def _compress(
+        self,
+        messages: list[Message],
+        budget: int,
+        agent_id: str,
     ) -> list[Message]:
-        """Remove oldest non-system messages if over token budget."""
-        budget = max_tokens if max_tokens is not None else self._max_context_tokens
+        """Compress messages to fit within token budget.
+
+        If LLM provider is configured, summarizes old messages.
+        Otherwise falls back to simple truncation.
+        """
         tokens = estimate_messages_tokens(messages)
         if tokens <= budget:
             return messages
 
-        # Keep system messages and the last message (current query)
-        # Remove from the middle (oldest non-system messages first)
+        # Find messages to remove (oldest non-system, not the last)
         result = list(messages)
-        truncated = False
+        to_summarize: list[Message] = []
 
         while estimate_messages_tokens(result) > budget and len(result) > 2:
-            # Find the first non-system message that isn't the last
             for i in range(len(result) - 1):
                 if result[i].role != MessageRole.SYSTEM:
-                    result.pop(i)
-                    truncated = True
+                    to_summarize.append(result.pop(i))
                     break
             else:
-                break  # Only system messages left
+                break
 
-        if truncated:
-            # Insert truncation marker after system messages
-            marker_idx = 0
-            for i, msg in enumerate(result):
-                if msg.role == MessageRole.SYSTEM:
-                    marker_idx = i + 1
-                else:
-                    break
-            result.insert(
-                marker_idx,
-                Message(
-                    role=MessageRole.SYSTEM,
-                    content=(
-                        "[Earlier conversation history truncated for context limits]"
-                    ),
-                ),
-            )
+        if not to_summarize:
+            return result
+
+        # Try LLM summarization
+        if self._llm and self._summary_model:
+            try:
+                summary = await self._summarize_messages(to_summarize)
+                # Save as EPISODIC memory
+                entry = MemoryEntry(
+                    agent_id=agent_id,
+                    content=summary,
+                    memory_type=MemoryType.EPISODIC,
+                    importance=0.6,
+                    visibility=MemoryVisibility.PRIVATE,
+                )
+                await self._store.add(entry)
+                logger.info(
+                    "Summarized %d messages into memory %s",
+                    len(to_summarize),
+                    entry.id,
+                )
+                marker = f"[Summary of {len(to_summarize)} earlier messages: {summary}]"
+            except Exception:
+                logger.exception("Summarization failed, using truncation")
+                marker = "[Earlier conversation history truncated for context limits]"
+        else:
+            marker = "[Earlier conversation history truncated for context limits]"
+
+        # Insert marker after system messages
+        marker_idx = 0
+        for i, msg in enumerate(result):
+            if msg.role == MessageRole.SYSTEM:
+                marker_idx = i + 1
+            else:
+                break
+        result.insert(
+            marker_idx,
+            Message(role=MessageRole.SYSTEM, content=marker),
+        )
 
         return result
+
+    async def _summarize_messages(self, messages: list[Message]) -> str:
+        """Summarize messages using the configured LLM."""
+        from agent_platform.memory.summarizer import ContextSummarizer
+
+        summarizer = ContextSummarizer(
+            llm_provider=self._llm,
+            summary_model=self._summary_model,  # type: ignore[arg-type]
+            system_prompt=self._summary_prompt,
+        )
+        return await summarizer.summarize(messages)

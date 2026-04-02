@@ -82,6 +82,15 @@ async def create_agent(req: CreateAgentRequest):
         config.max_context_tokens = file_config.context.max_tokens
         config.memory_top_k = file_config.context.memory_top_k
 
+    if file_config.summary_model is not None:
+        config.summary_model = file_config.summary_model
+    if file_config.extraction_model is not None:
+        config.extraction_model = file_config.extraction_model
+    if file_config.auto_extract is not None:
+        config.auto_extract = file_config.auto_extract
+    if file_config.memory_sharing is not None:
+        config.memory_sharing = file_config.memory_sharing
+
     # Apply platform defaults for fields not set by file config
     pc = get_platform_config()
     if pc:
@@ -97,6 +106,10 @@ async def create_agent(req: CreateAgentRequest):
             if file_config.context is None:
                 config.max_context_tokens = pc.context.max_tokens
                 config.memory_top_k = pc.context.memory_top_k
+        if config.summary_model is None:
+            config.summary_model = pc.summaryModel
+        if config.extraction_model is None:
+            config.extraction_model = pc.extractionModel
 
     # Apply system prompt from name.md
     if config.system_prompt == AgentConfig().system_prompt:

@@ -6,7 +6,7 @@ import chromadb
 
 from agent_platform.memory.decay import TimeDecayStrategy
 from agent_platform.memory.fake_embeddings import FakeEmbeddingProvider
-from agent_platform.memory.models import MemoryEntry, MemoryType
+from agent_platform.memory.models import MemoryEntry, MemoryType, MemoryVisibility
 
 COLLECTION_NAME = "agent_memories"
 
@@ -72,13 +72,30 @@ class ChromaMemoryStore:
         agent_id: str | None = None,
         memory_type: MemoryType | None = None,
         top_k: int = 5,
+        include_public: bool = False,
     ) -> list[MemoryEntry]:
-        """Semantic search for relevant memories."""
+        """Semantic search for relevant memories.
+
+        When include_public=True, also returns PUBLIC/TEAM memories
+        from other agents (cross-agent memory).
+        """
         where: dict[str, Any] | None = None
         conditions: list[dict[str, Any]] = []
 
-        if agent_id:
+        if agent_id and include_public:
+            # Own memories OR public/team memories from any agent
+            conditions.append(
+                {
+                    "$or": [
+                        {"agent_id": agent_id},
+                        {"visibility": MemoryVisibility.PUBLIC.value},
+                        {"visibility": MemoryVisibility.TEAM.value},
+                    ]
+                }
+            )
+        elif agent_id:
             conditions.append({"agent_id": agent_id})
+
         if memory_type:
             conditions.append({"memory_type": memory_type.value})
 
@@ -174,6 +191,7 @@ class ChromaMemoryStore:
             "agent_id": entry.agent_id,
             "memory_type": entry.memory_type.value,
             "importance": entry.importance,
+            "visibility": entry.visibility.value,
             "created_at": entry.created_at.isoformat(),
             "last_accessed_at": entry.last_accessed_at.isoformat(),
             "access_count": entry.access_count,
@@ -193,6 +211,7 @@ class ChromaMemoryStore:
             content=document,
             memory_type=MemoryType(metadata["memory_type"]),
             importance=metadata.get("importance", 0.5),
+            visibility=MemoryVisibility(metadata.get("visibility", "private")),
             created_at=datetime.fromisoformat(
                 metadata.get("created_at", datetime.now(UTC).isoformat())
             ).replace(tzinfo=UTC),

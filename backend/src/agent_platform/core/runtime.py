@@ -28,6 +28,7 @@ class AgentRuntime:
         event_bus: InProcessEventBus,
         tool_registry: ToolRegistry | None = None,
         context_manager: object | None = None,
+        extractor: object | None = None,
     ) -> None:
         self._agent_repo = agent_repo
         self._conv_repo = conversation_repo
@@ -35,6 +36,7 @@ class AgentRuntime:
         self._event_bus = event_bus
         self._tool_registry = tool_registry or ToolRegistry()
         self._context_manager = context_manager
+        self._extractor = extractor
         self._hitl_pending: dict[str, asyncio.Event] = {}
         self._hitl_responses: dict[str, dict] = {}
 
@@ -195,6 +197,14 @@ class AgentRuntime:
                     await self._conv_repo.update(conversation.id, conversation)
                     agent.status = AgentStatus.IDLE
                     await self._agent_repo.update(agent.id, agent)
+
+                    # Auto-extract facts from the response
+                    await self._auto_extract(
+                        agent_id,
+                        response.content or "",
+                        conversation.messages,
+                        agent.config,
+                    )
 
                     # Prune stale memories after successful run
                     await self._prune_memories(agent_id, agent.config)
@@ -447,6 +457,28 @@ class AgentRuntime:
         emb_fn = getattr(store, "embedding_fn", None)
         if emb_fn is not None and hasattr(emb_fn, "set_agent_id"):
             emb_fn.set_agent_id(agent_id)
+
+    async def _auto_extract(
+        self,
+        agent_id: str,
+        content: str,
+        messages: list,
+        config: object,
+    ) -> None:
+        """Run automatic fact extraction if enabled."""
+        if not getattr(config, "auto_extract", False):
+            return
+        if self._extractor is None:
+            return
+        try:
+            await self._extractor.extract(
+                agent_id=agent_id,
+                assistant_message=content,
+                conversation_context=messages,
+                memory_sharing=getattr(config, "memory_sharing", None),
+            )
+        except Exception:
+            pass  # Extraction failure never breaks the run
 
     async def _prune_memories(
         self, agent_id: str, agent_config: object | None = None
