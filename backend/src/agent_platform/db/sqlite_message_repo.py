@@ -109,8 +109,7 @@ class SqliteMessageRepo:
 
         where = " AND ".join(clauses)
         sql = (
-            f"SELECT * FROM agent_messages WHERE {where} "
-            f"ORDER BY timestamp ASC LIMIT ?"
+            f"SELECT * FROM agent_messages WHERE {where} ORDER BY timestamp ASC LIMIT ?"
         )
         params.append(limit)
 

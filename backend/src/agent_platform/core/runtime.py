@@ -29,6 +29,7 @@ class AgentRuntime:
         tool_registry: ToolRegistry | None = None,
         context_manager: object | None = None,
         extractor: object | None = None,
+        message_repo: object | None = None,
     ) -> None:
         self._agent_repo = agent_repo
         self._conv_repo = conversation_repo
@@ -37,6 +38,7 @@ class AgentRuntime:
         self._tool_registry = tool_registry or ToolRegistry()
         self._context_manager = context_manager
         self._extractor = extractor
+        self._message_repo = message_repo
         self._hitl_pending: dict[str, asyncio.Event] = {}
         self._hitl_responses: dict[str, dict] = {}
 
@@ -103,6 +105,9 @@ class AgentRuntime:
             iteration = 0
             while iteration < agent.config.max_iterations:
                 iteration += 1
+
+                # Inject pending GUIDANCE messages
+                await self._inject_guidance(agent_id, conversation)
 
                 # Call LLM with tool list
                 llm_config = LLMConfig(
@@ -465,6 +470,30 @@ class AgentRuntime:
         emb_fn = getattr(store, "embedding_fn", None)
         if emb_fn is not None and hasattr(emb_fn, "set_agent_id"):
             emb_fn.set_agent_id(agent_id)
+
+    async def _inject_guidance(self, agent_id: str, conversation: Conversation) -> None:
+        """Inject pending GUIDANCE messages into conversation context."""
+        if self._message_repo is None:
+            return
+        try:
+            from agent_platform.core.models import MessageType
+
+            msgs = await self._message_repo.list_for_agent(
+                agent_id,
+                direction="inbox",
+                message_type=MessageType.GUIDANCE,
+            )
+            for msg in msgs:
+                guidance_text = (
+                    f"[Guidance from agent {msg.from_agent_id}]: {msg.content}"
+                )
+                conversation.messages.append(
+                    Message(role=MessageRole.SYSTEM, content=guidance_text)
+                )
+                # Delete after injection so it's not re-injected
+                await self._message_repo.delete(msg.id)
+        except Exception:
+            pass  # Never break the runtime loop
 
     async def _auto_extract(
         self,

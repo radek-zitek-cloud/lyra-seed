@@ -1,6 +1,8 @@
-"""Agent spawner — tools for creating and managing sub-agents."""
+"""Agent spawner — tools for creating, managing, and messaging sub-agents."""
 
+import asyncio
 import json
+import logging
 import time
 from collections.abc import Callable
 from typing import Any
@@ -8,19 +10,24 @@ from typing import Any
 from agent_platform.core.models import (
     Agent,
     AgentConfig,
+    AgentMessage,
     AgentResponse,
     AgentStatus,
+    MessageType,
 )
 from agent_platform.db.sqlite_agent_repo import SqliteAgentRepo
 from agent_platform.db.sqlite_conversation_repo import SqliteConversationRepo
+from agent_platform.db.sqlite_message_repo import SqliteMessageRepo
 from agent_platform.llm.models import MessageRole
 from agent_platform.observation.events import Event, EventType
 from agent_platform.observation.in_process_event_bus import InProcessEventBus
 from agent_platform.tools.models import Tool, ToolResult, ToolType
 
+logger = logging.getLogger(__name__)
+
 
 class AgentSpawnerProvider:
-    """ToolProvider that lets agents spawn and manage sub-agents."""
+    """ToolProvider for spawning sub-agents, lifecycle management, and messaging."""
 
     def __init__(
         self,
@@ -33,6 +40,7 @@ class AgentSpawnerProvider:
         system_prompt_resolver: Callable[[str], str] | None = None,
         agent_config_resolver: Callable | None = None,
         tool_registry: object | None = None,
+        message_repo: SqliteMessageRepo | None = None,
         max_spawn_depth: int = 3,
     ) -> None:
         self._agent_repo = agent_repo
@@ -44,54 +52,30 @@ class AgentSpawnerProvider:
         self._resolve_prompt = system_prompt_resolver
         self._resolve_config = agent_config_resolver
         self._tool_registry = tool_registry
+        self._message_repo = message_repo
         self._max_spawn_depth = max_spawn_depth
+        # Async spawn tracking
+        self._running_tasks: dict[str, asyncio.Task] = {}
+        self._completion_events: dict[str, asyncio.Event] = {}
 
     async def list_tools(self) -> list[Tool]:
         return [
             Tool(
                 name="spawn_agent",
                 description=(
-                    "Create and run a sub-agent to handle a specific task. "
-                    "The sub-agent runs to completion and returns its response."
+                    "Spawn an async sub-agent. Returns immediately with "
+                    "child_agent_id. Use wait_for_agent to get results."
                 ),
                 input_schema={
                     "type": "object",
                     "properties": {
-                        "name": {
-                            "type": "string",
-                            "description": "Name for the sub-agent",
-                        },
-                        "task": {
-                            "type": "string",
-                            "description": "The task/prompt to give the sub-agent",
-                        },
-                        "template": {
-                            "type": "string",
-                            "description": (
-                                "Template name to load prompt and config "
-                                "from prompts/{template}.md and "
-                                "prompts/{template}.json (optional)"
-                            ),
-                        },
-                        "system_prompt": {
-                            "type": "string",
-                            "description": (
-                                "Custom system prompt — overrides template "
-                                "prompt if both provided (optional)"
-                            ),
-                        },
-                        "model": {
-                            "type": "string",
-                            "description": "LLM model override (optional)",
-                        },
-                        "temperature": {
-                            "type": "number",
-                            "description": "Temperature override (optional)",
-                        },
-                        "agent_id": {
-                            "type": "string",
-                            "description": "Parent agent ID (auto-injected)",
-                        },
+                        "name": {"type": "string"},
+                        "task": {"type": "string"},
+                        "template": {"type": "string"},
+                        "system_prompt": {"type": "string"},
+                        "model": {"type": "string"},
+                        "temperature": {"type": "number"},
+                        "agent_id": {"type": "string"},
                     },
                     "required": ["name", "task"],
                 },
@@ -100,18 +84,41 @@ class AgentSpawnerProvider:
             ),
             Tool(
                 name="wait_for_agent",
-                description="Wait for a child agent to complete and return its result.",
+                description="Wait for a child agent to complete.",
                 input_schema={
                     "type": "object",
                     "properties": {
-                        "child_agent_id": {
-                            "type": "string",
-                            "description": "ID of the child agent to wait for",
-                        },
-                        "agent_id": {
-                            "type": "string",
-                            "description": "Parent agent ID (auto-injected)",
-                        },
+                        "child_agent_id": {"type": "string"},
+                        "timeout": {"type": "number"},
+                        "agent_id": {"type": "string"},
+                    },
+                    "required": ["child_agent_id"],
+                },
+                tool_type=ToolType.PROMPT_MACRO,
+                source="agent_spawner",
+            ),
+            Tool(
+                name="check_agent_status",
+                description="Check a child agent's status (non-blocking).",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "child_agent_id": {"type": "string"},
+                        "agent_id": {"type": "string"},
+                    },
+                    "required": ["child_agent_id"],
+                },
+                tool_type=ToolType.PROMPT_MACRO,
+                source="agent_spawner",
+            ),
+            Tool(
+                name="stop_agent",
+                description="Stop a running child agent.",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "child_agent_id": {"type": "string"},
+                        "agent_id": {"type": "string"},
                     },
                     "required": ["child_agent_id"],
                 },
@@ -120,21 +127,12 @@ class AgentSpawnerProvider:
             ),
             Tool(
                 name="get_agent_result",
-                description=(
-                    "Get the current status and last response of a child agent. "
-                    "Non-blocking — returns immediately."
-                ),
+                description="Get child agent's last response.",
                 input_schema={
                     "type": "object",
                     "properties": {
-                        "child_agent_id": {
-                            "type": "string",
-                            "description": "ID of the child agent",
-                        },
-                        "agent_id": {
-                            "type": "string",
-                            "description": "Parent agent ID (auto-injected)",
-                        },
+                        "child_agent_id": {"type": "string"},
+                        "agent_id": {"type": "string"},
                     },
                     "required": ["child_agent_id"],
                 },
@@ -143,16 +141,62 @@ class AgentSpawnerProvider:
             ),
             Tool(
                 name="list_child_agents",
-                description="List all child agents spawned by this agent.",
+                description="List all child agents.",
                 input_schema={
                     "type": "object",
                     "properties": {
-                        "agent_id": {
-                            "type": "string",
-                            "description": "Parent agent ID (auto-injected)",
-                        },
+                        "agent_id": {"type": "string"},
                     },
                     "required": [],
+                },
+                tool_type=ToolType.PROMPT_MACRO,
+                source="agent_spawner",
+            ),
+            Tool(
+                name="send_message",
+                description="Send a message to another agent.",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "target_agent_id": {"type": "string"},
+                        "content": {"type": "string"},
+                        "message_type": {
+                            "type": "string",
+                            "enum": [t.value for t in MessageType],
+                        },
+                        "in_reply_to": {"type": "string"},
+                        "agent_id": {"type": "string"},
+                    },
+                    "required": ["target_agent_id", "content", "message_type"],
+                },
+                tool_type=ToolType.PROMPT_MACRO,
+                source="agent_spawner",
+            ),
+            Tool(
+                name="receive_messages",
+                description="Check inbox for messages (non-blocking).",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "message_type": {"type": "string"},
+                        "since": {"type": "string"},
+                        "agent_id": {"type": "string"},
+                    },
+                    "required": [],
+                },
+                tool_type=ToolType.PROMPT_MACRO,
+                source="agent_spawner",
+            ),
+            Tool(
+                name="dismiss_agent",
+                description="Mark a child agent as COMPLETED (no longer reusable).",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "child_agent_id": {"type": "string"},
+                        "agent_id": {"type": "string"},
+                    },
+                    "required": ["child_agent_id"],
                 },
                 tool_type=ToolType.PROMPT_MACRO,
                 source="agent_spawner",
@@ -161,76 +205,52 @@ class AgentSpawnerProvider:
 
     async def call_tool(self, name: str, arguments: dict[str, Any]) -> ToolResult:
         start = time.monotonic()
-        if name == "spawn_agent":
-            return await self._spawn_agent(arguments, start)
-        elif name == "wait_for_agent":
-            return await self._wait_for_agent(arguments, start)
-        elif name == "get_agent_result":
-            return await self._get_agent_result(arguments, start)
-        elif name == "list_child_agents":
-            return await self._list_child_agents(arguments, start)
-        return ToolResult(success=False, error=f"Unknown tool: {name}")
+        handlers = {
+            "spawn_agent": self._spawn_agent,
+            "wait_for_agent": self._wait_for_agent,
+            "check_agent_status": self._check_agent_status,
+            "stop_agent": self._stop_agent,
+            "get_agent_result": self._get_agent_result,
+            "list_child_agents": self._list_child_agents,
+            "send_message": self._send_message,
+            "receive_messages": self._receive_messages,
+            "dismiss_agent": self._dismiss_agent,
+        }
+        handler = handlers.get(name)
+        if handler is None:
+            return ToolResult(success=False, error=f"Unknown tool: {name}")
+        return await handler(arguments, start)
+
+    async def cancel_all_tasks(self) -> None:
+        """Cancel all running child tasks. Called on shutdown."""
+        for child_id, task in list(self._running_tasks.items()):
+            if not task.done():
+                task.cancel()
+                logger.info("Cancelled background task for agent %s", child_id)
+        self._running_tasks.clear()
+        self._completion_events.clear()
+
+    # ── Spawn ──────────────────────────────────────────
 
     async def _spawn_agent(self, args: dict[str, Any], start: float) -> ToolResult:
-        """Create a child agent, run it with the task, return result."""
+        """Create a child agent and run it async in a background task."""
         parent_id = args.get("agent_id")
         child_name = args["name"]
-        task = args["task"]
+        task_text = args["task"]
 
-        # Guard against infinite recursion
+        # Depth guard
         depth = await self._get_spawn_depth(parent_id)
         if depth >= self._max_spawn_depth:
             return ToolResult(
                 success=False,
-                error=(
-                    f"Maximum spawn depth ({self._max_spawn_depth}) reached. "
-                    f"Cannot spawn '{child_name}' at depth {depth + 1}."
-                ),
+                error=f"Max spawn depth ({self._max_spawn_depth}) reached.",
                 duration_ms=int((time.monotonic() - start) * 1000),
             )
 
         # Resolve child config
-        parent = await self._agent_repo.get(parent_id) if parent_id else None
-        child_config = AgentConfig()
-        template = args.get("template")
+        child_config = await self._resolve_child_config(args)
 
-        if template and self._resolve_prompt:
-            # Templated spawn: load from prompts/{template}.md/.json
-            child_config.system_prompt = self._resolve_prompt(template)
-            if self._resolve_config:
-                file_config = self._resolve_config(template)
-                if file_config.model:
-                    child_config.model = file_config.model
-                if file_config.temperature is not None:
-                    child_config.temperature = file_config.temperature
-                if file_config.max_iterations is not None:
-                    child_config.max_iterations = file_config.max_iterations
-                if file_config.hitl_policy is not None:
-                    from agent_platform.core.models import HITLPolicy
-
-                    child_config.hitl_policy = HITLPolicy(file_config.hitl_policy)
-                if file_config.auto_extract is not None:
-                    child_config.auto_extract = file_config.auto_extract
-            # Fall back to parent for fields not set by template
-            if parent:
-                if child_config.model == AgentConfig().model:
-                    child_config.model = parent.config.model
-                if child_config.temperature == AgentConfig().temperature:
-                    child_config.temperature = parent.config.temperature
-        elif parent:
-            # Ad-hoc spawn: inherit from parent
-            child_config.model = parent.config.model
-            child_config.temperature = parent.config.temperature
-
-        # Explicit overrides from spawn call always win
-        if "system_prompt" in args and args["system_prompt"]:
-            child_config.system_prompt = args["system_prompt"]
-        if "model" in args and args["model"]:
-            child_config.model = args["model"]
-        if "temperature" in args and args["temperature"] is not None:
-            child_config.temperature = args["temperature"]
-
-        # Create child agent
+        # Create child
         child = Agent(
             name=child_name,
             config=child_config,
@@ -238,7 +258,7 @@ class AgentSpawnerProvider:
         )
         await self._agent_repo.create(child)
 
-        # Emit AGENT_SPAWN event on parent
+        # Emit AGENT_SPAWN
         if parent_id:
             await self._event_bus.emit(
                 Event(
@@ -248,17 +268,40 @@ class AgentSpawnerProvider:
                     payload={
                         "child_agent_id": child.id,
                         "child_name": child_name,
-                        "task": task[:200],
+                        "task": task_text[:200],
                     },
                 )
             )
 
-        # Run the child agent
+        # Launch background task
+        completion_event = asyncio.Event()
+        self._completion_events[child.id] = completion_event
+
+        bg_task = asyncio.create_task(
+            self._run_child_background(child, task_text, parent_id)
+        )
+        self._running_tasks[child.id] = bg_task
+
+        duration = int((time.monotonic() - start) * 1000)
+        return ToolResult(
+            success=True,
+            output=json.dumps(
+                {
+                    "child_agent_id": child.id,
+                    "status": "running",
+                }
+            ),
+            duration_ms=duration,
+        )
+
+    async def _run_child_background(
+        self, child: Agent, task: str, parent_id: str | None
+    ) -> None:
+        """Background task that runs a child agent to completion."""
+        start = time.monotonic()
         try:
             response = await self._run_child(child, task)
             duration = int((time.monotonic() - start) * 1000)
-
-            # Emit AGENT_COMPLETE on child
             await self._event_bus.emit(
                 Event(
                     agent_id=child.id,
@@ -273,21 +316,13 @@ class AgentSpawnerProvider:
                     duration_ms=duration,
                 )
             )
-
-            return ToolResult(
-                success=True,
-                output=json.dumps(
-                    {
-                        "child_agent_id": child.id,
-                        "content": response.content,
-                    }
-                ),
-                duration_ms=duration,
-            )
+        except asyncio.CancelledError:
+            logger.info("Child agent %s cancelled", child.id)
+            child.status = AgentStatus.IDLE
+            await self._agent_repo.update(child.id, child)
         except Exception as e:
+            logger.exception("Child agent %s failed", child.id)
             duration = int((time.monotonic() - start) * 1000)
-
-            # Emit ERROR on child
             await self._event_bus.emit(
                 Event(
                     agent_id=child.id,
@@ -300,28 +335,13 @@ class AgentSpawnerProvider:
                     duration_ms=duration,
                 )
             )
-
-            # Update child status to FAILED
             child.status = AgentStatus.FAILED
             await self._agent_repo.update(child.id, child)
-
-            return ToolResult(
-                success=False,
-                error=f"Child agent '{child_name}' failed: {e}",
-                duration_ms=duration,
-            )
-
-    async def _get_spawn_depth(self, agent_id: str | None) -> int:
-        """Count the parent chain depth for an agent."""
-        depth = 0
-        current_id = agent_id
-        while current_id:
-            agent = await self._agent_repo.get(current_id)
-            if agent is None or agent.parent_agent_id is None:
-                break
-            depth += 1
-            current_id = agent.parent_agent_id
-        return depth
+        finally:
+            self._running_tasks.pop(child.id, None)
+            evt = self._completion_events.pop(child.id, None)
+            if evt:
+                evt.set()
 
     async def _run_child(self, child: Agent, task: str) -> AgentResponse:
         """Run a child agent using the full AgentRuntime loop."""
@@ -336,28 +356,35 @@ class AgentSpawnerProvider:
             tool_registry=self._tool_registry or ToolRegistry(),
             context_manager=self._context_manager,
             extractor=self._extractor,
+            message_repo=self._message_repo,
         )
         return await runtime.run(child.id, task)
 
+    # ── Lifecycle ──────────────────────────────────────
+
     async def _wait_for_agent(self, args: dict[str, Any], start: float) -> ToolResult:
-        """Wait for a child agent to complete and return its result."""
+        """Wait for a child agent to finish."""
         child_id = args["child_agent_id"]
+        timeout = args.get("timeout", 300)
 
-        child = await self._agent_repo.get(child_id)
-        if child is None:
-            return ToolResult(
-                success=False,
-                error=f"Agent {child_id} not found",
-                duration_ms=int((time.monotonic() - start) * 1000),
-            )
+        evt = self._completion_events.get(child_id)
+        if evt and not evt.is_set():
+            try:
+                await asyncio.wait_for(evt.wait(), timeout=timeout)
+            except TimeoutError:
+                return ToolResult(
+                    success=False,
+                    error=f"Timeout waiting for agent {child_id}",
+                    duration_ms=int((time.monotonic() - start) * 1000),
+                )
 
-        # For synchronous spawn, child is already complete
         return await self._get_agent_result(args, start)
 
-    async def _get_agent_result(self, args: dict[str, Any], start: float) -> ToolResult:
-        """Get a child agent's current status and last response."""
+    async def _check_agent_status(
+        self, args: dict[str, Any], start: float
+    ) -> ToolResult:
+        """Non-blocking status check."""
         child_id = args["child_agent_id"]
-
         child = await self._agent_repo.get(child_id)
         if child is None:
             return ToolResult(
@@ -366,7 +393,82 @@ class AgentSpawnerProvider:
                 duration_ms=int((time.monotonic() - start) * 1000),
             )
 
-        # Get last assistant message from conversation
+        # Get last message preview
+        content_preview = None
+        convos = await self._conv_repo.list(filters={"agent_id": child_id})
+        if convos:
+            for msg in reversed(convos[0].messages):
+                if msg.role == MessageRole.ASSISTANT:
+                    content_preview = str(msg.content)[:100] if msg.content else None
+                    break
+
+        return ToolResult(
+            success=True,
+            output=json.dumps(
+                {
+                    "child_agent_id": child.id,
+                    "name": child.name,
+                    "status": child.status.value,
+                    "content_preview": content_preview,
+                }
+            ),
+            duration_ms=int((time.monotonic() - start) * 1000),
+        )
+
+    async def _stop_agent(self, args: dict[str, Any], start: float) -> ToolResult:
+        """Cancel a running child's background task."""
+        child_id = args["child_agent_id"]
+        task = self._running_tasks.get(child_id)
+
+        if task and not task.done():
+            task.cancel()
+            # Wait briefly for cancellation
+            try:
+                await asyncio.wait_for(asyncio.shield(task), timeout=2.0)
+            except (asyncio.CancelledError, TimeoutError):
+                pass
+
+        child = await self._agent_repo.get(child_id)
+        if child and child.status == AgentStatus.RUNNING:
+            child.status = AgentStatus.IDLE
+            await self._agent_repo.update(child.id, child)
+
+        return ToolResult(
+            success=True,
+            output=f"Agent {child_id} stopped",
+            duration_ms=int((time.monotonic() - start) * 1000),
+        )
+
+    async def _dismiss_agent(self, args: dict[str, Any], start: float) -> ToolResult:
+        """Mark a child as COMPLETED (no longer reusable)."""
+        child_id = args["child_agent_id"]
+        child = await self._agent_repo.get(child_id)
+        if child is None:
+            return ToolResult(
+                success=False,
+                error=f"Agent {child_id} not found",
+                duration_ms=int((time.monotonic() - start) * 1000),
+            )
+
+        child.status = AgentStatus.COMPLETED
+        await self._agent_repo.update(child.id, child)
+        return ToolResult(
+            success=True,
+            output=f"Agent {child_id} dismissed",
+            duration_ms=int((time.monotonic() - start) * 1000),
+        )
+
+    async def _get_agent_result(self, args: dict[str, Any], start: float) -> ToolResult:
+        """Get child's current status and last response."""
+        child_id = args["child_agent_id"]
+        child = await self._agent_repo.get(child_id)
+        if child is None:
+            return ToolResult(
+                success=False,
+                error=f"Agent {child_id} not found",
+                duration_ms=int((time.monotonic() - start) * 1000),
+            )
+
         content = None
         convos = await self._conv_repo.list(filters={"agent_id": child_id})
         if convos:
@@ -375,7 +477,6 @@ class AgentSpawnerProvider:
                     content = msg.content
                     break
 
-        duration = int((time.monotonic() - start) * 1000)
         return ToolResult(
             success=True,
             output=json.dumps(
@@ -385,13 +486,12 @@ class AgentSpawnerProvider:
                     "content": content,
                 }
             ),
-            duration_ms=duration,
+            duration_ms=int((time.monotonic() - start) * 1000),
         )
 
     async def _list_child_agents(
         self, args: dict[str, Any], start: float
     ) -> ToolResult:
-        """List all children of the calling agent."""
         parent_id = args.get("agent_id")
         if not parent_id:
             return ToolResult(
@@ -401,18 +501,178 @@ class AgentSpawnerProvider:
             )
 
         children = await self._agent_repo.list_children(parent_id)
-        duration = int((time.monotonic() - start) * 1000)
+        return ToolResult(
+            success=True,
+            output=json.dumps(
+                [
+                    {"id": c.id, "name": c.name, "status": c.status.value}
+                    for c in children
+                ]
+            ),
+            duration_ms=int((time.monotonic() - start) * 1000),
+        )
+
+    # ── Messaging ──────────────────────────────────────
+
+    async def _send_message(self, args: dict[str, Any], start: float) -> ToolResult:
+        """Send a message to another agent."""
+        if not self._message_repo:
+            return ToolResult(
+                success=False,
+                error="Message repo not configured",
+                duration_ms=int((time.monotonic() - start) * 1000),
+            )
+
+        from_id = args.get("agent_id", "human")
+        to_id = args["target_agent_id"]
+        content = args["content"]
+        msg_type = MessageType(args["message_type"])
+
+        msg = AgentMessage(
+            from_agent_id=from_id,
+            to_agent_id=to_id,
+            content=content,
+            message_type=msg_type,
+            in_reply_to=args.get("in_reply_to"),
+        )
+        await self._message_repo.create(msg)
+
+        # Emit events
+        await self._event_bus.emit(
+            Event(
+                agent_id=from_id,
+                event_type=EventType.MESSAGE_SENT,
+                module="tools.agent_spawner",
+                payload={
+                    "message_id": msg.id,
+                    "to_agent_id": to_id,
+                    "message_type": msg_type.value,
+                    "content_preview": content[:100],
+                },
+            )
+        )
+        await self._event_bus.emit(
+            Event(
+                agent_id=to_id,
+                event_type=EventType.MESSAGE_RECEIVED,
+                module="tools.agent_spawner",
+                payload={
+                    "message_id": msg.id,
+                    "from_agent_id": from_id,
+                    "message_type": msg_type.value,
+                    "content_preview": content[:100],
+                },
+            )
+        )
+
+        return ToolResult(
+            success=True,
+            output=json.dumps(
+                {
+                    "message_id": msg.id,
+                    "status": "sent",
+                }
+            ),
+            duration_ms=int((time.monotonic() - start) * 1000),
+        )
+
+    async def _receive_messages(self, args: dict[str, Any], start: float) -> ToolResult:
+        """Check inbox for messages."""
+        if not self._message_repo:
+            return ToolResult(
+                success=True,
+                output="[]",
+                duration_ms=int((time.monotonic() - start) * 1000),
+            )
+
+        agent_id = args.get("agent_id")
+        if not agent_id:
+            return ToolResult(
+                success=False,
+                error="agent_id required",
+                duration_ms=int((time.monotonic() - start) * 1000),
+            )
+
+        msg_type = None
+        if args.get("message_type"):
+            msg_type = MessageType(args["message_type"])
+
+        msgs = await self._message_repo.list_for_agent(
+            agent_id,
+            direction="inbox",
+            message_type=msg_type,
+            since=args.get("since"),
+        )
+
         return ToolResult(
             success=True,
             output=json.dumps(
                 [
                     {
-                        "id": c.id,
-                        "name": c.name,
-                        "status": c.status.value,
+                        "id": m.id,
+                        "from_agent_id": m.from_agent_id,
+                        "content": m.content,
+                        "message_type": m.message_type.value,
+                        "timestamp": m.timestamp.isoformat(),
+                        "in_reply_to": m.in_reply_to,
                     }
-                    for c in children
+                    for m in msgs
                 ]
             ),
-            duration_ms=duration,
+            duration_ms=int((time.monotonic() - start) * 1000),
         )
+
+    # ── Helpers ────────────────────────────────────────
+
+    async def _get_spawn_depth(self, agent_id: str | None) -> int:
+        depth = 0
+        current_id = agent_id
+        while current_id:
+            agent = await self._agent_repo.get(current_id)
+            if agent is None or agent.parent_agent_id is None:
+                break
+            depth += 1
+            current_id = agent.parent_agent_id
+        return depth
+
+    async def _resolve_child_config(self, args: dict[str, Any]) -> AgentConfig:
+        """Resolve child config from template, parent, and explicit overrides."""
+        parent_id = args.get("agent_id")
+        parent = await self._agent_repo.get(parent_id) if parent_id else None
+        child_config = AgentConfig()
+        template = args.get("template")
+
+        if template and self._resolve_prompt:
+            child_config.system_prompt = self._resolve_prompt(template)
+            if self._resolve_config:
+                fc = self._resolve_config(template)
+                if fc.model:
+                    child_config.model = fc.model
+                if fc.temperature is not None:
+                    child_config.temperature = fc.temperature
+                if fc.max_iterations is not None:
+                    child_config.max_iterations = fc.max_iterations
+                if fc.hitl_policy is not None:
+                    from agent_platform.core.models import HITLPolicy
+
+                    child_config.hitl_policy = HITLPolicy(fc.hitl_policy)
+                if fc.auto_extract is not None:
+                    child_config.auto_extract = fc.auto_extract
+            if parent:
+                if child_config.model == AgentConfig().model:
+                    child_config.model = parent.config.model
+                if child_config.temperature == AgentConfig().temperature:
+                    child_config.temperature = parent.config.temperature
+        elif parent:
+            child_config.model = parent.config.model
+            child_config.temperature = parent.config.temperature
+
+        # Explicit overrides
+        if args.get("system_prompt"):
+            child_config.system_prompt = args["system_prompt"]
+        if args.get("model"):
+            child_config.model = args["model"]
+        if args.get("temperature") is not None:
+            child_config.temperature = args["temperature"]
+
+        return child_config

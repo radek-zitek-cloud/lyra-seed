@@ -160,7 +160,10 @@ class TestV2Phase2:
         assert "child_agent_id" in data
         assert data.get("status") == "running"
 
-        # Child should be RUNNING
+        # Yield to let background task start
+        await asyncio.sleep(0.05)
+
+        # Child should be RUNNING (mock takes 0.5s)
         child = await agent_repo.get(data["child_agent_id"])
         assert child is not None
         assert child.status == AgentStatus.RUNNING
@@ -203,9 +206,7 @@ class TestV2Phase2:
         await agent_repo.create(parent)
 
         mock_llm = AsyncMock()
-        mock_llm.complete.return_value = LLMResponse(
-            content="Task complete!", usage={}
-        )
+        mock_llm.complete.return_value = LLMResponse(content="Task complete!", usage={})
 
         spawner = AgentSpawnerProvider(
             agent_repo=agent_repo,
@@ -367,7 +368,10 @@ class TestV2Phase2:
         )
         child_id = json.loads(spawn_result.output)["child_agent_id"]
 
-        # Check status immediately — should be running
+        # Yield to let background task start
+        await asyncio.sleep(0.05)
+
+        # Check status — should be running (mock takes 1.0s)
         status_result = await spawner.call_tool(
             "check_agent_status",
             {"child_agent_id": child_id, "agent_id": parent.id},
@@ -536,7 +540,12 @@ class TestV2Phase2:
     @pytest.mark.asyncio
     async def test_st_v2_2_9_receive_messages(self, tmp_path):
         """ST-V2-2.9: receive_messages returns inbox messages."""
-        from agent_platform.core.models import Agent, AgentConfig, AgentMessage, MessageType
+        from agent_platform.core.models import (
+            Agent,
+            AgentConfig,
+            AgentMessage,
+            MessageType,
+        )
         from agent_platform.db.sqlite_agent_repo import SqliteAgentRepo
         from agent_platform.db.sqlite_conversation_repo import (
             SqliteConversationRepo,
@@ -736,8 +745,7 @@ class TestV2Phase2:
         messages = call_args[0][0]  # first positional arg
         # Should have a system message with the guidance content
         guidance_found = any(
-            "Change approach: use recursion" in str(m.content)
-            for m in messages
+            "Change approach: use recursion" in str(m.content) for m in messages
         )
         assert guidance_found
 
