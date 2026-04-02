@@ -565,6 +565,10 @@ class AgentSpawnerProvider:
             )
         )
 
+        # Auto-wake idle target agent on actionable messages
+        if msg_type in (MessageType.TASK, MessageType.GUIDANCE):
+            await self._wake_idle_agent(to_id, msg)
+
         return ToolResult(
             success=True,
             output=json.dumps(
@@ -575,6 +579,45 @@ class AgentSpawnerProvider:
             ),
             duration_ms=int((time.monotonic() - start) * 1000),
         )
+
+    async def _wake_idle_agent(self, agent_id: str, msg: AgentMessage) -> None:
+        """If agent is idle, trigger a background runtime turn."""
+        try:
+            agent = await self._agent_repo.get(agent_id)
+            if agent is None or agent.status != AgentStatus.IDLE:
+                return
+
+            prompt = (
+                f"[{msg.message_type.value} from {msg.from_agent_id}]: {msg.content}"
+            )
+
+            async def _run() -> None:
+                try:
+                    from agent_platform.core.runtime import AgentRuntime
+                    from agent_platform.tools.registry import ToolRegistry
+
+                    runtime = AgentRuntime(
+                        agent_repo=self._agent_repo,
+                        conversation_repo=self._conv_repo,
+                        llm_provider=self._llm,
+                        event_bus=self._event_bus,
+                        tool_registry=self._tool_registry or ToolRegistry(),
+                        context_manager=self._context_manager,
+                        extractor=self._extractor,
+                        message_repo=self._message_repo,
+                    )
+                    await runtime.run(agent_id, prompt)
+                except Exception:
+                    logger.exception("Failed to wake agent %s on message", agent_id)
+
+            asyncio.create_task(_run())
+            logger.info(
+                "Auto-woke idle agent %s on %s message",
+                agent_id,
+                msg.message_type.value,
+            )
+        except Exception:
+            pass  # Never break the sender's flow
 
     async def _receive_messages(self, args: dict[str, Any], start: float) -> ToolResult:
         """Check inbox for messages."""

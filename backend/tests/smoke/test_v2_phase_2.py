@@ -878,8 +878,8 @@ class TestV2Phase2:
                 msgs = resp.json()
                 assert any(m["content"] == "Build feature X" for m in msgs)
 
-                # Child can still receive prompts (conversation preserved)
-                # This verifies the agent is reusable
+                # Auto-wake should have activated the child
                 resp = await client.get(f"/agents/{child_id}")
                 assert resp.status_code == 200
-                assert resp.json()["status"] == "idle"
+                # Child is running (auto-woke) or idle (already finished)
+                assert resp.json()["status"] in ("running", "idle")

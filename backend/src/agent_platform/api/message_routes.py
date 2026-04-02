@@ -1,9 +1,14 @@
 """Message API routes — inter-agent messaging from the UI."""
 
+import asyncio
+import logging
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from agent_platform.core.models import AgentMessage, MessageType
+from agent_platform.core.models import AgentMessage, AgentStatus, MessageType
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -75,7 +80,40 @@ async def send_message_to_agent(agent_id: str, req: SendMessageRequest):
         )
     )
 
+    # Auto-wake idle agents on actionable messages
+    if msg.message_type in (MessageType.TASK, MessageType.GUIDANCE):
+        await _wake_idle_agent(agent_id, msg)
+
     return _msg_to_dict(msg)
+
+
+async def _wake_idle_agent(agent_id: str, msg: AgentMessage) -> None:
+    """If the target agent is idle, trigger a background runtime turn."""
+    from agent_platform.api._deps import get_agent_repo, get_runtime
+
+    try:
+        repo = get_agent_repo()
+        agent = await repo.get(agent_id)
+        if agent is None or agent.status != AgentStatus.IDLE:
+            return
+
+        runtime = get_runtime()
+        prompt = f"[{msg.message_type.value} from {msg.from_agent_id}]: {msg.content}"
+
+        async def _run() -> None:
+            try:
+                await runtime.run(agent_id, prompt)
+            except Exception:
+                logger.exception("Failed to wake agent %s on message", agent_id)
+
+        asyncio.create_task(_run())
+        logger.info(
+            "Auto-woke idle agent %s on %s message",
+            agent_id,
+            msg.message_type.value,
+        )
+    except Exception:
+        logger.exception("Error in _wake_idle_agent for %s", agent_id)
 
 
 def _msg_to_dict(m: AgentMessage) -> dict:
