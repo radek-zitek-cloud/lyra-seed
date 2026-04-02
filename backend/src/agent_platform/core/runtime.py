@@ -219,9 +219,14 @@ class AgentRuntime:
                     )
                     events_emitted += 1
 
+                    # Inject agent_id for memory tools
+                    call_args = dict(tool_call.arguments)
+                    if tool_call.name in ("remember", "recall", "forget"):
+                        call_args.setdefault("agent_id", agent_id)
+
                     # Execute tool via registry
                     result = await self._tool_registry.call_tool(
-                        tool_call.name, tool_call.arguments
+                        tool_call.name, call_args
                     )
                     tool_result = (
                         result.output if result.success else f"Error: {result.error}"
