@@ -19,8 +19,18 @@ export function useEventStream(agentId?: string) {
   const [connectionState, setConnectionState] =
     useState<ConnectionState>("disconnected");
   const sourceRef = useRef<EventSource | null>(null);
+  const manualDisconnect = useRef(false);
+  const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const connect = useCallback(() => {
+    // Clear any pending reconnect
+    if (reconnectTimer.current) {
+      clearTimeout(reconnectTimer.current);
+      reconnectTimer.current = null;
+    }
+
+    manualDisconnect.current = false;
+
     const base = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
     const url = agentId
       ? `${base}/agents/${agentId}/events/stream`
@@ -38,19 +48,37 @@ export function useEventStream(agentId?: string) {
     };
 
     source.onerror = () => {
-      setConnectionState("disconnected");
       source.close();
-      // Reconnect after 3 seconds
-      setTimeout(connect, 3000);
+      sourceRef.current = null;
+      setConnectionState("disconnected");
+      // Only auto-reconnect if not manually disconnected
+      if (!manualDisconnect.current) {
+        reconnectTimer.current = setTimeout(connect, 3000);
+      }
     };
   }, [agentId]);
+
+  const disconnect = useCallback(() => {
+    manualDisconnect.current = true;
+    if (reconnectTimer.current) {
+      clearTimeout(reconnectTimer.current);
+      reconnectTimer.current = null;
+    }
+    if (sourceRef.current) {
+      sourceRef.current.close();
+      sourceRef.current = null;
+    }
+    setConnectionState("disconnected");
+  }, []);
 
   useEffect(() => {
     connect();
     return () => {
+      manualDisconnect.current = true;
+      if (reconnectTimer.current) clearTimeout(reconnectTimer.current);
       sourceRef.current?.close();
     };
   }, [connect]);
 
-  return { events, connectionState };
+  return { events, connectionState, connect, disconnect };
 }

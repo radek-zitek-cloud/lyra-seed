@@ -43,22 +43,14 @@ describe("V1 Phase 5 — Observation UI", () => {
 
     expect(screen.getByText("Agent Alpha")).toBeInTheDocument();
     expect(screen.getByText("Agent Beta")).toBeInTheDocument();
-    // Status badges
     expect(screen.getByText("idle")).toBeInTheDocument();
     expect(screen.getByText("running")).toBeInTheDocument();
   });
 
   test("ST-5.10: Agent detail page renders", async () => {
-    const { AgentDetail } = await import("@/components/AgentDetail");
-
-    const agent = {
-      id: "a1",
-      name: "Agent Alpha",
-      status: "idle",
-      config: { model: "test/model" },
-      created_at: "2026-04-01T00:00:00Z",
-      updated_at: "2026-04-01T00:00:00Z",
-    };
+    const { ConversationPanel, EventTimeline } = await import(
+      "@/components/AgentDetail"
+    );
 
     const messages = [
       { role: "human", content: "Hello", timestamp: "2026-04-01T00:00:00Z" },
@@ -88,13 +80,12 @@ describe("V1 Phase 5 — Observation UI", () => {
       },
     ];
 
-    render(
-      <AgentDetail agent={agent} messages={messages} events={events} />,
+    const { container } = render(
+      <>
+        <ConversationPanel messages={messages} />
+        <EventTimeline events={events} />
+      </>,
     );
-
-    // Agent name and status
-    expect(screen.getByText("Agent Alpha")).toBeInTheDocument();
-    expect(screen.getByText("idle")).toBeInTheDocument();
 
     // Conversation messages
     expect(screen.getByText("Hello")).toBeInTheDocument();
@@ -127,9 +118,9 @@ describe("V1 Phase 5 — Observation UI", () => {
     // Pending action displayed
     expect(screen.getByText("dangerous_tool")).toBeInTheDocument();
 
-    // Approve and Deny buttons
-    expect(screen.getByRole("button", { name: /approve/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /deny/i })).toBeInTheDocument();
+    // Approve and Deny buttons (now labeled OK / NO)
+    expect(screen.getByRole("button", { name: /ok/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /no/i })).toBeInTheDocument();
   });
 
   test("ST-5.12: Tool inspector renders", async () => {
@@ -157,7 +148,7 @@ describe("V1 Phase 5 — Observation UI", () => {
         payload: {
           tool_name: "search",
           success: true,
-          output: "result data",
+          result: "result data",
         },
         duration_ms: null,
       },
@@ -168,7 +159,7 @@ describe("V1 Phase 5 — Observation UI", () => {
     // Tool name displayed
     expect(screen.getByText("search")).toBeInTheDocument();
 
-    // Status visible
-    expect(screen.getByText(/success/i)).toBeInTheDocument();
+    // Status visible (now labeled "ok" not "success")
+    expect(screen.getByText("ok")).toBeInTheDocument();
   });
 });

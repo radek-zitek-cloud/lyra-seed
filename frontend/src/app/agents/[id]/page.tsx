@@ -37,7 +37,7 @@ export default function AgentPage() {
   const [events, setEvents] = useState<Record<string, unknown>[]>([]);
   const [cost, setCost] = useState<{ total_cost_usd: number; total_prompt_tokens: number; total_completion_tokens: number } | null>(null);
   const [sending, setSending] = useState(false);
-  const { events: liveEvents, connectionState } = useEventStream(agentId);
+  const { events: liveEvents, connectionState, connect, disconnect } = useEventStream(agentId);
   const promptInFlight = useRef(false);
 
   const refreshAll = async () => {
@@ -166,7 +166,7 @@ export default function AgentPage() {
           </>
         )}
         <span style={{ marginLeft: "auto" }}>
-          <ConnectionStatus state={connectionState} />
+          <ConnectionStatus state={connectionState} onConnect={connect} onDisconnect={disconnect} />
         </span>
       </div>
 

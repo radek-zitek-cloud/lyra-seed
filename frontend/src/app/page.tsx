@@ -20,7 +20,7 @@ export default function HomePage() {
   >([]);
   const [agentCosts, setAgentCosts] = useState<Record<string, number>>({});
   const [newName, setNewName] = useState("");
-  const { connectionState } = useEventStream();
+  const { connectionState, connect, disconnect } = useEventStream();
 
   const refreshAll = async () => {
     const agentList = await fetchAgents();
@@ -86,7 +86,7 @@ export default function HomePage() {
             </span>
           )}
         </div>
-        <ConnectionStatus state={connectionState} />
+        <ConnectionStatus state={connectionState} onConnect={connect} onDisconnect={disconnect} />
       </div>
 
       <form
