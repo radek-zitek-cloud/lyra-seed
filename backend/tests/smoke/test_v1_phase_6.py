@@ -325,10 +325,17 @@ class TestV1Phase6:
         """ST-6.9: Cost aggregation from events."""
         from agent_platform.observation.cost_tracker import (
             compute_agent_cost,
+            configure as configure_costs,
         )
         from agent_platform.observation.events import Event, EventType
         from agent_platform.observation.in_process_event_bus import (
             InProcessEventBus,
+        )
+
+        # Configure costs (normally done by app startup)
+        configure_costs(
+            model_costs={"openai/gpt-4.1-mini": [0.4, 1.6]},
+            default_cost=[1.0, 4.0],
         )
 
         event_bus = InProcessEventBus(db_path=str(tmp_path / "events.db"))

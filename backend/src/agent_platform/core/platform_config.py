@@ -41,6 +41,8 @@ class PlatformConfig(BaseModel):
     embeddingModel: str = "openai/text-embedding-3-large"
     mcpServers: dict[str, MCPServerConfig] = Field(default_factory=dict)
     systemPromptsDir: str = "./prompts"
+    modelCosts: dict[str, list[float]] = Field(default_factory=dict)
+    defaultModelCost: list[float] = Field(default_factory=lambda: [1.0, 4.0])
 
 
 def load_platform_config(project_root: Path) -> PlatformConfig:

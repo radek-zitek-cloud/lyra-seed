@@ -168,6 +168,16 @@ def create_app(
         # Cleanup agents stuck from previous crash
         await runtime.cleanup_stuck_agents()
 
+        # Configure cost tracking from config
+        from agent_platform.observation.cost_tracker import (
+            configure as configure_costs,
+        )
+
+        configure_costs(
+            model_costs=platform_config.modelCosts,
+            default_cost=platform_config.defaultModelCost,
+        )
+
         _deps.configure(
             agent_repo,
             conv_repo,

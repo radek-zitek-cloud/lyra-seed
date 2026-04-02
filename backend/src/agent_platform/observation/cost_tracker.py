@@ -1,33 +1,36 @@
-"""Cost tracking — aggregate token usage from events."""
+"""Cost tracking — aggregate token usage from events.
+
+Model costs are loaded from lyra.config.json (per million tokens).
+"""
 
 from agent_platform.observation.events import EventFilter, EventType
 from agent_platform.observation.in_process_event_bus import InProcessEventBus
 
-# Cost per 1K tokens (input, output) in USD.
-# Approximate pricing — update as needed.
-MODEL_COSTS: dict[str, tuple[float, float]] = {
-    "openai/gpt-4.1": (0.002, 0.008),
-    "openai/gpt-4.1-mini": (0.0004, 0.0016),
-    "openai/gpt-4.1-nano": (0.0001, 0.0004),
-    "openai/gpt-5.4": (0.003, 0.012),
-    "openai/text-embedding-3-large": (0.00013, 0.0),
-    "openai/text-embedding-3-small": (0.00002, 0.0),
-    "anthropic/claude-sonnet-4": (0.003, 0.015),
-    "anthropic/claude-haiku-4": (0.0008, 0.004),
-}
-
-DEFAULT_COST = (0.001, 0.004)  # fallback per 1K tokens
+# Module-level state — set by configure() on startup
+_model_costs: dict[str, list[float]] = {}
+_default_cost: list[float] = [1.0, 4.0]
 
 
-def _get_cost_per_1k(model: str) -> tuple[float, float]:
-    """Look up cost for a model, with prefix matching fallback."""
-    if model in MODEL_COSTS:
-        return MODEL_COSTS[model]
+def configure(
+    model_costs: dict[str, list[float]],
+    default_cost: list[float],
+) -> None:
+    """Load cost config. Called once during app startup."""
+    global _model_costs, _default_cost
+    _model_costs = model_costs
+    _default_cost = default_cost
+
+
+def _get_cost_per_million(model: str) -> tuple[float, float]:
+    """Look up cost per million tokens, with prefix matching fallback."""
+    if model in _model_costs:
+        c = _model_costs[model]
+        return (c[0], c[1])
     # Try prefix match
-    for prefix, cost in MODEL_COSTS.items():
+    for prefix, c in _model_costs.items():
         if model.startswith(prefix):
-            return cost
-    return DEFAULT_COST
+            return (c[0], c[1])
+    return (_default_cost[0], _default_cost[1])
 
 
 async def compute_agent_cost(
@@ -48,7 +51,9 @@ async def compute_total_cost(
     event_bus: InProcessEventBus,
 ) -> dict:
     """Compute cost summary across all agents."""
-    events = await event_bus.query(EventFilter(event_types=[EventType.LLM_RESPONSE]))
+    events = await event_bus.query(
+        EventFilter(event_types=[EventType.LLM_RESPONSE])
+    )
     return _aggregate_costs(events)
 
 
@@ -69,8 +74,10 @@ def _aggregate_costs(events: list) -> dict:
         total_prompt += prompt
         total_completion += completion
 
-        input_rate, output_rate = _get_cost_per_1k(model)
-        cost = (prompt / 1000 * input_rate) + (completion / 1000 * output_rate)
+        input_rate, output_rate = _get_cost_per_million(model)
+        cost = (prompt / 1_000_000 * input_rate) + (
+            completion / 1_000_000 * output_rate
+        )
         total_cost += cost
 
         if model not in by_model:
@@ -90,6 +97,7 @@ def _aggregate_costs(events: list) -> dict:
         "total_completion_tokens": total_completion,
         "total_cost_usd": round(total_cost, 6),
         "by_model": {
-            k: {**v, "cost_usd": round(v["cost_usd"], 6)} for k, v in by_model.items()
+            k: {**v, "cost_usd": round(v["cost_usd"], 6)}
+            for k, v in by_model.items()
         },
     }
