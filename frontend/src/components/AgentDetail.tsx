@@ -114,12 +114,12 @@ export function ConversationPanel({ messages }: { messages: Message[] }) {
 
   return (
     <div style={{ background: "#111", border: "1px solid #1a1a1a", borderRadius: "3px", padding: "6px", flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
-      <h2 style={{ fontSize: "11px", fontWeight: 700, color: "#555", letterSpacing: "1px", marginBottom: "4px", flexShrink: 0 }}>
+      <h2 style={{ fontSize: "11px", fontWeight: 700, color: "#888", letterSpacing: "1px", marginBottom: "4px", flexShrink: 0 }}>
         CONVERSATION
       </h2>
       <div ref={scrollRef} onScroll={handleScroll} style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
-        {messages.map((msg, i) => {
-          const roleColor = ROLE_COLORS[msg.role] ?? "#555";
+        {messages.filter((msg) => msg.role !== "tool_result").map((msg, i) => {
+          const roleColor = ROLE_COLORS[msg.role] ?? "#888";
           return (
             <div
               key={i}
@@ -130,22 +130,28 @@ export function ConversationPanel({ messages }: { messages: Message[] }) {
                 background: "#0a0a0a",
                 fontSize: "12px",
                 lineHeight: "1.4",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "flex-start",
+                gap: "6px",
               }}
             >
-              <span style={{ color: roleColor, fontWeight: 700, fontSize: "10px", letterSpacing: "0.5px", textTransform: "uppercase", marginRight: "6px" }}>
-                {msg.role}:
-              </span>
-              <span style={{ color: "#b0b0b0", whiteSpace: msg.role === "tool_result" ? "nowrap" : "pre-wrap", overflow: msg.role === "tool_result" ? "hidden" : undefined, textOverflow: msg.role === "tool_result" ? "ellipsis" : undefined }}>
-                {msg.role === "tool_result" ? msg.content.slice(0, 80) + (msg.content.length > 80 ? "…" : "") : msg.content}
-              </span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ color: roleColor, fontWeight: 700, fontSize: "10px", letterSpacing: "0.5px", textTransform: "uppercase", marginRight: "6px" }}>
+                  {msg.role}:
+                </span>
+                <span style={{ color: "#d0d0d0", whiteSpace: "pre-wrap" }}>
+                  {msg.content}
+                </span>
+              </div>
               {msg.timestamp && (
-                <span style={{ color: "#333", fontSize: "10px", marginLeft: "6px" }}>{fmtTime(msg.timestamp)}</span>
+                <span style={{ color: "#666", fontSize: "10px", flexShrink: 0 }}>{fmtTime(msg.timestamp)}</span>
               )}
             </div>
           );
         })}
-        {messages.length === 0 && (
-          <div style={{ color: "#333", textAlign: "center", padding: "8px", fontSize: "11px" }}>
+        {messages.filter((m) => m.role !== "tool_result").length === 0 && (
+          <div style={{ color: "#555", textAlign: "center", padding: "8px", fontSize: "11px" }}>
             No messages yet.
           </div>
         )}
@@ -182,7 +188,7 @@ export function EventTimeline({ events }: { events: EventItem[] }) {
 
   return (
     <div style={{ background: "#111", border: "1px solid #1a1a1a", borderRadius: "3px", padding: "6px", minHeight: 0, display: "flex", flexDirection: "column" }}>
-      <h2 style={{ fontSize: "11px", fontWeight: 700, color: "#555", letterSpacing: "1px", marginBottom: "4px", flexShrink: 0 }}>
+      <h2 style={{ fontSize: "11px", fontWeight: 700, color: "#888", letterSpacing: "1px", marginBottom: "4px", flexShrink: 0 }}>
         EVENTS
       </h2>
       <div ref={scrollRef} onScroll={handleScroll} style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
@@ -210,24 +216,24 @@ export function EventTimeline({ events }: { events: EventItem[] }) {
                 onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: "4px", minWidth: 0, flex: 1 }}>
-                  <span style={{ color: "#444", fontSize: "9px" }}>
+                  <span style={{ color: "#777", fontSize: "9px" }}>
                     {expanded.has(evt.id) ? "\u25BC" : "\u25B6"}
                   </span>
                   <span style={{ color, fontWeight: 700, letterSpacing: "0.5px", flexShrink: 0, fontSize: "11px" }}>
                     {evt.event_type}
                   </span>
                   {eventSummary(evt) && (
-                    <span style={{ color: "#666", fontSize: "10px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    <span style={{ color: "#999", fontSize: "10px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {eventSummary(evt)}
                     </span>
                   )}
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
                   {evt.duration_ms != null && (
-                    <span style={{ color: "#444", fontSize: "10px" }}>{evt.duration_ms}ms</span>
+                    <span style={{ color: "#777", fontSize: "10px" }}>{evt.duration_ms}ms</span>
                   )}
-                  <span style={{ color: "#686", fontSize: "10px" }}>{evt.module}</span>
-                  <span style={{ color: "#333", fontSize: "10px" }}>{fmtTime(evt.timestamp)}</span>
+                  <span style={{ color: "#8a8", fontSize: "10px" }}>{evt.module}</span>
+                  <span style={{ color: "#666", fontSize: "10px" }}>{fmtTime(evt.timestamp)}</span>
                 </div>
               </button>
               {expanded.has(evt.id) && (
@@ -235,7 +241,7 @@ export function EventTimeline({ events }: { events: EventItem[] }) {
                   <pre
                     style={{
                       fontSize: "10px",
-                      color: "#555",
+                      color: "#888",
                       background: "#0a0a0a",
                       border: "1px solid #1a1a1a",
                       borderRadius: "2px",
