@@ -47,7 +47,7 @@ export default function AgentPage() {
   const promptInFlight = useRef(false);
 
   const refreshAll = async () => {
-    const [a, evts, convos, c, ch] = await Promise.all([
+    const [a, evts, convos, c, ch, msgs] = await Promise.all([
       fetchAgent(agentId),
       fetchAgentEvents(agentId),
       fetchAgentConversations(agentId),
