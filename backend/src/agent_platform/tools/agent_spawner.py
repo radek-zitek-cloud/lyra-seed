@@ -588,8 +588,16 @@ class AgentSpawnerProvider:
                 return
 
             prompt = (
-                f"[{msg.message_type.value} from {msg.from_agent_id}]: {msg.content}"
+                f"[{msg.message_type.value} from {msg.from_agent_id}]: "
+                f"{msg.content}\n\n"
+                f"When you complete this task, send the result back to "
+                f"{msg.from_agent_id} using the send_message tool with "
+                f'message_type "result".'
             )
+
+            # Consume the message
+            if self._message_repo:
+                await self._message_repo.delete(msg.id)
 
             async def _run() -> None:
                 try:

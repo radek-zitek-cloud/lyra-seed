@@ -462,7 +462,7 @@ class TestV2Phase2:
     @pytest.mark.asyncio
     async def test_st_v2_2_8_send_message(self, tmp_path):
         """ST-V2-2.8: send_message creates message and emits events."""
-        from agent_platform.core.models import Agent, AgentConfig
+        from agent_platform.core.models import Agent, AgentConfig, AgentStatus
         from agent_platform.db.sqlite_agent_repo import SqliteAgentRepo
         from agent_platform.db.sqlite_conversation_repo import (
             SqliteConversationRepo,
@@ -486,7 +486,11 @@ class TestV2Phase2:
         await event_bus.initialize()
 
         a1 = Agent(name="sender", config=AgentConfig(model="test"))
-        a2 = Agent(name="receiver", config=AgentConfig(model="test"))
+        a2 = Agent(
+            name="receiver",
+            config=AgentConfig(model="test"),
+            status=AgentStatus.RUNNING,  # Prevent auto-wake
+        )
         await agent_repo.create(a1)
         await agent_repo.create(a2)
 
@@ -778,12 +782,12 @@ class TestV2Phase2:
                 )
                 agent_id = resp.json()["id"]
 
-                # Send a message via API
+                # Send a non-actionable message (won't trigger auto-wake)
                 await client.post(
                     f"/agents/{agent_id}/messages",
                     json={
                         "content": "Hello agent",
-                        "message_type": "guidance",
+                        "message_type": "question",
                     },
                 )
 
@@ -873,12 +877,8 @@ class TestV2Phase2:
                 )
                 assert resp.status_code == 201
 
-                # Verify message is in child's inbox
-                resp = await client.get(f"/agents/{child_id}/messages")
-                msgs = resp.json()
-                assert any(m["content"] == "Build feature X" for m in msgs)
-
-                # Auto-wake should have activated the child
+                # TASK message is consumed by auto-wake, child should activate
+                await asyncio.sleep(0.1)
                 resp = await client.get(f"/agents/{child_id}")
                 assert resp.status_code == 200
                 # Child is running (auto-woke) or idle (already finished)

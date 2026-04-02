@@ -89,7 +89,7 @@ async def send_message_to_agent(agent_id: str, req: SendMessageRequest):
 
 async def _wake_idle_agent(agent_id: str, msg: AgentMessage) -> None:
     """If the target agent is idle, trigger a background runtime turn."""
-    from agent_platform.api._deps import get_agent_repo, get_runtime
+    from agent_platform.api._deps import get_agent_repo, get_message_repo, get_runtime
 
     try:
         repo = get_agent_repo()
@@ -98,7 +98,18 @@ async def _wake_idle_agent(agent_id: str, msg: AgentMessage) -> None:
             return
 
         runtime = get_runtime()
-        prompt = f"[{msg.message_type.value} from {msg.from_agent_id}]: {msg.content}"
+        prompt = (
+            f"[{msg.message_type.value} from {msg.from_agent_id}]: "
+            f"{msg.content}\n\n"
+            f"When you complete this task, send the result back to "
+            f"{msg.from_agent_id} using the send_message tool with "
+            f'message_type "result".'
+        )
+
+        # Consume the message (mark as delivered)
+        msg_repo = get_message_repo()
+        if msg_repo:
+            await msg_repo.delete(msg.id)
 
         async def _run() -> None:
             try:
