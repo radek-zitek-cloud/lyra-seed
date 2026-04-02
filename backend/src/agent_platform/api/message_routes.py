@@ -37,14 +37,28 @@ async def get_agent_messages(
 @router.post("/agents/{agent_id}/messages", status_code=201)
 async def send_message_to_agent(agent_id: str, req: SendMessageRequest):
     """Send a message to an agent (from human or another agent)."""
-    from agent_platform.api._deps import get_event_bus, get_message_repo
+    from agent_platform.api._deps import (
+        get_agent_repo,
+        get_event_bus,
+        get_message_repo,
+    )
 
     repo = get_message_repo()
     if repo is None:
         raise HTTPException(status_code=500, detail="Message repo not configured")
 
+    # Resolve sender: explicit > agent's parent > "human"
+    from_id = req.from_agent_id
+    if not from_id:
+        agent_repo = get_agent_repo()
+        agent = await agent_repo.get(agent_id)
+        if agent and agent.parent_agent_id:
+            from_id = agent.parent_agent_id
+        else:
+            from_id = "human"
+
     msg = AgentMessage(
-        from_agent_id=req.from_agent_id or "human",
+        from_agent_id=from_id,
         to_agent_id=agent_id,
         content=req.content,
         message_type=MessageType(req.message_type),
