@@ -271,10 +271,18 @@ class AgentRuntime:
                     )
                     events_emitted += 1
 
-                    # Inject agent_id for memory tools (always override —
-                    # LLM may hallucinate the name instead of UUID)
+                    # Inject agent_id for memory and spawner tools
+                    # (always override — LLM may hallucinate the name instead of UUID)
                     call_args = dict(tool_call.arguments)
-                    if tool_call.name in ("remember", "recall", "forget"):
+                    if tool_call.name in (
+                        "remember",
+                        "recall",
+                        "forget",
+                        "spawn_agent",
+                        "wait_for_agent",
+                        "get_agent_result",
+                        "list_child_agents",
+                    ):
                         call_args["agent_id"] = agent_id
 
                     # Execute tool via registry

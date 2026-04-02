@@ -144,6 +144,19 @@ async def delete_agent(agent_id: str):
     return {"status": "ok"}
 
 
+@router.get("/agents/{agent_id}/children")
+async def list_children(agent_id: str):
+    """List child agents of a given parent."""
+    from agent_platform.api._deps import get_agent_repo
+
+    repo = get_agent_repo()
+    parent = await repo.get(agent_id)
+    if parent is None:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    children = await repo.list_children(agent_id)
+    return [c.model_dump(mode="json") for c in children]
+
+
 @router.post("/agents/{agent_id}/prompt")
 async def prompt_agent(agent_id: str, req: PromptRequest):
     """Send a prompt to an agent."""
