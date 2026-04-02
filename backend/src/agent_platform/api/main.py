@@ -238,6 +238,7 @@ def create_app(
             agent_config_resolver=config_resolver,
             default_model=platform_config.defaultModel,
             platform_config=platform_config,
+            project_root=project_root,
         )
         yield
         # Shutdown — with timeout to prevent hanging on reload
