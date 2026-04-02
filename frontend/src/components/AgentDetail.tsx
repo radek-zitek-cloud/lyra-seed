@@ -118,7 +118,7 @@ export function ConversationPanel({ messages }: { messages: Message[] }) {
         CONVERSATION
       </h2>
       <div ref={scrollRef} onScroll={handleScroll} style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
-        {messages.filter((msg) => msg.role !== "tool_result").map((msg, i) => {
+        {messages.filter((msg) => msg.role !== "tool_result" && msg.role !== "system").map((msg, i) => {
           const roleColor = ROLE_COLORS[msg.role] ?? "#888";
           return (
             <div
@@ -150,7 +150,7 @@ export function ConversationPanel({ messages }: { messages: Message[] }) {
             </div>
           );
         })}
-        {messages.filter((m) => m.role !== "tool_result").length === 0 && (
+        {messages.filter((m) => m.role !== "tool_result" && m.role !== "system").length === 0 && (
           <div style={{ color: "#555", textAlign: "center", padding: "8px", fontSize: "11px" }}>
             No messages yet.
           </div>
