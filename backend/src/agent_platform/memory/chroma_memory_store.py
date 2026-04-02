@@ -73,17 +73,19 @@ class ChromaMemoryStore:
         memory_type: MemoryType | None = None,
         top_k: int = 5,
         include_public: bool = False,
+        exclude_archived: bool = False,
     ) -> list[MemoryEntry]:
         """Semantic search for relevant memories.
 
         When include_public=True, also returns PUBLIC/TEAM memories
         from other agents (cross-agent memory).
+        When exclude_archived=True, filters out archived memories
+        (used for context injection but not for explicit recall).
         """
         where: dict[str, Any] | None = None
         conditions: list[dict[str, Any]] = []
 
         if agent_id and include_public:
-            # Own memories OR public/team memories from any agent
             conditions.append(
                 {
                     "$or": [
@@ -98,6 +100,9 @@ class ChromaMemoryStore:
 
         if memory_type:
             conditions.append({"memory_type": memory_type.value})
+
+        if exclude_archived:
+            conditions.append({"archived": False})
 
         if len(conditions) > 1:
             where = {"$and": conditions}
@@ -154,35 +159,52 @@ class ChromaMemoryStore:
         threshold: float = 0.1,
         max_entries: int = 500,
     ) -> int:
-        """Delete stale memories below decay threshold or over max count."""
+        """Archive stale memories below decay threshold or over max count.
+
+        Archived memories are excluded from context injection but remain
+        searchable via the recall tool.
+        """
         entries = await self.list_by_agent(agent_id, limit=10000)
         if not entries:
             return 0
 
+        # Only consider non-archived entries
+        active = [e for e in entries if not e.archived]
+        if not active:
+            return 0
+
         # Recompute decay scores
-        for entry in entries:
+        for entry in active:
             entry.decay_score = self._decay.compute(entry)
 
-        # Find entries to delete
-        to_delete: list[str] = []
+        # Find entries to archive
+        to_archive: list[str] = []
 
         # Below threshold
-        for entry in entries:
+        for entry in active:
             if entry.decay_score < threshold:
-                to_delete.append(entry.id)
+                to_archive.append(entry.id)
 
-        # Over max entries — delete lowest-scored beyond limit
-        if len(entries) - len(to_delete) > max_entries:
-            surviving = [e for e in entries if e.id not in set(to_delete)]
+        # Over max entries — archive lowest-scored beyond limit
+        remaining = len(active) - len(to_archive)
+        if remaining > max_entries:
+            surviving = [e for e in active if e.id not in set(to_archive)]
             surviving.sort(key=lambda e: e.decay_score)
             excess = len(surviving) - max_entries
             for entry in surviving[:excess]:
-                to_delete.append(entry.id)
+                to_archive.append(entry.id)
 
-        if to_delete:
-            self._collection.delete(ids=to_delete)
+        # Mark as archived (not deleted)
+        for mid in to_archive:
+            entry = await self.get(mid)
+            if entry:
+                entry.archived = True
+                self._collection.update(
+                    ids=[mid],
+                    metadatas=[self._entry_to_metadata(entry)],
+                )
 
-        return len(to_delete)
+        return len(to_archive)
 
     @staticmethod
     def _entry_to_metadata(entry: MemoryEntry) -> dict[str, Any]:
@@ -196,6 +218,7 @@ class ChromaMemoryStore:
             "last_accessed_at": entry.last_accessed_at.isoformat(),
             "access_count": entry.access_count,
             "decay_score": entry.decay_score,
+            "archived": entry.archived,
         }
 
     @staticmethod
@@ -220,6 +243,7 @@ class ChromaMemoryStore:
             ).replace(tzinfo=UTC),
             access_count=metadata.get("access_count", 0),
             decay_score=metadata.get("decay_score", 1.0),
+            archived=metadata.get("archived", False),
         )
 
     @staticmethod

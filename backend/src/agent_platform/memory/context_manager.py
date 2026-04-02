@@ -56,6 +56,7 @@ class ContextManager:
             agent_id=agent_id,
             top_k=_top_k,
             include_public=True,
+            exclude_archived=True,
         )
 
         if not memories:

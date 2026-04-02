@@ -511,8 +511,8 @@ class AgentRuntime:
                         event_type=EventType.MEMORY_WRITE,
                         module="core.runtime",
                         payload={
-                            "action": "gc_prune",
-                            "deleted_count": deleted,
+                            "action": "gc_archive",
+                            "archived_count": deleted,
                         },
                     )
                 )

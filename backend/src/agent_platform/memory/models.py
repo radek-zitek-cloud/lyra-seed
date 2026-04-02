@@ -57,3 +57,4 @@ class MemoryEntry(BaseModel):
     last_accessed_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     access_count: int = 0
     decay_score: float = 1.0
+    archived: bool = False
