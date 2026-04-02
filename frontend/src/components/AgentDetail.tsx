@@ -60,7 +60,8 @@ function eventSummary(evt: EventItem): string {
         const u = p.usage as Record<string, unknown>;
         const inTok = u.prompt_tokens ?? u.input_tokens ?? "?";
         const outTok = u.completion_tokens ?? u.output_tokens ?? "?";
-        return `in=${inTok} out=${outTok}`;
+        const cost = p.cost_usd != null ? ` $${Number(p.cost_usd).toFixed(4)}` : "";
+        return `in=${inTok} out=${outTok}${cost}`;
       }
       if (p.tool_call_count) return `tools=${p.tool_call_count}`;
       return "";

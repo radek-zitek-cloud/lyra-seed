@@ -128,6 +128,22 @@ class AgentRuntime:
                     config=llm_config,
                 )
 
+                # Compute cost for this call
+                from agent_platform.observation.cost_tracker import (
+                    _get_cost_per_million,
+                )
+
+                _usage = response.usage or {}
+                _prompt_tok = _usage.get("prompt_tokens", 0) or 0
+                _compl_tok = _usage.get("completion_tokens", 0) or 0
+                _in_rate, _out_rate = _get_cost_per_million(
+                    llm_config.model
+                )
+                _cost = (
+                    _prompt_tok / 1_000_000 * _in_rate
+                    + _compl_tok / 1_000_000 * _out_rate
+                )
+
                 # Emit LLM_RESPONSE event
                 await self._event_bus.emit(
                     Event(
@@ -143,6 +159,8 @@ class AgentRuntime:
                             "tool_call_count": len(response.tool_calls),
                             "tool_calls": [tc.name for tc in response.tool_calls],
                             "usage": response.usage,
+                            "model": llm_config.model,
+                            "cost_usd": round(_cost, 6),
                         },
                     )
                 )
