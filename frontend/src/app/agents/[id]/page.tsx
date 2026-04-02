@@ -7,7 +7,6 @@ import { ConversationPanel, EventTimeline } from "@/components/AgentDetail";
 import { ConnectionStatus } from "@/components/ConnectionStatus";
 import { HITLPanel } from "@/components/HITLPanel";
 import { PromptInput } from "@/components/PromptInput";
-import { ToolInspector } from "@/components/ToolInspector";
 import { useEventStream } from "@/hooks/useEventStream";
 import {
   fetchAgent,
@@ -77,7 +76,6 @@ export default function AgentPage() {
   const handlePrompt = async (message: string) => {
     setSending(true);
     promptInFlight.current = true;
-    // Show the human message immediately in the conversation
     setMessages((prev) => [...prev, { role: "human", content: message }]);
 
     sendPrompt(agentId, message)
@@ -102,10 +100,6 @@ export default function AgentPage() {
     return <p style={{ color: "#333", fontSize: "12px" }}>Loading...</p>;
   }
 
-  const toolEvents = (events as Record<string, unknown>[]).filter(
-    (e) => e.event_type === "tool_call" || e.event_type === "tool_result",
-  );
-
   const isWaitingHITL = (agent as Record<string, unknown>).status === "waiting_hitl";
   const hitlEvents = isWaitingHITL
     ? (events as Record<string, unknown>[]).filter(
@@ -121,9 +115,9 @@ export default function AgentPage() {
   const agentModel = String(agentConfig?.model ?? "default");
 
   return (
-    <div>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       {/* Header row */}
-      <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "6px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "4px", flexShrink: 0 }}>
         <span style={{ fontSize: "14px", fontWeight: 700, color: "#e0e0e0", letterSpacing: "1px" }}>
           {agentName}
         </span>
@@ -146,44 +140,31 @@ export default function AgentPage() {
         >
           {agentStatus}
         </span>
+        {sending && (
+          <>
+            <span
+              style={{
+                width: "6px",
+                height: "6px",
+                borderRadius: "50%",
+                background: isWaitingHITL ? "#ffaa00" : "#00ff41",
+                animation: "blink 1s step-end infinite",
+              }}
+            />
+            <span style={{ fontSize: "11px", color: isWaitingHITL ? "#ffaa00" : "#00ff41", fontWeight: 700, letterSpacing: "1px" }}>
+              {isWaitingHITL ? "AWAITING APPROVAL" : "RUNNING"}
+            </span>
+          </>
+        )}
         <span style={{ marginLeft: "auto" }}>
           <ConnectionStatus state={connectionState} />
         </span>
       </div>
 
-      {/* Status banner */}
-      {sending && (
-        <div
-          style={{
-            background: isWaitingHITL ? "rgba(255,170,0,0.04)" : "rgba(0,255,65,0.04)",
-            border: `1px solid ${isWaitingHITL ? "rgba(255,170,0,0.15)" : "rgba(0,255,65,0.15)"}`,
-            borderRadius: "3px",
-            padding: "4px 8px",
-            marginBottom: "6px",
-            display: "flex",
-            alignItems: "center",
-            gap: "6px",
-            animation: "pulse-glow 2s ease-in-out infinite",
-          }}
-        >
-          <span
-            style={{
-              width: "6px",
-              height: "6px",
-              borderRadius: "50%",
-              background: isWaitingHITL ? "#ffaa00" : "#00ff41",
-              animation: "blink 1s step-end infinite",
-            }}
-          />
-          <span style={{ fontSize: "11px", color: isWaitingHITL ? "#ffaa00" : "#00ff41", fontWeight: 700, letterSpacing: "1px" }}>
-            {isWaitingHITL ? "WAITING FOR APPROVAL" : "AGENT RUNNING"}
-          </span>
-        </div>
-      )}
-
-      {/* Main row: left = conversation + prompt + HITL, right = events */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px" }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+      {/* Two-column layout filling viewport */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px", flex: 1, minHeight: 0 }}>
+        {/* Left column: conversation + prompt + HITL */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "4px", minHeight: 0 }}>
           <ConversationPanel messages={messages as never} />
           <PromptInput onSubmit={handlePrompt} disabled={sending} />
           {pendingHITL.length > 0 && (
@@ -193,13 +174,10 @@ export default function AgentPage() {
             />
           )}
         </div>
+
+        {/* Right column: event timeline */}
         <EventTimeline events={events as never} />
       </div>
-
-      {/* Tool inspector below */}
-      {toolEvents.length > 0 && (
-        <ToolInspector toolEvents={toolEvents as never} />
-      )}
     </div>
   );
 }

@@ -12,20 +12,21 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>
+      <body style={{ display: "flex", flexDirection: "column", height: "100vh", margin: 0, overflow: "hidden" }}>
         <header
           style={{
-            padding: "12px 20px",
+            padding: "8px 20px",
             borderBottom: "1px solid #1a1a1a",
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
+            flexShrink: 0,
           }}
         >
           <a
             href="/"
             style={{
-              fontSize: "18px",
+              fontSize: "16px",
               fontWeight: 700,
               color: "#e0e0e0",
               letterSpacing: "2px",
@@ -42,25 +43,14 @@ export default function RootLayout({
                 textDecoration: "none",
                 border: "1px solid #222",
                 borderRadius: "2px",
-                padding: "4px 10px",
+                padding: "3px 10px",
               }}
             >
               AGENTS
             </a>
           </nav>
         </header>
-        <main style={{ padding: "12px 20px" }}>{children}</main>
-        <footer
-          style={{
-            padding: "8px 20px",
-            borderTop: "1px solid #1a1a1a",
-            fontSize: "11px",
-            color: "#333",
-            textAlign: "center",
-          }}
-        >
-          Lyra Agent Platform v0.1
-        </footer>
+        <main style={{ padding: "8px 12px", flex: 1, minHeight: 0, overflow: "auto" }}>{children}</main>
       </body>
     </html>
   );

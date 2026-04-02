@@ -113,11 +113,11 @@ export function ConversationPanel({ messages }: { messages: Message[] }) {
   }, [messages]);
 
   return (
-    <div style={{ background: "#111", border: "1px solid #1a1a1a", borderRadius: "3px", padding: "6px" }}>
-      <h2 style={{ fontSize: "11px", fontWeight: 700, color: "#555", letterSpacing: "1px", marginBottom: "4px" }}>
+    <div style={{ background: "#111", border: "1px solid #1a1a1a", borderRadius: "3px", padding: "6px", flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+      <h2 style={{ fontSize: "11px", fontWeight: 700, color: "#555", letterSpacing: "1px", marginBottom: "4px", flexShrink: 0 }}>
         CONVERSATION
       </h2>
-      <div ref={scrollRef} onScroll={handleScroll} style={{ maxHeight: "500px", overflowY: "auto" }}>
+      <div ref={scrollRef} onScroll={handleScroll} style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
         {messages.map((msg, i) => {
           const roleColor = ROLE_COLORS[msg.role] ?? "#555";
           return (
@@ -181,11 +181,11 @@ export function EventTimeline({ events }: { events: EventItem[] }) {
   }, [events]);
 
   return (
-    <div style={{ background: "#111", border: "1px solid #1a1a1a", borderRadius: "3px", padding: "6px" }}>
-      <h2 style={{ fontSize: "11px", fontWeight: 700, color: "#555", letterSpacing: "1px", marginBottom: "4px" }}>
+    <div style={{ background: "#111", border: "1px solid #1a1a1a", borderRadius: "3px", padding: "6px", minHeight: 0, display: "flex", flexDirection: "column" }}>
+      <h2 style={{ fontSize: "11px", fontWeight: 700, color: "#555", letterSpacing: "1px", marginBottom: "4px", flexShrink: 0 }}>
         EVENTS
       </h2>
-      <div ref={scrollRef} onScroll={handleScroll} style={{ maxHeight: "500px", overflowY: "auto" }}>
+      <div ref={scrollRef} onScroll={handleScroll} style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
         {events.map((evt) => {
           const color = EVENT_COLORS[evt.event_type] ?? "#555";
           return (
