@@ -61,6 +61,6 @@
     "memory_top_k": 5
   },
 
-  "summaryModel": "openai/gpt-5.4-nano",
-  "extractionModel": "openai/gpt-5.4-nano"
+  "summaryModel": "openai/gpt-5.4-mini",
+  "extractionModel": "openai/gpt-5.4-mini"
 }

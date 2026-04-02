@@ -512,9 +512,7 @@ class TestV2Phase1:
         # Create template files
         prompts_dir = tmp_path / "prompts"
         prompts_dir.mkdir()
-        (prompts_dir / "tpl.md").write_text(
-            "Template prompt.", encoding="utf-8"
-        )
+        (prompts_dir / "tpl.md").write_text("Template prompt.", encoding="utf-8")
         (prompts_dir / "tpl.json").write_text(
             json.dumps({"model": "template/model", "temperature": 0.1}),
             encoding="utf-8",

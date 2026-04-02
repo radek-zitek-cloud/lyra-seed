@@ -484,6 +484,7 @@ class AgentRuntime:
                 assistant_message=content,
                 conversation_context=messages,
                 memory_sharing=getattr(config, "memory_sharing", None),
+                extraction_model=getattr(config, "extraction_model", None),
             )
         except Exception:
             pass  # Extraction failure never breaks the run

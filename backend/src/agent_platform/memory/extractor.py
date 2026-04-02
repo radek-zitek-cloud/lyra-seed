@@ -46,8 +46,12 @@ class FactExtractor:
         assistant_message: str,
         conversation_context: list[Message],
         memory_sharing: dict[str, str] | None = None,
+        extraction_model: str | None = None,
     ) -> list[MemoryEntry]:
         """Extract memories from an assistant response.
+
+        Args:
+            extraction_model: Override the default model for this call.
 
         Returns list of created MemoryEntry objects.
         Failures are caught and logged — never breaks the caller.
@@ -58,6 +62,7 @@ class FactExtractor:
                 assistant_message,
                 conversation_context,
                 memory_sharing,
+                extraction_model,
             )
         except Exception:
             logger.exception("Fact extraction failed for agent %s", agent_id)
@@ -69,6 +74,7 @@ class FactExtractor:
         assistant_message: str,
         conversation_context: list[Message],
         memory_sharing: dict[str, str] | None,
+        extraction_model: str | None = None,
     ) -> list[MemoryEntry]:
         # Build context — last few messages + the response
         recent = conversation_context[-6:]
@@ -87,7 +93,8 @@ class FactExtractor:
             ),
         ]
 
-        config = LLMConfig(model=self._model, temperature=0.0)
+        model = extraction_model or self._model
+        config = LLMConfig(model=model, temperature=0.0)
         response = await self._llm.complete(llm_messages, config=config)
 
         if not response.content:
