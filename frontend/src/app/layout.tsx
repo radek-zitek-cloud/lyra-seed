@@ -48,6 +48,18 @@ export default function RootLayout({
             >
               AGENTS
             </a>
+            <a
+              href="/memories"
+              style={{
+                color: "#555",
+                textDecoration: "none",
+                border: "1px solid #222",
+                borderRadius: "2px",
+                padding: "3px 10px",
+              }}
+            >
+              MEMORIES
+            </a>
           </nav>
         </header>
         <main style={{ padding: "8px 12px", flex: 1, minHeight: 0, overflow: "auto" }}>{children}</main>

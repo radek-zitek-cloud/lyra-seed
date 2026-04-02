@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from agent_platform.api import _deps
 from agent_platform.api.macro_routes import router as macro_router
+from agent_platform.api.memory_routes import router as memory_router
 from agent_platform.api.observation_routes import router as observation_router
 from agent_platform.api.routes import router
 from agent_platform.api.ws_routes import router as ws_router
@@ -239,6 +240,7 @@ def create_app(
             default_model=platform_config.defaultModel,
             platform_config=platform_config,
             project_root=project_root,
+            memory_store=memory_store,
         )
         yield
         # Shutdown — with timeout to prevent hanging on reload
@@ -277,6 +279,7 @@ def create_app(
     app.include_router(router)
     app.include_router(macro_router)
     app.include_router(observation_router)
+    app.include_router(memory_router)
     app.include_router(ws_router)
 
     @app.get("/health")

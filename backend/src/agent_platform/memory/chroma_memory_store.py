@@ -57,6 +57,38 @@ class ChromaMemoryStore:
             result["metadatas"][0],  # type: ignore[index]
         )
 
+    async def list_all(
+        self,
+        agent_id: str | None = None,
+        memory_type: MemoryType | None = None,
+        archived: bool | None = None,
+        visibility: MemoryVisibility | None = None,
+        limit: int = 100,
+    ) -> list[MemoryEntry]:
+        """List memories with optional filters."""
+        conditions: list[dict[str, Any]] = []
+        if agent_id:
+            conditions.append({"agent_id": agent_id})
+        if memory_type:
+            conditions.append({"memory_type": memory_type.value})
+        if archived is not None:
+            conditions.append({"archived": archived})
+        if visibility:
+            conditions.append({"visibility": visibility.value})
+
+        where: dict[str, Any] | None = None
+        if len(conditions) > 1:
+            where = {"$and": conditions}
+        elif len(conditions) == 1:
+            where = conditions[0]
+
+        result = self._collection.get(
+            where=where,
+            include=["documents", "metadatas"],
+            limit=limit,
+        )
+        return self._results_to_entries(result)
+
     async def list_by_agent(self, agent_id: str, limit: int = 100) -> list[MemoryEntry]:
         """List all memories for an agent."""
         result = self._collection.get(

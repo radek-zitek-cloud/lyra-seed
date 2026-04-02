@@ -88,6 +88,40 @@ export async function fetchAgentCost(id: string) {
   return res.json();
 }
 
+export async function fetchMemories(params?: {
+  agent_id?: string;
+  memory_type?: string;
+  q?: string;
+  archived?: boolean;
+  limit?: number;
+}) {
+  const url = new URL(`${API_BASE}/memories`);
+  if (params?.agent_id) url.searchParams.set("agent_id", params.agent_id);
+  if (params?.memory_type) url.searchParams.set("memory_type", params.memory_type);
+  if (params?.q) url.searchParams.set("q", params.q);
+  if (params?.archived !== undefined) url.searchParams.set("archived", String(params.archived));
+  if (params?.limit) url.searchParams.set("limit", String(params.limit));
+  const res = await fetch(url.toString());
+  if (!res.ok) throw new Error("Failed to fetch memories");
+  return res.json();
+}
+
+export async function deleteMemory(id: string) {
+  const res = await fetch(`${API_BASE}/memories/${id}`, { method: "DELETE" });
+  if (!res.ok) throw new Error("Failed to delete memory");
+  return res.json();
+}
+
+export async function updateMemory(id: string, patch: { importance?: number; archived?: boolean }) {
+  const res = await fetch(`${API_BASE}/memories/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(patch),
+  });
+  if (!res.ok) throw new Error("Failed to update memory");
+  return res.json();
+}
+
 export function createEventStream(agentId?: string): EventSource {
   const url = agentId
     ? `${API_BASE}/agents/${agentId}/events/stream`

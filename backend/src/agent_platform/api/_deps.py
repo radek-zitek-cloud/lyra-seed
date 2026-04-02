@@ -27,6 +27,7 @@ _agent_config_resolver: Callable | None = None
 _default_model: str | None = None
 _platform_config: Any = None
 _project_root: Any = None
+_memory_store: Any = None
 
 
 def configure(
@@ -42,10 +43,12 @@ def configure(
     default_model: str | None = None,
     platform_config: Any = None,
     project_root: Any = None,
+    memory_store: Any = None,
 ) -> None:
     global _agent_repo, _conversation_repo, _event_bus, _runtime
     global _macro_repo, _macro_provider, _tool_registry
     global _system_prompt_resolver, _agent_config_resolver, _default_model
+    global _memory_store
     global _platform_config, _project_root
     _agent_repo = agent_repo
     _conversation_repo = conversation_repo
@@ -59,6 +62,7 @@ def configure(
     _default_model = default_model
     _platform_config = platform_config
     _project_root = project_root
+    _memory_store = memory_store
 
 
 def get_agent_repo() -> SqliteAgentRepo:
@@ -117,3 +121,8 @@ def get_platform_config():
 
         return load_platform_config(_project_root)
     return _platform_config
+
+
+def get_memory_store():
+    assert _memory_store is not None, "App not initialized"
+    return _memory_store
