@@ -72,6 +72,18 @@ export default function RootLayout({
             >
               GRAPH
             </a>
+            <a
+              href="/config"
+              style={{
+                color: "#555",
+                textDecoration: "none",
+                border: "1px solid #222",
+                borderRadius: "2px",
+                padding: "3px 10px",
+              }}
+            >
+              CONFIG
+            </a>
           </nav>
         </header>
         <main style={{ padding: "8px 12px", flex: 1, minHeight: 0, overflow: "auto" }}>{children}</main>
