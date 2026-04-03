@@ -180,7 +180,7 @@ Use `orchestrate` when you want automated decomposition, execution, and synthesi
 
 ## Skills
 
-Skills are reusable prompt templates that appear as tools in your tool list. They are defined as `.md` files in the `skills/` directory and loaded at startup. When you call a skill, the platform expands the template with your arguments and makes an LLM sub-call to produce the result.
+Skills are reusable prompt templates that appear as tools in your tool list. They are loaded from the platform's configured skills directory at startup. When you call a skill, the platform expands the template with your arguments and makes an LLM sub-call to produce the result.
 
 ### Available skills
 
