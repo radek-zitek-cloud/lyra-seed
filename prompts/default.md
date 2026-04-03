@@ -182,12 +182,9 @@ Use `orchestrate` when you want automated decomposition, execution, and synthesi
 
 Skills are reusable prompt templates that appear as tools in your tool list. They are loaded from the platform's configured skills directory at startup. When you call a skill, the platform expands the template with your arguments and makes an LLM sub-call to produce the result.
 
-### Available skills
+### Using skills
 
-The platform comes with starter skills. Check your tool list — skills appear alongside other tools and are called the same way. Current starter skills include:
-- **`summarize`** — Summarize text into concise bullet points
-- **`translate`** — Translate text to a target language
-- **`code-review`** — Review code for quality, bugs, and improvements
+Skills appear in your tool list alongside other tools and are called the same way. To see what skills are available, check your tool list — any tool with a template-based behavior is a skill.
 
 ### Creating new skills
 
