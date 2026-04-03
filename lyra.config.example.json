@@ -46,7 +46,9 @@
   "memoryGC": {
     "prune_threshold": 0.1,
     "max_entries": 500,
-    "dedup_threshold": 0.9
+    "dedup_threshold": 0.9,
+    "half_life_days": 7.0,
+    "decay_weights": [0.6, 0.2, 0.2]
   },
 
   "context": {
@@ -57,5 +59,8 @@
   "summaryModel": "openai/gpt-4.1-nano",
   "extractionModel": "openai/gpt-4.1-nano",
   "orchestrationModel": "openai/gpt-4.1-mini",
-  "maxSubtasks": 10
+  "orchestrationTemperature": 0.3,
+  "maxSubtasks": 10,
+  "mcpRequestTimeout": 30.0,
+  "maxSpawnDepth": 3
 }

@@ -57,7 +57,9 @@
   "memoryGC": {
     "prune_threshold": 0.1,
     "max_entries": 500,
-    "dedup_threshold": 0.9
+    "dedup_threshold": 0.9,
+    "half_life_days": 7.0,
+    "decay_weights": [0.6, 0.2, 0.2]
   },
 
   "context": {
@@ -65,5 +67,8 @@
     "memory_top_k": 5
   },
 
-  "maxSubtasks": 10
+  "maxSubtasks": 10,
+  "orchestrationTemperature": 0.3,
+  "mcpRequestTimeout": 30.0,
+  "maxSpawnDepth": 3
 }
