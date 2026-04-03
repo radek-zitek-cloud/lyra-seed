@@ -61,3 +61,27 @@ The original V2P3 roadmap specified "each subtask mapped to: existing tool, exis
 - HITL policies on sub-agent subtasks need to be defined (inherit parent? independent?)
 
 **Priority:** Medium — the current LLM-only approach handles analysis/writing tasks well, but tool access would unlock orchestration of tasks that require real-world interaction (code generation, file processing, API calls).
+
+---
+
+### BL-006: Live orchestration graph visualization
+
+**Context:** Orchestration runs take 1–2 minutes and involve multiple parallel/sequential LLM calls, sub-agent spawns, and message flows. Currently the only way to observe progress is the event timeline — a flat chronological list of events. A graph view would make the orchestration structure, dependencies, progress, and agent relationships immediately visible.
+
+**Concept:** A real-time node-edge graph where:
+- Each agent is a container box showing name, model, and status
+- Orchestration subtasks appear as nodes inside the agent box, colored by status (pending/running/completed/failed/skipped)
+- Dependency edges connect subtasks within an agent (from the plan's `dependencies` field)
+- Parent-child relationships link agent boxes (from `parent_agent_id`)
+- Inter-agent messages show as labeled edges between agent boxes (from message events)
+- Auto-synthesis by the platform shown as a final node after all subtasks converge
+- Everything updates in real-time as SSE events arrive
+
+**Tech:** React Flow (compound nodes, custom styling, animated edges, Dagre/ELK auto-layout). All required data already streams via SSE — no backend changes needed for the basic version.
+
+**Scope tiers:**
+1. Basic — agent boxes with subtask nodes, dependency edges, real-time status colors
+2. Enhanced — parent-child agent links, message flow edges, spawn animations, pipeline progress
+3. Full — timeline scrubber for historical replay, click-to-expand agent details, duration overlays
+
+**Priority:** Low — quality of life. The event timeline works for debugging; this is about making orchestration intuitive and visually impressive.
