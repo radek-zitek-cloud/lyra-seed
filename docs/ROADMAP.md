@@ -672,23 +672,82 @@ V2P1 proved that sub-agents can spawn and execute with full tool access. However
 
 ---
 
+### V2 Phase 7: Skills — Filesystem-Based Prompt Macros
+
+**Objective:** Replace the database-backed prompt macro system with filesystem-based skill definitions. Skills are `.md` files with YAML frontmatter that define reusable LLM sub-call templates. Aligns with the project's filesystem-first configuration pattern and industry conventions (Claude Code commands, Cursor rules).
+
+**Background:** The current `PromptMacroProvider` stores macros in SQLite via `SqliteMacroRepo` and manages them through CRUD API endpoints (`/macros`). In practice the feature is unused — no macros have been created outside of testing. Meanwhile, all other agent configuration (system prompts, agent configs, internal prompts) lives in the filesystem and works well. Moving macros to the filesystem as "skills" makes them discoverable, version-controlled, and editable without API calls.
+
+**Deliverables:**
+
+- Skill file format in `skills/` directory:
+  ```markdown
+  ---
+  name: summarize
+  description: Summarize text into bullet points
+  parameters:
+    text:
+      type: string
+      description: The text to summarize
+      required: true
+  ---
+
+  Summarize the following text into 3-5 bullet points:
+
+  {{text}}
+  ```
+  YAML frontmatter defines the tool schema (name, description, parameters). Body is the template with `{{parameter}}` placeholders.
+
+- `SkillProvider` implementing `ToolProvider`:
+  - Scans `skills/` directory for `.md` files at startup
+  - Parses frontmatter + template from each file
+  - Registers each skill as a tool in the `ToolRegistry`
+  - Executes skills by expanding the template and making an LLM sub-call (same as current `PromptMacroProvider`)
+  - Uses the calling agent's model (not LLMConfig default)
+
+- Remove database-backed macro system:
+  - Remove `SqliteMacroRepo` and its database table
+  - Remove `macro_routes.py` (CRUD API)
+  - Remove `PromptMacroProvider`
+  - Remove macro loading from `main.py` lifespan
+
+- Agent tool for runtime skill creation:
+  - `create_skill(name, description, parameters, template)` tool
+  - Writes a new `.md` file to `skills/` directory
+  - Immediately available to all agents (re-scan or register on create)
+  - Enables V3 self-evolution: agents can create new skills at runtime
+
+- Configurable skills directory in `lyra.config.json`:
+  - `"skillsDir": "./skills"` (default)
+  - Documented in CONFIGURATION_GUIDE.md
+
+- Bundled starter skills:
+  - `summarize.md` — summarize text into bullet points
+  - `translate.md` — translate text to a target language
+  - `code-review.md` — review code for quality, bugs, and improvements
+
+- Update documentation:
+  - `prompts/README.md` — update to reference skills
+  - `docs/CONFIGURATION_GUIDE.md` — add skills directory section
+  - `prompts/default.md` — document skill tools in system prompt
+
+**Exit Criteria:** Skills load from `skills/*.md` at startup and register as tools. Agents can call skills via function-calling. Agents can create new skills at runtime via `create_skill`. Database macro system fully removed. All existing smoke tests pass (macro-related tests updated or replaced).
+
+---
+
 ## 6. V3 — Self-Evolution & Capability Acquisition
 
 **Goal:** Agents can identify capability gaps and fill them by creating new tools. The system becomes self-improving.
 
 ---
 
-### V3 Phase 1: Tool Creation — Prompt Macros
+### V3 Phase 1: Tool Creation — Skills & MCP Servers
 
 **Deliverables:**
 
-- Agent can create new prompt macros dynamically:
-  - `create_prompt_macro(name, description, template, parameters)` tool
-  - Validates the macro definition
-  - Stores in the tool registry
-  - Immediately available for use by the creating agent and others
-- Macro testing: agent can dry-run a macro before registering it
-- Macro versioning: updates create new versions, old versions retained
+- Agent can create new skills dynamically (delivered in V2P7 via `create_skill` tool)
+- Skill validation: agent can dry-run a skill before making it permanent
+- Skill versioning: updates create new versions, old versions retained as `{name}.v{n}.md`
 
 ---
 
