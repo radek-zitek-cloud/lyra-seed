@@ -741,7 +741,7 @@ V2P1 proved that sub-agents can spawn and execute with full tool access. However
 
 ---
 
-### V3 Phase 1: Tool Creation — Skills & MCP Servers
+### V3 Phase 1: Tool Creation — Skills 
 
 **Deliverables:**
 
