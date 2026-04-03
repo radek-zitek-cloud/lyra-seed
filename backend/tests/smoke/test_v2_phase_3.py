@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from agent_platform.core.models import Agent, AgentConfig, AgentStatus
+from agent_platform.core.models import Agent, AgentConfig
 from agent_platform.db.sqlite_agent_repo import SqliteAgentRepo
 from agent_platform.db.sqlite_conversation_repo import SqliteConversationRepo
 from agent_platform.db.sqlite_message_repo import SqliteMessageRepo
@@ -160,28 +160,30 @@ class TestV2Phase3:
 
         mock_llm = deps["llm"]
         # Mock LLM to return a structured decomposition
-        decomposition_json = json.dumps({
-            "subtasks": [
-                {
-                    "description": "Research the topic",
-                    "assigned_to": "spawn_agent",
-                    "failure_policy": "retry",
-                },
-                {
-                    "description": "Write the report",
-                    "assigned_to": "spawn_agent",
-                    "dependencies": [0],
-                    "failure_policy": "escalate",
-                },
-                {
-                    "description": "Review the report",
-                    "assigned_to": "spawn_agent",
-                    "dependencies": [1],
-                    "failure_policy": "skip",
-                },
-            ],
-            "strategy": "sequential",
-        })
+        decomposition_json = json.dumps(
+            {
+                "subtasks": [
+                    {
+                        "description": "Research the topic",
+                        "assigned_to": "spawn_agent",
+                        "failure_policy": "retry",
+                    },
+                    {
+                        "description": "Write the report",
+                        "assigned_to": "spawn_agent",
+                        "dependencies": [0],
+                        "failure_policy": "escalate",
+                    },
+                    {
+                        "description": "Review the report",
+                        "assigned_to": "spawn_agent",
+                        "dependencies": [1],
+                        "failure_policy": "skip",
+                    },
+                ],
+                "strategy": "sequential",
+            }
+        )
         mock_llm.complete.return_value = LLMResponse(
             content=decomposition_json, usage={}
         )
@@ -218,9 +220,7 @@ class TestV2Phase3:
 
         async def track_execution(*a, **kw):
             execution_order.append(len(execution_order) + 1)
-            return LLMResponse(
-                content=f"Result {len(execution_order)}", usage={}
-            )
+            return LLMResponse(content=f"Result {len(execution_order)}", usage={})
 
         mock_llm.complete.side_effect = track_execution
 
@@ -334,9 +334,21 @@ class TestV2Phase3:
         plan = TaskPlan(
             original_task="Test pipeline",
             subtasks=[
-                SubTask(id="st-1", description="Stage 1: gather data", assigned_to="spawn_agent"),
-                SubTask(id="st-2", description="Stage 2: process data", assigned_to="spawn_agent"),
-                SubTask(id="st-3", description="Stage 3: format output", assigned_to="spawn_agent"),
+                SubTask(
+                    id="st-1",
+                    description="Stage 1: gather data",
+                    assigned_to="spawn_agent",
+                ),
+                SubTask(
+                    id="st-2",
+                    description="Stage 2: process data",
+                    assigned_to="spawn_agent",
+                ),
+                SubTask(
+                    id="st-3",
+                    description="Stage 3: format output",
+                    assigned_to="spawn_agent",
+                ),
             ],
             strategy=OrchestrationStrategyType.PIPELINE,
         )
@@ -350,7 +362,7 @@ class TestV2Phase3:
             parent_agent_id=deps["parent"].id,
         )
 
-        result = await strategy.execute(plan)
+        await strategy.execute(plan)
 
         # All completed
         for st in plan.subtasks:
@@ -443,7 +455,7 @@ class TestV2Phase3:
             parent_agent_id=deps["parent"].id,
         )
 
-        result = await strategy.execute(plan)
+        await strategy.execute(plan)
 
         assert call_count >= 2  # Retried
         assert plan.subtasks[0].status == SubTaskStatus.COMPLETED
@@ -500,7 +512,7 @@ class TestV2Phase3:
             parent_agent_id=deps["parent"].id,
         )
 
-        result = await strategy.execute(plan)
+        await strategy.execute(plan)
 
         assert plan.subtasks[0].status == SubTaskStatus.SKIPPED
         assert plan.subtasks[1].status == SubTaskStatus.COMPLETED
@@ -561,15 +573,17 @@ class TestV2Phase3:
         )
 
         mock_llm = deps["llm"]
-        decomposition_json = json.dumps({
-            "subtasks": [
-                {
-                    "description": "Step 1",
-                    "assigned_to": "spawn_agent",
-                },
-            ],
-            "strategy": "sequential",
-        })
+        decomposition_json = json.dumps(
+            {
+                "subtasks": [
+                    {
+                        "description": "Step 1",
+                        "assigned_to": "spawn_agent",
+                    },
+                ],
+                "strategy": "sequential",
+            }
+        )
         mock_llm.complete.return_value = LLMResponse(
             content=decomposition_json, usage={}
         )
@@ -616,31 +630,29 @@ class TestV2Phase3:
             if call_count == 1:
                 # Decomposition response
                 return LLMResponse(
-                    content=json.dumps({
-                        "subtasks": [
-                            {
-                                "description": "Research",
-                                "assigned_to": "spawn_agent",
-                            },
-                            {
-                                "description": "Write",
-                                "assigned_to": "spawn_agent",
-                            },
-                        ],
-                        "strategy": "sequential",
-                    }),
+                    content=json.dumps(
+                        {
+                            "subtasks": [
+                                {
+                                    "description": "Research",
+                                    "assigned_to": "spawn_agent",
+                                },
+                                {
+                                    "description": "Write",
+                                    "assigned_to": "spawn_agent",
+                                },
+                            ],
+                            "strategy": "sequential",
+                        }
+                    ),
                     usage={},
                 )
             elif call_count <= 3:
                 # Subtask execution responses
-                return LLMResponse(
-                    content=f"Subtask {call_count - 1} done", usage={}
-                )
+                return LLMResponse(content=f"Subtask {call_count - 1} done", usage={})
             else:
                 # Synthesis response
-                return LLMResponse(
-                    content="Final synthesized response", usage={}
-                )
+                return LLMResponse(content="Final synthesized response", usage={})
 
         mock_llm.complete.side_effect = multi_response
 
@@ -665,7 +677,7 @@ class TestV2Phase3:
     @pytest.mark.asyncio
     async def test_st_v2_3_12_orchestration_events(self, deps):
         """ST-V2-3.12: Orchestration emits events."""
-        from agent_platform.observation.events import EventFilter, EventType
+        from agent_platform.observation.events import EventFilter
         from agent_platform.orchestration.tool_provider import (
             OrchestrationToolProvider,
         )
@@ -678,15 +690,17 @@ class TestV2Phase3:
             call_count += 1
             if call_count == 1:
                 return LLMResponse(
-                    content=json.dumps({
-                        "subtasks": [
-                            {
-                                "description": "Only task",
-                                "assigned_to": "spawn_agent",
-                            },
-                        ],
-                        "strategy": "sequential",
-                    }),
+                    content=json.dumps(
+                        {
+                            "subtasks": [
+                                {
+                                    "description": "Only task",
+                                    "assigned_to": "spawn_agent",
+                                },
+                            ],
+                            "strategy": "sequential",
+                        }
+                    ),
                     usage={},
                 )
             elif call_count == 2:
@@ -710,9 +724,7 @@ class TestV2Phase3:
         )
 
         # Query events for this agent
-        events = await deps["event_bus"].query(
-            EventFilter(agent_id=deps["parent"].id)
-        )
+        events = await deps["event_bus"].query(EventFilter(agent_id=deps["parent"].id))
 
         # Should have events for orchestration
         assert len(events) >= 1

@@ -20,4 +20,4 @@ Items for future consideration, not tied to a specific phase.
 
 **Scope:** Add optional `mcpServers` field to `AgentFileConfig`. On agent creation, merge agent-specific MCP servers with (or instead of) system-wide ones. May require per-agent `ToolRegistry` instances rather than a shared singleton — significant architectural change.
 
-**Priority:** Medium — becomes important as agent specialization increases and for security (least-privilege tool access).
+**Priority:** Medium — becomes important as agent specialization increases and for security (least-privilege tool access). Additional motivation: every tool in the registry adds to the tools schema sent to the LLM on every call, inflating context size and token costs. A worker that only needs filesystem tools currently receives 38+ tool definitions. Per-agent tool scoping would significantly reduce per-call token overhead.

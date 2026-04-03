@@ -99,9 +99,7 @@ class OrchestrationToolProvider:
             duration_ms=int((time.monotonic() - start) * 1000),
         )
 
-    async def _decompose_task(
-        self, args: dict[str, Any], start: float
-    ) -> ToolResult:
+    async def _decompose_task(self, args: dict[str, Any], start: float) -> ToolResult:
         task = args["task"]
         agent_id = args.get("agent_id", "system")
 
@@ -124,21 +122,23 @@ class OrchestrationToolProvider:
 
             return ToolResult(
                 success=True,
-                output=json.dumps({
-                    "plan_id": plan.id,
-                    "original_task": plan.original_task,
-                    "strategy": plan.strategy.value,
-                    "subtasks": [
-                        {
-                            "id": st.id,
-                            "description": st.description,
-                            "assigned_to": st.assigned_to,
-                            "dependencies": st.dependencies,
-                            "failure_policy": st.failure_policy.value,
-                        }
-                        for st in plan.subtasks
-                    ],
-                }),
+                output=json.dumps(
+                    {
+                        "plan_id": plan.id,
+                        "original_task": plan.original_task,
+                        "strategy": plan.strategy.value,
+                        "subtasks": [
+                            {
+                                "id": st.id,
+                                "description": st.description,
+                                "assigned_to": st.assigned_to,
+                                "dependencies": st.dependencies,
+                                "failure_policy": st.failure_policy.value,
+                            }
+                            for st in plan.subtasks
+                        ],
+                    }
+                ),
                 duration_ms=int((time.monotonic() - start) * 1000),
             )
         except Exception as e:
@@ -149,9 +149,7 @@ class OrchestrationToolProvider:
                 duration_ms=int((time.monotonic() - start) * 1000),
             )
 
-    async def _orchestrate(
-        self, args: dict[str, Any], start: float
-    ) -> ToolResult:
+    async def _orchestrate(self, args: dict[str, Any], start: float) -> ToolResult:
         task = args["task"]
         agent_id = args.get("agent_id", "system")
         strategy_override = args.get("strategy")
@@ -221,12 +219,14 @@ class OrchestrationToolProvider:
 
             return ToolResult(
                 success=orch_result.status == SubTaskStatus.COMPLETED,
-                output=json.dumps({
-                    "plan_id": orch_result.plan_id,
-                    "status": orch_result.status.value,
-                    "synthesized_response": orch_result.synthesized_response,
-                    "subtask_results": orch_result.results,
-                }),
+                output=json.dumps(
+                    {
+                        "plan_id": orch_result.plan_id,
+                        "status": orch_result.status.value,
+                        "synthesized_response": orch_result.synthesized_response,
+                        "subtask_results": orch_result.results,
+                    }
+                ),
                 duration_ms=int((time.monotonic() - start) * 1000),
             )
         except Exception as e:

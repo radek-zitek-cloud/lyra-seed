@@ -2,7 +2,6 @@
 
 import asyncio
 import logging
-import time
 
 from agent_platform.db.sqlite_agent_repo import SqliteAgentRepo
 from agent_platform.db.sqlite_conversation_repo import SqliteConversationRepo
@@ -225,9 +224,7 @@ class ParallelOrchestration:
                 )
                 return subtask.id, recovered
 
-        task_results = await asyncio.gather(
-            *(run_subtask(st) for st in plan.subtasks)
-        )
+        task_results = await asyncio.gather(*(run_subtask(st) for st in plan.subtasks))
 
         failed = False
         for subtask_id, result in task_results:
@@ -283,7 +280,11 @@ class PipelineOrchestration:
                 previous_output = result
             except Exception as e:
                 recovered = await _handle_failure(
-                    subtask, e, self._llm, self._event_bus, self._parent_agent_id,
+                    subtask,
+                    e,
+                    self._llm,
+                    self._event_bus,
+                    self._parent_agent_id,
                     previous_output=previous_output,
                 )
                 if recovered is not None:

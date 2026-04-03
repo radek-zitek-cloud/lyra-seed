@@ -72,7 +72,11 @@ class TaskDecomposer:
         # Strip markdown code fences if present
         if content.startswith("```"):
             lines = content.split("\n")
-            content = "\n".join(lines[1:-1]) if lines[-1].strip() == "```" else "\n".join(lines[1:])
+            content = (
+                "\n".join(lines[1:-1])
+                if lines[-1].strip() == "```"
+                else "\n".join(lines[1:])
+            )
 
         data = json.loads(content)
 
