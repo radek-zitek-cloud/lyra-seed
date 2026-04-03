@@ -65,3 +65,35 @@ Delivered in V2 Phase 5 (deliverables 5.1–5.3). The Full tier's timeline scrub
 - May need a "session" concept to group events belonging to one orchestration run
 
 **Priority:** Low — quality of life for debugging and demos. The live graph from V2P5 covers the primary use case.
+
+---
+
+### BL-008: Unified RAG-based capability discovery
+
+**Context:** The platform now has three separate semantic search tools for capability discovery: `list_skills(query="...")` for skills, `list_templates(query="...")` for agent templates, and `recall(query="...")` for memories. Each searches its own domain independently. An agent that needs to find the right capability for a task must call all three separately — or guess which one to use.
+
+Additionally, the full tool schema (48+ tools) is sent on every LLM call, consuming tokens regardless of relevance. This is brute-force RAG — dump everything into context and hope the LLM pays attention.
+
+**Scope:** A unified `discover(query="...")` tool that searches across all capability sources in a single call:
+
+1. **Skills** — reusable prompt templates
+2. **Agent templates** — specialized agent roles for delegation
+3. **Tools** — MCP tools and core tools (currently not searchable)
+4. **Memories** — relevant knowledge from past interactions
+
+Returns a ranked list of capabilities with their type, name, description, and relevance score. The agent gets a single view of "what can I use to accomplish this?"
+
+**Longer-term evolution:**
+- Instead of sending all 48+ tools in every LLM call, send only core tools (memory, spawner) + a `discover` tool
+- The agent calls `discover(query="...")` to find relevant tools on demand
+- Only discovered tools are added to the schema for subsequent iterations
+- This would dramatically reduce per-call token cost and improve tool selection accuracy (the LLM chooses from 5 relevant tools, not 48)
+
+**Considerations:**
+- Requires a unified embedding index across skills, templates, tools, and memories
+- Tool descriptions need to be embedded (currently only skills and templates are)
+- The "discover then use" pattern adds one extra LLM round-trip per novel capability need
+- Caching: once a tool is discovered in a conversation, it stays in the schema for remaining turns
+- Backward compatibility: agents with `allowed_tools` set should still get their tools directly
+
+**Priority:** Medium — foundational for true self-evolution. The current separate search tools work but don't scale. The token savings from on-demand tool discovery would be significant for agents with many tools.

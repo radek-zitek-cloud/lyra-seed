@@ -741,13 +741,19 @@ V2P1 proved that sub-agents can spawn and execute with full tool access. However
 
 ---
 
-### V3 Phase 1: Tool Creation — Skills 
+### V3 Phase 1: Tool Creation — Skills — COMPLETE
 
 **Deliverables:**
 
 - Agent can create new skills dynamically (delivered in V2P7 via `create_skill` tool)
-- Skill validation: agent can dry-run a skill before making it permanent
-- Skill versioning: updates create new versions, old versions retained as `{name}.v{n}.md`
+- Skill validation: `test_skill` dry-runs a template with test arguments, then evaluates the output against the skill's description via a second LLM call (execution model + evaluation with orchestration model). Returns PASS/FAIL verdict with reasoning.
+- Skill versioning: `update_skill` renames the current file to `{name}.v{n}.md` and writes the new version. Version numbers auto-increment. Version files excluded from loading.
+- Name validation: `create_skill` rejects invalid characters and reserved tool names.
+- Semantic skill search: `list_skills(query="...")` embeds the query and ranks skills by cosine similarity to their descriptions.
+- Skill deduplication: `create_skill` embeds the new description and rejects if similarity > 0.85 to an existing skill, preventing near-duplicate proliferation.
+- Agent template discovery: `list_templates(query="...")` and `get_template(name)` tools let agents find the right template before spawning sub-agents. Same semantic search pattern as skills.
+- Evaluation prompt externalized to `prompts/system/evaluate_skill.md`.
+- All features degrade gracefully without an embedding provider.
 
 ---
 
