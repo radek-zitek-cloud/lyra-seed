@@ -145,9 +145,17 @@ This section documents what was delivered, what deviated from the original requi
 - **Configuration:** Agent config from `{name}.json` files (model, hitl_policy, temperature, max_iterations, auto_extract). Platform config from `lyra.config.json` (dataDir, defaultModel, embeddingModel, mcpServers, retry, memoryGC, context). Config reloads from disk on each agent creation.
 - **Memory Deduplication:** Pre-write similarity check prevents duplicate memories (configurable threshold).
 
+### Post-V2P3 Addendum
+
+- **Orchestration Patterns (Req 3):** Task decomposition via LLM-based `TaskDecomposer` producing structured `TaskPlan` with subtasks, dependencies, and failure policies. Three orchestration strategies: `SequentialOrchestration` (ordered), `ParallelOrchestration` (concurrent via asyncio.gather), `PipelineOrchestration` (chained output-to-input). `ResultSynthesizer` combines subtask results into unified response via LLM. Four failure policies per subtask: retry, reassign, escalate, skip.
+- **Orchestration Tools:** `decompose_task` (plan-only) and `orchestrate` (end-to-end: decompose + execute + synthesize) registered as agent tools. Agents use them autonomously based on system prompt guidance.
+- **Orchestration Configuration:** `orchestrationModel` in `lyra.config.json` routes orchestration LLM calls to a cheaper model (e.g., gpt-5.4-mini) while the agent's main reasoning uses the full model. `maxSubtasks` caps decomposition to prevent runaway cost (default 10). Both configurable per-agent via `prompts/{name}.json`.
+- **Externalized Prompts:** Decomposition and synthesis system prompts stored in `prompts/system/decompose_task.md` and `prompts/system/synthesize_results.md`, editable without code changes.
+
+**Deviation from roadmap:** Subtasks execute as direct LLM calls, not as tool calls or sub-agent spawns. The `assigned_to` field exists on `SubTask` but is not used for routing — all subtasks get the same LLM-call execution. This was sufficient for analysis/writing tasks but means orchestrated subtasks cannot use tools, access memory, or run multi-iteration loops. See backlog BL-005 for the enhancement to wire `assigned_to` to actual tool/agent execution.
+
 ### Not yet delivered
 
-- **Orchestration Patterns (V2P3):** Task decomposition, sequential/parallel/pipeline patterns, result synthesis
 - **Per-Agent Tool Scoping (V2P4):** Per-agent MCP server config, scoped tool registries, token optimization. Currently all agents share one global tool registry (38+ tools), inflating context size and cost on every LLM call regardless of what the agent needs.
 - **Multi-Agent UI (V2P5):** Agent topology graph, communication flow visualization
 - **Self-Evolution (V3):** Agents cannot create new tools at runtime

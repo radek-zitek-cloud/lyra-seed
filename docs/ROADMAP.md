@@ -564,7 +564,7 @@ V2P1 proved that sub-agents can spawn and execute with full tool access. However
 
 ---
 
-### V2 Phase 3: Orchestration Patterns
+### V2 Phase 3: Orchestration Patterns — COMPLETE
 
 **Deliverables:**
 
@@ -581,6 +581,8 @@ V2P1 proved that sub-agents can spawn and execute with full tool access. However
   - Uses LLM to synthesize a unified response
 - Failure handling strategy:
   - Retry, reassign, escalate, or skip — configurable per subtask
+
+**Implementation notes:** Subtasks execute as direct LLM calls rather than tool calls or sub-agent spawns (see backlog BL-005). Added `orchestrationModel` and `maxSubtasks` config entries. Externalized decomposition and synthesis prompts to `prompts/system/`. System prompt updated to document orchestration tools.
 
 ---
 
