@@ -17,12 +17,14 @@ from agent_platform.observation.in_process_event_bus import (
 )
 from agent_platform.tools.registry import ToolRegistry
 from agent_platform.tools.skill_provider import SkillProvider
+from agent_platform.tools.template_provider import TemplateProvider
 
 _agent_repo: SqliteAgentRepo | None = None
 _conversation_repo: SqliteConversationRepo | None = None
 _event_bus: InProcessEventBus | None = None
 _runtime: AgentRuntime | None = None
 _skill_provider: SkillProvider | None = None
+_template_provider: TemplateProvider | None = None
 _tool_registry: ToolRegistry | None = None
 _system_prompt_resolver: Callable[[str], str] | None = None
 _agent_config_resolver: Callable | None = None
@@ -39,6 +41,7 @@ def configure(
     event_bus: InProcessEventBus,
     runtime: AgentRuntime,
     skill_provider: SkillProvider | None = None,
+    template_provider: TemplateProvider | None = None,
     tool_registry: ToolRegistry | None = None,
     system_prompt_resolver: Callable[[str], str] | None = None,
     agent_config_resolver: Callable | None = None,
@@ -49,7 +52,7 @@ def configure(
     message_repo: Any = None,
 ) -> None:
     global _agent_repo, _conversation_repo, _event_bus, _runtime
-    global _skill_provider, _tool_registry
+    global _skill_provider, _template_provider, _tool_registry
     global _system_prompt_resolver, _agent_config_resolver
     global _default_model
     global _memory_store, _message_repo
@@ -59,6 +62,7 @@ def configure(
     _event_bus = event_bus
     _runtime = runtime
     _skill_provider = skill_provider
+    _template_provider = template_provider
     _tool_registry = tool_registry
     _system_prompt_resolver = system_prompt_resolver
     _agent_config_resolver = agent_config_resolver
@@ -92,6 +96,11 @@ def get_runtime() -> AgentRuntime:
 def get_skill_provider() -> SkillProvider:
     assert _skill_provider is not None, "App not initialized"
     return _skill_provider
+
+
+def get_template_provider() -> TemplateProvider:
+    assert _template_provider is not None, "App not initialized"
+    return _template_provider
 
 
 def get_tool_registry() -> ToolRegistry:

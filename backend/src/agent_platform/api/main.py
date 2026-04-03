@@ -17,6 +17,7 @@ from agent_platform.api.message_routes import router as message_router
 from agent_platform.api.observation_routes import router as observation_router
 from agent_platform.api.routes import router
 from agent_platform.api.skill_routes import router as skill_router
+from agent_platform.api.template_routes import router as template_router
 from agent_platform.api.ws_routes import router as ws_router
 from agent_platform.core.config import Settings
 from agent_platform.core.platform_config import (
@@ -41,6 +42,7 @@ from agent_platform.tools.agent_spawner import AgentSpawnerProvider
 from agent_platform.tools.mcp_client import MCPClientProvider, MCPStdioClient
 from agent_platform.tools.registry import ToolRegistry
 from agent_platform.tools.skill_provider import SkillProvider
+from agent_platform.tools.template_provider import TemplateProvider
 
 logger = logging.getLogger(__name__)
 
@@ -170,6 +172,16 @@ def create_app(
         eval_prompt=eval_prompt,
     )
     tool_registry.register_provider(skill_provider)
+
+    # Template discovery
+    template_provider = TemplateProvider(
+        prompts_dir=str(
+            project_root / platform_config.systemPromptsDir
+        ),
+        embedding_provider=embedding_provider,
+    )
+    tool_registry.register_provider(template_provider)
+
     # Load system prompts for summarization and extraction
     summary_prompt = load_system_prompt("summarize", project_root)
     extraction_prompt = load_system_prompt("extract_facts", project_root)
@@ -279,6 +291,7 @@ def create_app(
             event_bus,
             runtime,
             skill_provider=skill_provider,
+            template_provider=template_provider,
             tool_registry=tool_registry,
             system_prompt_resolver=prompt_resolver,
             agent_config_resolver=config_resolver,
@@ -328,6 +341,7 @@ def create_app(
 
     app.include_router(router)
     app.include_router(skill_router)
+    app.include_router(template_router)
     app.include_router(config_router)
     app.include_router(observation_router)
     app.include_router(memory_router)

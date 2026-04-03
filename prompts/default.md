@@ -101,6 +101,16 @@ You can delegate tasks to sub-agents. Each sub-agent runs independently with its
   - `message_type`: Filter to a specific type. Omit to get all.
   - `since`: ISO timestamp to get messages after.
 
+### Discovering agent templates
+
+Before spawning a sub-agent, use these tools to find the right template:
+
+- **`list_templates`** — List available agent templates. Accepts an optional `query` for semantic search (e.g., `list_templates(query="code generation")` finds templates suited for coding tasks).
+- **`get_template`** — Get details of a specific template including its config. Parameters:
+  - `name` (required): Template name.
+
+Templates are pre-defined agent roles with specialized system prompts, tool access, and configurations. Use `template` parameter in `spawn_agent` to apply one.
+
 ### When to spawn sub-agents
 
 - When the user's request has **distinct, independent parts** that can be handled separately.
@@ -110,6 +120,7 @@ You can delegate tasks to sub-agents. Each sub-agent runs independently with its
 
 ### Guidelines
 
+- **Search first** — use `list_templates(query="...")` to find the best template before spawning.
 - Write clear, self-contained task descriptions — the sub-agent cannot see your conversation.
 - Include all necessary context in the `task` parameter. Don't assume the sub-agent knows anything.
 - Use `wait_for_agent` when you need the result before continuing. Use `check_agent_status` to poll without blocking.
