@@ -1,9 +1,14 @@
 """API routes for configuration file browsing and editing."""
 
+import logging
+import os
+import sys
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/config", tags=["config"])
 
@@ -176,3 +181,77 @@ async def delete_config_file(path: str):
 
     file_path.unlink()
     return {"status": "deleted", "path": path}
+
+
+@router.post("/reload")
+async def reload_config():
+    """Reload configuration, skills, and prompts without restarting."""
+    from agent_platform.api._deps import (
+        _project_root,
+        get_skill_provider,
+    )
+
+    reloaded = []
+
+    # Reload skills from disk
+    try:
+        provider = get_skill_provider()
+        provider.reload()
+        reloaded.append(
+            f"skills ({len(provider._skills)} loaded)"
+        )
+    except Exception as e:
+        logger.exception("Failed to reload skills")
+        reloaded.append(f"skills (error: {e})")
+
+    # Platform config reloads on every agent creation already
+    reloaded.append("platform config (reloads per agent creation)")
+    # Prompts reload on every agent creation already
+    reloaded.append("agent prompts (reload per agent creation)")
+
+    return {
+        "status": "reloaded",
+        "reloaded": reloaded,
+        "note": "MCP server changes require a full restart.",
+    }
+
+
+@router.post("/restart")
+async def restart_server():
+    """Restart the backend server process.
+
+    Works with uvicorn --reload by touching a source file
+    to trigger the file watcher. Falls back to os._exit()
+    if the touch doesn't apply.
+    """
+    import asyncio
+
+    root = _get_project_root()
+
+    # Touch a .py file to trigger uvicorn --reload watcher
+    trigger = (
+        root
+        / "backend"
+        / "src"
+        / "agent_platform"
+        / "__init__.py"
+    )
+    if trigger.exists():
+        trigger.touch()
+        logger.info(
+            "Touched %s to trigger uvicorn reload", trigger
+        )
+
+    # Schedule hard exit as fallback after 2 seconds
+    # (gives time for the response to be sent)
+    async def _delayed_exit():
+        await asyncio.sleep(2)
+        logger.info("Forcing process exit for restart")
+        os._exit(0)
+
+    asyncio.create_task(_delayed_exit())
+
+    return {
+        "status": "restarting",
+        "note": "Server will restart momentarily.",
+    }

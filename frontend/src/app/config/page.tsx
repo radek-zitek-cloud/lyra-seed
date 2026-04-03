@@ -168,6 +168,8 @@ export default function ConfigPage() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [helpText, setHelpText] = useState<string | null>(null);
   const [helpKey, setHelpKey] = useState<string | null>(null);
+  const [confirmRestart, setConfirmRestart] = useState(false);
+  const [serverAction, setServerAction] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Load file tree
@@ -266,6 +268,54 @@ export default function ConfigPage() {
     setHelpText(key ? HELP[key] || null : null);
   }, [selected, content]);
 
+  const doReload = useCallback(async () => {
+    setServerAction("reloading");
+    try {
+      const res = await fetch(`${API}/config/reload`, { method: "POST" });
+      if (res.ok) {
+        const data = await res.json();
+        setServerAction(`Reloaded: ${data.reloaded.join(", ")}`);
+        // Refresh file tree
+        fetch(`${API}/config/files`).then((r) => r.json()).then(setTree);
+        setTimeout(() => setServerAction(null), 4000);
+      } else {
+        setServerAction("Reload failed");
+        setTimeout(() => setServerAction(null), 3000);
+      }
+    } catch {
+      setServerAction("Reload failed — server unreachable");
+      setTimeout(() => setServerAction(null), 3000);
+    }
+  }, []);
+
+  const doRestart = useCallback(async () => {
+    setConfirmRestart(false);
+    setServerAction("restarting");
+    try {
+      await fetch(`${API}/config/restart`, { method: "POST" });
+      setServerAction("Server restarting — reconnecting...");
+      // Poll until server is back
+      const poll = setInterval(async () => {
+        try {
+          const res = await fetch(`${API}/health`);
+          if (res.ok) {
+            clearInterval(poll);
+            setServerAction("Server restarted");
+            fetch(`${API}/config/files`).then((r) => r.json()).then(setTree);
+            setTimeout(() => setServerAction(null), 2000);
+          }
+        } catch {
+          // Still restarting
+        }
+      }, 1000);
+      // Give up after 30s
+      setTimeout(() => clearInterval(poll), 30000);
+    } catch {
+      setServerAction("Restart failed");
+      setTimeout(() => setServerAction(null), 3000);
+    }
+  }, []);
+
   const dirty = content !== original;
 
   return (
@@ -278,6 +328,8 @@ export default function ConfigPage() {
           borderRight: "1px solid #222",
           overflowY: "auto",
           padding: "8px 0",
+          display: "flex",
+          flexDirection: "column",
         }}
       >
         <div
@@ -347,6 +399,105 @@ export default function ConfigPage() {
               </div>
             );
           })}
+
+        {/* Server actions */}
+        <div
+          style={{
+            marginTop: "auto",
+            padding: "12px",
+            borderTop: "1px solid #222",
+            display: "flex",
+            flexDirection: "column",
+            gap: 6,
+          }}
+        >
+          {serverAction && (
+            <div
+              style={{
+                fontSize: 10,
+                color: serverAction.startsWith("Reload failed") ||
+                  serverAction.startsWith("Restart failed")
+                  ? "#e66"
+                  : "#6a8",
+                padding: "4px 0",
+                wordBreak: "break-word",
+              }}
+            >
+              {serverAction}
+            </div>
+          )}
+          <button
+            onClick={doReload}
+            disabled={serverAction === "reloading"}
+            style={{
+              fontSize: 11,
+              padding: "5px 0",
+              border: "1px solid #333",
+              borderRadius: 2,
+              background: "#1a1a2a",
+              color: "#8af",
+              cursor: "pointer",
+              width: "100%",
+            }}
+          >
+            RELOAD CONFIG
+          </button>
+          {!confirmRestart ? (
+            <button
+              onClick={() => setConfirmRestart(true)}
+              disabled={serverAction === "restarting"}
+              style={{
+                fontSize: 11,
+                padding: "5px 0",
+                border: "1px solid #422",
+                borderRadius: 2,
+                background: "#1a1a1a",
+                color: "#e88",
+                cursor: "pointer",
+                width: "100%",
+              }}
+            >
+              RESTART SERVER
+            </button>
+          ) : (
+            <div style={{ display: "flex", gap: 4 }}>
+              <button
+                onClick={doRestart}
+                style={{
+                  flex: 1,
+                  fontSize: 11,
+                  padding: "5px 0",
+                  border: "1px solid #622",
+                  borderRadius: 2,
+                  background: "#3a1a1a",
+                  color: "#f88",
+                  cursor: "pointer",
+                }}
+              >
+                CONFIRM
+              </button>
+              <button
+                onClick={() => setConfirmRestart(false)}
+                style={{
+                  flex: 1,
+                  fontSize: 11,
+                  padding: "5px 0",
+                  border: "1px solid #333",
+                  borderRadius: 2,
+                  background: "#1a1a1a",
+                  color: "#888",
+                  cursor: "pointer",
+                }}
+              >
+                CANCEL
+              </button>
+            </div>
+          )}
+          <div style={{ fontSize: 9, color: "#444", lineHeight: 1.3 }}>
+            Reload applies skills and prompt changes.
+            Restart required for MCP server or .env changes.
+          </div>
+        </div>
       </div>
 
       {/* Editor */}
