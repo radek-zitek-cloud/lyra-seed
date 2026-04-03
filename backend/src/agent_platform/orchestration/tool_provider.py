@@ -104,12 +104,23 @@ class OrchestrationToolProvider:
             ),
         ]
 
-    async def _resolve_model(self, agent_id: str) -> str | None:
-        """Look up the calling agent's model."""
+    async def _resolve_agent_config(
+        self, agent_id: str
+    ) -> tuple[str | None, int]:
+        """Look up the calling agent's orchestration config.
+
+        Returns (model, max_subtasks).
+        """
         if agent_id == "system":
-            return None
+            return None, 10
         agent = await self._agent_repo.get(agent_id)
-        return agent.config.model if agent else None
+        if not agent:
+            return None, 10
+        model = (
+            agent.config.orchestration_model
+            or agent.config.model
+        )
+        return model, agent.config.max_subtasks
 
     async def call_tool(self, name: str, arguments: dict[str, Any]) -> ToolResult:
         start = time.monotonic()
@@ -128,10 +139,14 @@ class OrchestrationToolProvider:
         agent_id = args.get("agent_id", "system")
 
         try:
-            model = await self._resolve_model(agent_id)
+            model, max_subtasks = await self._resolve_agent_config(
+                agent_id,
+            )
             tools = await self._tool_registry.list_tools()
             plan = await self._decomposer.decompose(
-                task, tools, self._llm, model=model,
+                task, tools, self._llm,
+                model=model,
+                max_subtasks=max_subtasks,
             )
 
             await self._event_bus.emit(
@@ -183,10 +198,14 @@ class OrchestrationToolProvider:
 
         try:
             # 1. Decompose
-            model = await self._resolve_model(agent_id)
+            model, max_subtasks = await self._resolve_agent_config(
+                agent_id,
+            )
             tools = await self._tool_registry.list_tools()
             plan = await self._decomposer.decompose(
-                task, tools, self._llm, model=model,
+                task, tools, self._llm,
+                model=model,
+                max_subtasks=max_subtasks,
             )
 
             if strategy_override:

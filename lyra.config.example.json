@@ -55,5 +55,7 @@
   },
 
   "summaryModel": "openai/gpt-4.1-nano",
-  "extractionModel": "openai/gpt-4.1-nano"
+  "extractionModel": "openai/gpt-4.1-nano",
+  "orchestrationModel": "openai/gpt-4.1-mini",
+  "maxSubtasks": 10
 }

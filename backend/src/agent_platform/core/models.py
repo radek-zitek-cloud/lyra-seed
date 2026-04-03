@@ -53,6 +53,8 @@ class AgentConfig(BaseModel):
     memory_top_k: int = 5
     summary_model: str | None = None
     extraction_model: str | None = None
+    orchestration_model: str | None = None
+    max_subtasks: int = 10
     auto_extract: bool = True
     memory_sharing: dict[str, str] | None = None
 

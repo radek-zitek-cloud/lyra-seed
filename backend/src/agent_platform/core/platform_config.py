@@ -79,6 +79,8 @@ class PlatformConfig(BaseModel):
     context: ContextConfig = Field(default_factory=ContextConfig)
     summaryModel: str = "openai/gpt-4.1-nano"
     extractionModel: str = "openai/gpt-4.1-nano"
+    orchestrationModel: str | None = None
+    maxSubtasks: int = 10
 
 
 def load_platform_config(project_root: Path) -> PlatformConfig:
@@ -134,6 +136,8 @@ class AgentFileConfig(BaseModel):
     context: ContextConfig | None = None
     summary_model: str | None = None
     extraction_model: str | None = None
+    orchestration_model: str | None = None
+    max_subtasks: int | None = None
     auto_extract: bool | None = None
     memory_sharing: dict[str, str] | None = None
 

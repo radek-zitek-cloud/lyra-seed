@@ -58,6 +58,7 @@ class TaskDecomposer:
         available_tools: list[Tool],
         llm: LLMProvider,
         model: str | None = None,
+        max_subtasks: int = 10,
     ) -> TaskPlan:
         tool_descriptions = ", ".join(
             f"{t.name}: {t.description}" for t in available_tools
@@ -92,7 +93,8 @@ class TaskDecomposer:
         data = json.loads(content)
 
         subtasks = []
-        for i, st_data in enumerate(data.get("subtasks", [])):
+        raw_subtasks = data.get("subtasks", [])[:max_subtasks]
+        for i, st_data in enumerate(raw_subtasks):
             policy_str = st_data.get("failure_policy", "escalate")
             subtasks.append(
                 SubTask(

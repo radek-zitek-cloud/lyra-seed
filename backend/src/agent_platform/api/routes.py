@@ -86,6 +86,10 @@ async def create_agent(req: CreateAgentRequest):
         config.summary_model = file_config.summary_model
     if file_config.extraction_model is not None:
         config.extraction_model = file_config.extraction_model
+    if file_config.orchestration_model is not None:
+        config.orchestration_model = file_config.orchestration_model
+    if file_config.max_subtasks is not None:
+        config.max_subtasks = file_config.max_subtasks
     if file_config.auto_extract is not None:
         config.auto_extract = file_config.auto_extract
     if file_config.memory_sharing is not None:
@@ -110,6 +114,11 @@ async def create_agent(req: CreateAgentRequest):
             config.summary_model = pc.summaryModel
         if config.extraction_model is None:
             config.extraction_model = pc.extractionModel
+        if config.orchestration_model is None:
+            config.orchestration_model = pc.orchestrationModel
+        if config.max_subtasks == AgentConfig().max_subtasks:
+            if file_config.max_subtasks is None:
+                config.max_subtasks = pc.maxSubtasks
 
     # Apply system prompt from name.md
     if config.system_prompt == AgentConfig().system_prompt:
