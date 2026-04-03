@@ -59,9 +59,19 @@ class ContextManager:
             exclude_archived=True,
         )
 
-        if not memories:
-            result = list(messages)
-        else:
+        # Remove any previous memory injection messages
+        _MEMORY_PREFIX = "Relevant memories from previous interactions:"
+        result = [
+            m
+            for m in messages
+            if not (
+                m.role == MessageRole.SYSTEM
+                and isinstance(m.content, str)
+                and m.content.startswith(_MEMORY_PREFIX)
+            )
+        ]
+
+        if memories:
             for m in memories:
                 await self._store.update_access(m.id)
 
@@ -72,16 +82,14 @@ class ContextManager:
                     prefix += " [shared]"
                 memory_lines.append(f"- {prefix} {m.content}")
 
-            memory_text = "Relevant memories from previous interactions:\n" + "\n".join(
-                memory_lines
-            )
+            memory_text = _MEMORY_PREFIX + "\n" + "\n".join(memory_lines)
 
             memory_msg = Message(
                 role=MessageRole.SYSTEM,
                 content=memory_text,
             )
 
-            result = list(messages)
+            # Insert after the first system message (system prompt)
             insert_idx = 0
             for i, msg in enumerate(result):
                 if msg.role == MessageRole.SYSTEM:

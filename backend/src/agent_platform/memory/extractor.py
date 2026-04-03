@@ -57,13 +57,27 @@ class FactExtractor:
         Failures are caught and logged — never breaks the caller.
         """
         try:
-            return await self._do_extract(
+            result = await self._do_extract(
                 agent_id,
                 assistant_message,
                 conversation_context,
                 memory_sharing,
                 extraction_model,
             )
+            # Retry once if empty — small models are non-deterministic
+            if not result:
+                logger.info(
+                    "Extraction returned empty for agent %s, retrying",
+                    agent_id,
+                )
+                result = await self._do_extract(
+                    agent_id,
+                    assistant_message,
+                    conversation_context,
+                    memory_sharing,
+                    extraction_model,
+                )
+            return result
         except Exception:
             logger.exception("Fact extraction failed for agent %s", agent_id)
             return []

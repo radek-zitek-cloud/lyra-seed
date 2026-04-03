@@ -788,7 +788,7 @@ class TestV2Phase2:
                     "/agents",
                     json={"name": "busy-agent", "config": {"model": "test"}},
                 )
-                busy_id = resp2.json()["id"]
+                resp2.json()["id"]  # created but unused in test
                 # Manually set to running via prompt (starts a turn)
                 # Instead, just verify GET endpoint works with no messages
                 resp = await client.get(f"/agents/{agent_id}/messages")
