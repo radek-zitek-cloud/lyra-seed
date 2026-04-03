@@ -3,7 +3,7 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from agent_platform.core.models import Agent, AgentConfig, HITLPolicy
+from agent_platform.core.models import Agent, AgentConfig, AgentStatus, HITLPolicy
 
 router = APIRouter()
 
@@ -166,6 +166,11 @@ async def prompt_agent(agent_id: str, req: PromptRequest):
     agent = await repo.get(agent_id)
     if agent is None:
         raise HTTPException(status_code=404, detail="Agent not found")
+    if agent.status in (AgentStatus.COMPLETED, AgentStatus.FAILED):
+        raise HTTPException(
+            status_code=409,
+            detail=f"Agent is {agent.status.value} and cannot accept prompts",
+        )
 
     runtime = get_runtime()
     response = await runtime.run(agent_id, req.message)

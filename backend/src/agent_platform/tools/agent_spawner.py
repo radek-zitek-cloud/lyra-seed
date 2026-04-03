@@ -528,6 +528,21 @@ class AgentSpawnerProvider:
         content = args["content"]
         msg_type = MessageType(args["message_type"])
 
+        # Reject messages to terminated agents
+        target = await self._agent_repo.get(to_id)
+        if target and target.status in (
+            AgentStatus.COMPLETED,
+            AgentStatus.FAILED,
+        ):
+            return ToolResult(
+                success=False,
+                error=(
+                    f"Agent {to_id} is {target.status.value} "
+                    f"and cannot receive messages"
+                ),
+                duration_ms=int((time.monotonic() - start) * 1000),
+            )
+
         msg = AgentMessage(
             from_agent_id=from_id,
             to_agent_id=to_id,

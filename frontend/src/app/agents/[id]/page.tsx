@@ -25,7 +25,7 @@ const STATUS_STYLES: Record<string, { color: string; bg: string; border: string 
   idle: { color: "#555", bg: "rgba(85,85,85,0.08)", border: "rgba(85,85,85,0.2)" },
   running: { color: "#00ff41", bg: "rgba(0,255,65,0.08)", border: "rgba(0,255,65,0.2)" },
   waiting_hitl: { color: "#ffaa00", bg: "rgba(255,170,0,0.08)", border: "rgba(255,170,0,0.2)" },
-  completed: { color: "#00ff41", bg: "rgba(0,255,65,0.08)", border: "rgba(0,255,65,0.2)" },
+  completed: { color: "#6688ff", bg: "rgba(102,136,255,0.08)", border: "rgba(102,136,255,0.2)" },
   failed: { color: "#ff3333", bg: "rgba(255,51,51,0.08)", border: "rgba(255,51,51,0.2)" },
 };
 const DEFAULT_STATUS = { color: "#555", bg: "transparent", border: "#222" };

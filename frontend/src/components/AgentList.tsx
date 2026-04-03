@@ -26,9 +26,9 @@ const STATUS_STYLES: Record<string, { color: string; bg: string; border: string 
     border: "rgba(255, 170, 0, 0.2)",
   },
   completed: {
-    color: "#00ff41",
-    bg: "rgba(0, 255, 65, 0.08)",
-    border: "rgba(0, 255, 65, 0.2)",
+    color: "#6688ff",
+    bg: "rgba(102, 136, 255, 0.08)",
+    border: "rgba(102, 136, 255, 0.2)",
   },
   failed: {
     color: "#ff3333",
