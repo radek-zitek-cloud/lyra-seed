@@ -33,6 +33,7 @@ export default function ConfigPage() {
   const [original, setOriginal] = useState("");
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   // Load file tree
   useEffect(() => {
@@ -91,9 +92,9 @@ export default function ConfigPage() {
     !selected.startsWith(".env") &&
     !selected.startsWith("prompts/system/");
 
-  const deleteFile = useCallback(async () => {
+  const doDelete = useCallback(async () => {
     if (!selected || !deletable) return;
-    if (!confirm(`Delete ${selected}?`)) return;
+    setConfirmDelete(false);
     setStatus(null);
     try {
       const res = await fetch(
@@ -105,7 +106,6 @@ export default function ConfigPage() {
         setContent("");
         setOriginal("");
         setStatus("Deleted");
-        // Refresh file tree
         fetch(`${API}/config/files`)
           .then((r) => r.json())
           .then(setTree);
@@ -280,9 +280,9 @@ export default function ConfigPage() {
           >
             {saving ? "SAVING..." : "SAVE"}
           </button>
-          {deletable && !dirty && (
+          {deletable && !dirty && !confirmDelete && (
             <button
-              onClick={deleteFile}
+              onClick={() => setConfirmDelete(true)}
               style={{
                 fontSize: 11,
                 padding: "3px 12px",
@@ -295,6 +295,41 @@ export default function ConfigPage() {
             >
               DELETE
             </button>
+          )}
+          {confirmDelete && (
+            <>
+              <span style={{ fontSize: 11, color: "#e66" }}>
+                Delete {selected?.split("/").pop()}?
+              </span>
+              <button
+                onClick={doDelete}
+                style={{
+                  fontSize: 11,
+                  padding: "3px 12px",
+                  border: "1px solid #622",
+                  borderRadius: 2,
+                  background: "#3a1a1a",
+                  color: "#f88",
+                  cursor: "pointer",
+                }}
+              >
+                CONFIRM
+              </button>
+              <button
+                onClick={() => setConfirmDelete(false)}
+                style={{
+                  fontSize: 11,
+                  padding: "3px 12px",
+                  border: "1px solid #333",
+                  borderRadius: 2,
+                  background: "#1a1a1a",
+                  color: "#888",
+                  cursor: "pointer",
+                }}
+              >
+                CANCEL
+              </button>
+            </>
           )}
         </div>
 
