@@ -15,7 +15,7 @@ from agent_platform.tools.models import Tool
 
 logger = logging.getLogger(__name__)
 
-DECOMPOSITION_PROMPT = (
+_DEFAULT_PROMPT = (
     "You are a task decomposition engine. "
     "Break the given task into subtasks.\n\n"
     "Available tools: {tools}\n\n"
@@ -47,6 +47,11 @@ DECOMPOSITION_PROMPT = (
 class TaskDecomposer:
     """Decomposes complex tasks into subtask plans using LLM."""
 
+    def __init__(
+        self, system_prompt: str | None = None
+    ) -> None:
+        self._prompt = system_prompt or _DEFAULT_PROMPT
+
     async def decompose(
         self,
         task: str,
@@ -60,7 +65,7 @@ class TaskDecomposer:
         messages = [
             Message(
                 role=MessageRole.SYSTEM,
-                content=DECOMPOSITION_PROMPT.format(tools=tool_descriptions),
+                content=self._prompt.format(tools=tool_descriptions),
             ),
             Message(
                 role=MessageRole.HUMAN,

@@ -7,7 +7,7 @@ from agent_platform.llm.provider import LLMProvider
 
 logger = logging.getLogger(__name__)
 
-SYNTHESIS_PROMPT = (
+_DEFAULT_PROMPT = (
     "You are a result synthesis engine. "
     "Combine the results from multiple subtasks "
     "into a single unified response that "
@@ -24,6 +24,11 @@ SYNTHESIS_PROMPT = (
 class ResultSynthesizer:
     """Synthesizes multiple subtask results into a unified response."""
 
+    def __init__(
+        self, system_prompt: str | None = None
+    ) -> None:
+        self._prompt = system_prompt or _DEFAULT_PROMPT
+
     async def synthesize(
         self,
         original_task: str,
@@ -37,7 +42,7 @@ class ResultSynthesizer:
         messages = [
             Message(
                 role=MessageRole.SYSTEM,
-                content=SYNTHESIS_PROMPT.format(
+                content=self._prompt.format(
                     task=original_task,
                     results=results_text,
                 ),

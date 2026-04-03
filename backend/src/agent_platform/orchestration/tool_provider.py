@@ -37,14 +37,20 @@ class OrchestrationToolProvider:
         agent_repo: SqliteAgentRepo,
         conversation_repo: SqliteConversationRepo,
         event_bus: InProcessEventBus,
+        decompose_prompt: str | None = None,
+        synthesize_prompt: str | None = None,
     ) -> None:
         self._llm = llm_provider
         self._tool_registry = tool_registry
         self._agent_repo = agent_repo
         self._conv_repo = conversation_repo
         self._event_bus = event_bus
-        self._decomposer = TaskDecomposer()
-        self._synthesizer = ResultSynthesizer()
+        self._decomposer = TaskDecomposer(
+            system_prompt=decompose_prompt,
+        )
+        self._synthesizer = ResultSynthesizer(
+            system_prompt=synthesize_prompt,
+        )
 
     async def list_tools(self) -> list[Tool]:
         return [
