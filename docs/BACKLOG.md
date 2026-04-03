@@ -43,3 +43,21 @@ Items for future consideration, not tied to a specific phase.
 **Scope:** Add a third HITL mode where an LLM evaluates each tool call against configurable safety criteria and decides whether it can proceed automatically or needs human approval. For example, a `read_file` call would auto-approve, while `delete_agent` or shell commands with `rm` would escalate to the human. The safety policy should be configurable (e.g., via a prompt or rule set describing what is considered safe). Consider cost/latency tradeoffs of the extra LLM call per tool invocation — a smaller/faster model or cached rule matching may be preferable.
 
 **Priority:** Medium — improves usability as agent autonomy increases without sacrificing safety.
+
+---
+
+### BL-005: Orchestration subtasks can use tools or spawn sub-agents
+
+**Context:** Orchestration subtasks currently execute as single LLM calls — prompt in, text out. They have no tool access, no memory, no conversation history. The `assigned_to` field on each `SubTask` exists in the model but is ignored during execution; every subtask runs the same way regardless of what it's assigned to.
+
+The original V2P3 roadmap specified "each subtask mapped to: existing tool, existing skill, or new sub-agent" but the implementation took the simpler direct-LLM approach, which proved sufficient for knowledge-work tasks (analysis, research, writing).
+
+**Scope:** When `assigned_to` is a tool name (e.g., `shell`, `read_file`), execute it via the `ToolRegistry` instead of an LLM call. When `assigned_to` is `spawn_agent`, create an actual child agent with full runtime capabilities (tools, memory, multi-iteration loop) and collect its result. This would allow orchestrated subtasks to interact with the filesystem, run commands, query APIs, or perform complex multi-step work.
+
+**Considerations:**
+- Sub-agent subtasks would be significantly slower (full runtime loop vs single LLM call)
+- Parallel sub-agent spawning needs concurrency limits to avoid resource exhaustion
+- Tool-based subtasks need input/output mapping (tool arguments from subtask description, tool result as subtask output)
+- HITL policies on sub-agent subtasks need to be defined (inherit parent? independent?)
+
+**Priority:** Medium — the current LLM-only approach handles analysis/writing tasks well, but tool access would unlock orchestration of tasks that require real-world interaction (code generation, file processing, API calls).
