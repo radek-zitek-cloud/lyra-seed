@@ -65,8 +65,7 @@ class AgentSpawnerProvider:
             Tool(
                 name="spawn_agent",
                 description=(
-                    "Spawn an async sub-agent. Returns immediately "
-                    "with child_agent_id."
+                    "Spawn an async sub-agent. Returns immediately with child_agent_id."
                 ),
                 input_schema={
                     "type": "object",
@@ -195,10 +194,7 @@ class AgentSpawnerProvider:
             ),
             Tool(
                 name="dismiss_agent",
-                description=(
-                    "Mark a child agent as COMPLETED "
-                    "(no longer reusable)."
-                ),
+                description=("Mark a child agent as COMPLETED (no longer reusable)."),
                 input_schema={
                     "type": "object",
                     "properties": {
@@ -212,9 +208,7 @@ class AgentSpawnerProvider:
             ),
         ]
 
-    async def call_tool(
-        self, name: str, arguments: dict[str, Any]
-    ) -> ToolResult:
+    async def call_tool(self, name: str, arguments: dict[str, Any]) -> ToolResult:
         start = time.monotonic()
         handlers = {
             "spawn_agent": spawn_agent,
@@ -229,9 +223,7 @@ class AgentSpawnerProvider:
         }
         handler = handlers.get(name)
         if handler is None:
-            return ToolResult(
-                success=False, error=f"Unknown tool: {name}"
-            )
+            return ToolResult(success=False, error=f"Unknown tool: {name}")
         return await handler(self, arguments, start)
 
     async def cancel_all_tasks(self) -> None:
@@ -239,8 +231,6 @@ class AgentSpawnerProvider:
         for child_id, task in list(self._running_tasks.items()):
             if not task.done():
                 task.cancel()
-                logger.info(
-                    "Cancelled background task for agent %s", child_id
-                )
+                logger.info("Cancelled background task for agent %s", child_id)
         self._running_tasks.clear()
         self._completion_events.clear()

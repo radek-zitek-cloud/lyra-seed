@@ -26,10 +26,7 @@ ACTIONABLE_MSG_TYPES = {"task", "question", "guidance", "result", "answer"}
 
 def build_wake_prompt(msg: AgentMessage) -> str:
     """Build the prompt injected when auto-waking an idle agent."""
-    prompt = (
-        f"[{msg.message_type.value} from {msg.from_agent_id}]:"
-        f" {msg.content}"
-    )
+    prompt = f"[{msg.message_type.value} from {msg.from_agent_id}]: {msg.content}"
     if msg.message_type.value in ("task", "question"):
         prompt += (
             f"\n\nWhen done, send the result back to "
@@ -64,8 +61,7 @@ async def send_message(
         return ToolResult(
             success=False,
             error=(
-                f"Agent {to_id} is {target.status.value} "
-                f"and cannot receive messages"
+                f"Agent {to_id} is {target.status.value} and cannot receive messages"
             ),
             duration_ms=int((time.monotonic() - start) * 1000),
         )
@@ -112,9 +108,7 @@ async def send_message(
 
     return ToolResult(
         success=True,
-        output=json.dumps(
-            {"message_id": msg.id, "status": "sent"}
-        ),
+        output=json.dumps({"message_id": msg.id, "status": "sent"}),
         duration_ms=int((time.monotonic() - start) * 1000),
     )
 
@@ -149,18 +143,14 @@ async def wake_idle_agent(
                     conversation_repo=provider._conv_repo,
                     llm_provider=provider._llm,
                     event_bus=provider._event_bus,
-                    tool_registry=(
-                        provider._tool_registry or ToolRegistry()
-                    ),
+                    tool_registry=(provider._tool_registry or ToolRegistry()),
                     context_manager=provider._context_manager,
                     extractor=provider._extractor,
                     message_repo=provider._message_repo,
                 )
                 await runtime.run(agent_id, prompt)
             except Exception:
-                logger.exception(
-                    "Failed to wake agent %s on message", agent_id
-                )
+                logger.exception("Failed to wake agent %s on message", agent_id)
 
         asyncio.create_task(_run())
         logger.info(

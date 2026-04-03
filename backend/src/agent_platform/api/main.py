@@ -115,16 +115,7 @@ def create_app(
     )
 
     # Tool system
-    skills_dir_cfg = Path(platform_config.skillsDir)
-    if not skills_dir_cfg.is_absolute():
-        skills_dir_cfg = project_root / skills_dir_cfg
-    skill_provider = SkillProvider(
-        skills_dir=str(skills_dir_cfg),
-        llm_provider=llm_provider,
-        agent_repo=agent_repo,
-    )
     tool_registry = ToolRegistry()
-    tool_registry.register_provider(skill_provider)
 
     # MCP servers from config
     mcp_provider = MCPClientProvider()
@@ -165,6 +156,20 @@ def create_app(
     )
     memory_provider = MemoryToolProvider(memory_store=memory_store, event_bus=event_bus)
     tool_registry.register_provider(memory_provider)
+
+    # Skills
+    skills_dir_cfg = Path(platform_config.skillsDir)
+    if not skills_dir_cfg.is_absolute():
+        skills_dir_cfg = project_root / skills_dir_cfg
+    eval_prompt = load_system_prompt("evaluate_skill", project_root)
+    skill_provider = SkillProvider(
+        skills_dir=str(skills_dir_cfg),
+        llm_provider=llm_provider,
+        agent_repo=agent_repo,
+        embedding_provider=embedding_provider,
+        eval_prompt=eval_prompt,
+    )
+    tool_registry.register_provider(skill_provider)
     # Load system prompts for summarization and extraction
     summary_prompt = load_system_prompt("summarize", project_root)
     extraction_prompt = load_system_prompt("extract_facts", project_root)
@@ -308,9 +313,7 @@ def create_app(
     app.add_middleware(
         CORSMiddleware,
         allow_origins=[
-            o.strip()
-            for o in settings.cors_origins.split(",")
-            if o.strip()
+            o.strip() for o in settings.cors_origins.split(",") if o.strip()
         ],
         allow_credentials=True,
         allow_methods=["*"],
