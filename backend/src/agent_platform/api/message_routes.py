@@ -94,9 +94,8 @@ async def send_message_to_agent(agent_id: str, req: SendMessageRequest):
         )
     )
 
-    # Auto-wake idle agents on actionable messages
-    if msg.message_type in (MessageType.TASK, MessageType.GUIDANCE):
-        await _wake_idle_agent(agent_id, msg)
+    # Any message to an idle agent triggers a turn
+    await _wake_idle_agent(agent_id, msg)
 
     return _msg_to_dict(msg)
 
@@ -112,13 +111,14 @@ async def _wake_idle_agent(agent_id: str, msg: AgentMessage) -> None:
             return
 
         runtime = get_runtime()
-        prompt = (
-            f"[{msg.message_type.value} from {msg.from_agent_id}]: "
-            f"{msg.content}\n\n"
-            f"When you complete this task, send the result back to "
-            f"{msg.from_agent_id} using the send_message tool with "
-            f'message_type "result".'
-        )
+        prompt = f"[{msg.message_type.value} from {msg.from_agent_id}]: {msg.content}"
+        # For actionable messages, instruct to respond back
+        if msg.message_type.value in ("task", "question"):
+            prompt += (
+                f"\n\nWhen done, send the result back to "
+                f"{msg.from_agent_id} using send_message with "
+                f'message_type "result".'
+            )
 
         # Consume the message (mark as delivered)
         msg_repo = get_message_repo()

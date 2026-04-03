@@ -477,23 +477,21 @@ class AgentRuntime:
             emb_fn.set_agent_id(agent_id)
 
     async def _inject_guidance(self, agent_id: str, conversation: Conversation) -> None:
-        """Inject pending GUIDANCE messages into conversation context."""
+        """Inject all pending messages into conversation context."""
         if self._message_repo is None:
             return
         try:
-            from agent_platform.core.models import MessageType
-
             msgs = await self._message_repo.list_for_agent(
                 agent_id,
                 direction="inbox",
-                message_type=MessageType.GUIDANCE,
             )
             for msg in msgs:
-                guidance_text = (
-                    f"[Guidance from agent {msg.from_agent_id}]: {msg.content}"
+                text = (
+                    f"[{msg.message_type.value} from "
+                    f"{msg.from_agent_id}]: {msg.content}"
                 )
                 conversation.messages.append(
-                    Message(role=MessageRole.SYSTEM, content=guidance_text)
+                    Message(role=MessageRole.SYSTEM, content=text)
                 )
                 # Delete after injection so it's not re-injected
                 await self._message_repo.delete(msg.id)

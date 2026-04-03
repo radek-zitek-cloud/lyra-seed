@@ -566,8 +566,8 @@ class AgentSpawnerProvider:
         )
 
         # Auto-wake idle target agent on actionable messages
-        if msg_type in (MessageType.TASK, MessageType.GUIDANCE):
-            await self._wake_idle_agent(to_id, msg)
+        # Any message to an idle agent triggers a turn
+        await self._wake_idle_agent(to_id, msg)
 
         return ToolResult(
             success=True,
@@ -588,12 +588,14 @@ class AgentSpawnerProvider:
                 return
 
             prompt = (
-                f"[{msg.message_type.value} from {msg.from_agent_id}]: "
-                f"{msg.content}\n\n"
-                f"When you complete this task, send the result back to "
-                f"{msg.from_agent_id} using the send_message tool with "
-                f'message_type "result".'
+                f"[{msg.message_type.value} from {msg.from_agent_id}]: {msg.content}"
             )
+            if msg.message_type.value in ("task", "question"):
+                prompt += (
+                    f"\n\nWhen done, send the result back to "
+                    f"{msg.from_agent_id} using send_message with "
+                    f'message_type "result".'
+                )
 
             # Consume the message
             if self._message_repo:
