@@ -92,13 +92,34 @@ POST /agents/{id}/hitl-respond
 
 **Expected:** Agent receives the denial, does not execute the tool, and responds explaining it couldn't complete the action.
 
+### Step 8: Verify HITL event payloads
+
+```
+GET /agents/{id}/events
+```
+
+Filter for `hitl_request` and `hitl_response` event types. Verify payloads contain:
+- **HITL_REQUEST:** tool name, tool arguments, agent ID
+- **HITL_RESPONSE:** approved (bool), message, agent ID
+
+### Step 9: Test multiple HITL gates in one turn
+
+Send a prompt that triggers multiple tool calls (e.g., "Recall what you know about me, then remember that I prefer detailed responses"):
+- Agent should hit HITL gate for `recall`, wait for approval
+- After approval, agent should hit HITL gate for `remember`, wait again
+- Approve the second gate
+- Agent completes with both tool results
+
+**Expected:** Two separate `waiting_hitl` states, each requiring a separate approval.
+
 ## Success criteria
 
 1. Agent status transitions correctly: idle → running → waiting_hitl → running → idle
 2. HITL gate blocks execution until approval is received
 3. After approval, tool executes and agent completes normally
-4. HITL_REQUEST and HITL_RESPONSE events emitted with correct payloads
-5. (If denial tested) Agent handles denial gracefully without error
+4. HITL_REQUEST and HITL_RESPONSE events emitted with correct payloads (tool name, arguments)
+5. Denial: agent handles denial gracefully without error
+6. Multiple gates: agent pauses at each tool call, resumes after each approval
 
 ## What to report
 
