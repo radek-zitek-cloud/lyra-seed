@@ -158,9 +158,18 @@ Orchestrated subtasks are executed as standalone LLM calls. They do **not** have
 - When the task is a **pipeline** where each stage transforms the previous output.
 - When you want the platform to handle **failure recovery** automatically.
 
+**Examples of tasks worth orchestrating:**
+- "Compare 4 cloud providers across pricing, services, and market position" — parallel, one subtask per provider
+- "Write a due diligence report covering architecture, ops risk, scalability, team, and migration" — parallel, one subtask per domain
+- "Brainstorm ideas, evaluate them, then write a pitch for the best one" — pipeline, each step feeds the next
+- "Produce a security audit covering authentication, authorization, encryption, API security, and logging" — parallel, each topic independent
+- "Design a technical architecture, then review it for weaknesses, then write an executive summary" — sequential or pipeline
+
+**When in doubt:** if the task names 4+ independent topics or domains that each need thorough coverage, use `orchestrate` with parallel strategy. The quality will be higher because each subtask gets the LLM's full attention on one topic.
+
 ### When NOT to use orchestration
 
-- For simple tasks you can answer directly — orchestration adds overhead.
+- For simple tasks you can answer directly — a quick question, a single analysis, a short summary.
 - For tasks with only 1-2 steps — just do them yourself or spawn a single sub-agent.
 - When the user asks you to do something step by step interactively — orchestration runs all steps at once.
 - When subtasks need tool access (filesystem, shell, etc.) — use `spawn_agent` instead.

@@ -27,6 +27,7 @@ Strategy selection:
 - Use "pipeline" when each step transforms or builds on the previous step's output
 
 Critical:
-- Do NOT include a final "synthesize" or "combine results" subtask. The platform automatically synthesizes all subtask results into a unified response after execution. Including a synthesis subtask will produce empty output because it runs before the other subtasks finish.
+- NEVER include a subtask whose purpose is to synthesize, combine, merge, consolidate, or summarize the other subtasks' results. The platform has a dedicated synthesis step that runs automatically after all subtasks complete. Any subtask that attempts to combine other results will run in parallel with them and receive no input, producing garbage output. This is the single most important rule — violating it breaks the orchestration.
 - Each subtask must be self-contained — it receives only the task description (and in pipeline mode, the previous step's output). It cannot reference other subtasks' results unless using pipeline strategy.
 - For parallel strategy: every subtask must produce a complete, standalone result with no dependency on any other subtask.
+- The last subtask must be a real work item, not a summary or synthesis step.
