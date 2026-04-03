@@ -102,9 +102,9 @@ Frontend (Next.js)          Backend (FastAPI)
                      └────────────────────┘
 ```
 
-## User Testing Guide
+## User Testing / Showcase Guide
 
-Open the UI at `http://localhost:3000`. All testing happens through the observation UI.
+Open the UI at `http://localhost:3000`. This guide walks through Lyra's capabilities from the simplest interactions to complex multi-agent orchestration — use it to verify the platform works and to showcase what it can do.
 
 ### 1. Create an Agent and Chat
 
@@ -188,7 +188,19 @@ The worker should find the shared fact from the parent agent's memory (facts are
 
 The coder agent runs autonomously through a 7-phase workflow (requirements, plan, environment, TDD, implementation, testing, validation) using filesystem and shell tools. Check its conversation and events for the full execution trace. Output appears in `work/coder/`.
 
-### 9. Connection Control
+### 9. Test Orchestration — Simple Plan
+
+> Create a plan to compare the pros and cons of Python vs Rust for CLI tools. Break it into subtasks: research Python strengths, research Rust strengths, then synthesize a recommendation.
+
+The agent decomposes the task into subtasks, executes them (in parallel where possible), and auto-synthesizes a final result. Watch the events panel for `orchestration.plan_created`, `orchestration.subtask_started`, `orchestration.subtask_completed`, and `orchestration.synthesis_completed` events.
+
+### 10. Test Orchestration — Complex Multi-Step
+
+> Orchestrate a code review workflow: first analyze the project structure, then review the architecture for anti-patterns, then check for security concerns, and finally produce a summary report that incorporates all findings.
+
+This showcases sequential dependencies — each subtask builds on previous results. The synthesis step combines all subtask outputs into a coherent report.
+
+### 11. Connection Control
 
 Click **LIVE** in the header to disconnect from the SSE event stream. Click **OFFLINE** to reconnect. Useful when you want to stop real-time updates.
 
@@ -234,8 +246,9 @@ lyra-seed/
 - **V1 Complete:** 8 phases (skeleton, events, runtime, tools, memory, UI, HITL, hardening)
 - **V2P1 Complete:** Sub-agent spawning with full tool access
 - **V2P2 Complete:** Async spawn, message bus, reusable lifecycle, auto-wake
+- **V2P3 Complete:** Orchestration patterns (plan-execute, parallel/sequential subtasks, auto-synthesis)
 - **104 smoke tests** all passing
-- **Next:** V2 Phase 3 (Orchestration Patterns)
+- **Next:** V2 Phase 4 (Per-Agent Tool Scoping)
 
 ## Documentation
 

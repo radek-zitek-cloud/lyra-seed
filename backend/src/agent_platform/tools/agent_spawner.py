@@ -726,14 +726,35 @@ class AgentSpawnerProvider:
                     child_config.hitl_policy = HITLPolicy(fc.hitl_policy)
                 if fc.auto_extract is not None:
                     child_config.auto_extract = fc.auto_extract
+                if fc.allowed_mcp_servers is not None:
+                    child_config.allowed_mcp_servers = (
+                        fc.allowed_mcp_servers
+                    )
+                if fc.allowed_tools is not None:
+                    child_config.allowed_tools = fc.allowed_tools
             if parent:
                 if child_config.model == AgentConfig().model:
                     child_config.model = parent.config.model
                 if child_config.temperature == AgentConfig().temperature:
                     child_config.temperature = parent.config.temperature
+                # Inherit tool scope if template didn't set it
+                if child_config.allowed_mcp_servers is None:
+                    child_config.allowed_mcp_servers = (
+                        parent.config.allowed_mcp_servers
+                    )
+                if not child_config.allowed_tools:
+                    child_config.allowed_tools = (
+                        parent.config.allowed_tools
+                    )
         elif parent:
             child_config.model = parent.config.model
             child_config.temperature = parent.config.temperature
+            child_config.allowed_mcp_servers = (
+                parent.config.allowed_mcp_servers
+            )
+            child_config.allowed_tools = (
+                parent.config.allowed_tools
+            )
 
         # Explicit overrides
         if args.get("system_prompt"):
