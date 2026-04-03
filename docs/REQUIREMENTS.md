@@ -20,6 +20,7 @@
   - **MCP server tools** — tools exposed by Model Context Protocol servers (stdio or HTTP/SSE transport)
 - Unified tool interface: both tool types conform to the same contract (name, description, input schema, execute)
 - Tool registry aggregating tools from all providers
+- Per-agent tool scoping: each agent can have its own MCP server set configured via `{name}.json`, reducing token overhead and enforcing least-privilege access
 - Self-evolution: agents can create new tools at runtime
   - Define and register new prompt macros
   - Scaffold, deploy, and register new MCP servers
