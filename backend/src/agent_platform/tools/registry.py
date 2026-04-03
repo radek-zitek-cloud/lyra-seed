@@ -47,6 +47,12 @@ class ToolRegistry:
             )
         return await provider.call_tool(name, arguments)
 
+    def set_provider_config(self, attr: str, value: object) -> None:
+        """Set a config attribute on all providers that support it."""
+        for provider in self._providers:
+            if hasattr(provider, attr):
+                setattr(provider, attr, value)
+
     async def get_tools_schema(
         self,
         allowed_mcp_servers: list[str] | None = None,

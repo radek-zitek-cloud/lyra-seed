@@ -17,7 +17,7 @@ async def list_skills():
             "description": s.description,
             "parameters": s.parameters,
         }
-        for s in provider._skills.values()
+        for s in provider.get_skills().values()
     ]
 
 
@@ -27,7 +27,7 @@ async def get_skill(skill_name: str):
     from agent_platform.api._deps import get_skill_provider
 
     provider = get_skill_provider()
-    skill = provider._skills.get(skill_name)
+    skill = provider.get_skill(skill_name)
     if skill is None:
         raise HTTPException(
             status_code=404,

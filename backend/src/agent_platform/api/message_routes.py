@@ -100,18 +100,27 @@ async def send_message_to_agent(agent_id: str, req: SendMessageRequest):
         )
     )
 
-    # Only actionable messages (task, question, guidance) trigger auto-wake
+    # Only actionable messages trigger auto-wake
     await _wake_idle_agent(agent_id, msg)
 
     return _msg_to_dict(msg)
 
 
-_ACTIONABLE_MSG_TYPES = {"task", "question", "guidance", "result", "answer"}
-
-
 async def _wake_idle_agent(agent_id: str, msg: AgentMessage) -> None:
-    """If idle and message is actionable, trigger a runtime turn."""
-    from agent_platform.api._deps import get_agent_repo, get_message_repo, get_runtime
+    """If idle and message is actionable, trigger a runtime turn.
+
+    Uses shared constants and prompt builder from agent_messaging
+    to avoid duplicating business logic.
+    """
+    from agent_platform.api._deps import (
+        get_agent_repo,
+        get_message_repo,
+        get_runtime,
+    )
+    from agent_platform.tools.agent_messaging import (
+        ACTIONABLE_MSG_TYPES,
+        build_wake_prompt,
+    )
 
     try:
         repo = get_agent_repo()
@@ -119,30 +128,26 @@ async def _wake_idle_agent(agent_id: str, msg: AgentMessage) -> None:
         if agent is None or agent.status != AgentStatus.IDLE:
             return
 
-        # Only actionable messages trigger auto-wake
-        if msg.message_type.value not in _ACTIONABLE_MSG_TYPES:
+        if msg.message_type.value not in ACTIONABLE_MSG_TYPES:
             return
 
-        runtime = get_runtime()
-        prompt = f"[{msg.message_type.value} from {msg.from_agent_id}]: {msg.content}"
-        # For actionable messages, instruct to respond back
-        if msg.message_type.value in ("task", "question"):
-            prompt += (
-                f"\n\nWhen done, send the result back to "
-                f"{msg.from_agent_id} using send_message with "
-                f'message_type "result".'
-            )
+        prompt = build_wake_prompt(msg)
 
         # Consume the message (mark as delivered)
         msg_repo = get_message_repo()
         if msg_repo:
             await msg_repo.delete(msg.id)
 
+        runtime = get_runtime()
+
         async def _run() -> None:
             try:
                 await runtime.run(agent_id, prompt)
             except Exception:
-                logger.exception("Failed to wake agent %s on message", agent_id)
+                logger.exception(
+                    "Failed to wake agent %s on message",
+                    agent_id,
+                )
 
         asyncio.create_task(_run())
         logger.info(
@@ -151,7 +156,9 @@ async def _wake_idle_agent(agent_id: str, msg: AgentMessage) -> None:
             msg.message_type.value,
         )
     except Exception:
-        logger.exception("Error in _wake_idle_agent for %s", agent_id)
+        logger.exception(
+            "Error in _wake_idle_agent for %s", agent_id
+        )
 
 
 def _msg_to_dict(m: AgentMessage) -> dict:

@@ -125,6 +125,14 @@ class SkillProvider:
         self._skills: dict[str, Skill] = {}
         self._load_skills()
 
+    def get_skills(self) -> dict[str, Skill]:
+        """Return all loaded skills (public accessor)."""
+        return dict(self._skills)
+
+    def get_skill(self, name: str) -> Skill | None:
+        """Return a specific skill by name, or None."""
+        return self._skills.get(name)
+
     def _load_skills(self) -> None:
         """Scan skills directory and load all .md files."""
         self._skills.clear()

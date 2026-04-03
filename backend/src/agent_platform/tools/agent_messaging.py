@@ -21,7 +21,22 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-_ACTIONABLE_MSG_TYPES = {"task", "question", "guidance", "result", "answer"}
+ACTIONABLE_MSG_TYPES = {"task", "question", "guidance", "result", "answer"}
+
+
+def build_wake_prompt(msg: AgentMessage) -> str:
+    """Build the prompt injected when auto-waking an idle agent."""
+    prompt = (
+        f"[{msg.message_type.value} from {msg.from_agent_id}]:"
+        f" {msg.content}"
+    )
+    if msg.message_type.value in ("task", "question"):
+        prompt += (
+            f"\n\nWhen done, send the result back to "
+            f"{msg.from_agent_id} using send_message with "
+            f'message_type "result".'
+        )
+    return prompt
 
 
 async def send_message(
@@ -115,19 +130,10 @@ async def wake_idle_agent(
         if agent is None or agent.status != AgentStatus.IDLE:
             return
 
-        if msg.message_type.value not in _ACTIONABLE_MSG_TYPES:
+        if msg.message_type.value not in ACTIONABLE_MSG_TYPES:
             return
 
-        prompt = (
-            f"[{msg.message_type.value} from {msg.from_agent_id}]:"
-            f" {msg.content}"
-        )
-        if msg.message_type.value in ("task", "question"):
-            prompt += (
-                f"\n\nWhen done, send the result back to "
-                f"{msg.from_agent_id} using send_message with "
-                f'message_type "result".'
-            )
+        prompt = build_wake_prompt(msg)
 
         # Consume the message
         if provider._message_repo:
