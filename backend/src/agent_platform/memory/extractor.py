@@ -95,7 +95,21 @@ class FactExtractor:
 
         model = extraction_model or self._model
         config = LLMConfig(model=model, temperature=0.0)
+
+        logger.info(
+            "Extraction input for agent %s (model=%s):\n%s",
+            agent_id,
+            model,
+            llm_messages[1].content[:500],
+        )
+
         response = await self._llm.complete(llm_messages, config=config)
+
+        logger.info(
+            "Extraction output for agent %s: %s",
+            agent_id,
+            response.content[:200] if response.content else "(empty)",
+        )
 
         if not response.content:
             return []
