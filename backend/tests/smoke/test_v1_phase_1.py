@@ -80,12 +80,6 @@ class TestV1Phase1:
         result = VectorResult(id="v-1", score=0.95, metadata={"key": "value"})
         assert result.score == 0.95
 
-    def test_st_1_5_strategy_protocol(self):
-        """ST-1.5: Strategy protocol is defined."""
-        from agent_platform.core.strategy import Strategy
-
-        assert hasattr(Strategy, "execute")
-
     def test_st_1_6_event_model_and_types(self):
         """ST-1.6: Event model and types are defined."""
         from agent_platform.observation.events import (

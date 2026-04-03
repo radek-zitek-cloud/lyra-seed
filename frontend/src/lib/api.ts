@@ -30,18 +30,6 @@ export async function fetchAgentConversations(id: string) {
   return res.json();
 }
 
-export async function fetchTools() {
-  const res = await fetch(`${API_BASE}/tools`);
-  if (!res.ok) throw new Error("Failed to fetch tools");
-  return res.json();
-}
-
-export async function fetchToolCalls(toolName: string) {
-  const res = await fetch(`${API_BASE}/tools/${toolName}/calls`);
-  if (!res.ok) throw new Error("Failed to fetch tool calls");
-  return res.json();
-}
-
 export async function createAgent(name: string, config?: Record<string, unknown>) {
   const res = await fetch(`${API_BASE}/agents`, {
     method: "POST",
@@ -146,11 +134,4 @@ export async function updateMemory(id: string, patch: { importance?: number; arc
   });
   if (!res.ok) throw new Error("Failed to update memory");
   return res.json();
-}
-
-export function createEventStream(agentId?: string): EventSource {
-  const url = agentId
-    ? `${API_BASE}/agents/${agentId}/events/stream`
-    : `${API_BASE}/events/stream`;
-  return new EventSource(url);
 }

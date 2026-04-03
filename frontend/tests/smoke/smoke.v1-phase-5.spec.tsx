@@ -123,43 +123,4 @@ describe("V1 Phase 5 — Observation UI", () => {
     expect(screen.getByRole("button", { name: /no/i })).toBeInTheDocument();
   });
 
-  test("ST-5.12: Tool inspector renders", async () => {
-    const { ToolInspector } = await import("@/components/ToolInspector");
-
-    const toolCalls = [
-      {
-        id: "e1",
-        agent_id: "a1",
-        event_type: "tool_call",
-        module: "tools",
-        timestamp: "2026-04-01T00:00:00Z",
-        payload: {
-          tool_name: "search",
-          arguments: { query: "test" },
-        },
-        duration_ms: 150,
-      },
-      {
-        id: "e2",
-        agent_id: "a1",
-        event_type: "tool_result",
-        module: "tools",
-        timestamp: "2026-04-01T00:00:01Z",
-        payload: {
-          tool_name: "search",
-          success: true,
-          result: "result data",
-        },
-        duration_ms: null,
-      },
-    ];
-
-    render(<ToolInspector toolEvents={toolCalls} />);
-
-    // Tool name displayed
-    expect(screen.getByText("search")).toBeInTheDocument();
-
-    // Status visible (now labeled "ok" not "success")
-    expect(screen.getByText("ok")).toBeInTheDocument();
-  });
 });

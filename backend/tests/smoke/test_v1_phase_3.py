@@ -274,41 +274,22 @@ class TestV1Phase3:
                 assert resp.status_code == 404
 
     @pytest.mark.asyncio
-    async def test_st_3_6_mcp_tool_provider(self):
-        """ST-3.6: MCPToolProvider (stub)."""
-        from agent_platform.tools.mcp_provider import MCPToolProvider
-        from agent_platform.tools.models import Tool, ToolType
+    async def test_st_3_6_mcp_client_provider(self):
+        """ST-3.6: MCPClientProvider implements ToolProvider interface."""
+        from agent_platform.tools.mcp_client import MCPClientProvider
 
-        async def mock_handler(arguments: dict) -> str:
-            return f"result for {arguments.get('q', '')}"
+        provider = MCPClientProvider()
 
-        provider = MCPToolProvider(server_name="test-server")
-        provider.register_tool(
-            Tool(
-                name="web_search",
-                description="Search the web",
-                input_schema={
-                    "type": "object",
-                    "properties": {"q": {"type": "string"}},
-                },
-                tool_type=ToolType.MCP,
-                source="test-server",
-            ),
-            handler=mock_handler,
-        )
+        # Implements ToolProvider protocol
+        assert hasattr(provider, "list_tools")
+        assert hasattr(provider, "call_tool")
 
-        # List tools
+        # Empty provider returns no tools
         tools = await provider.list_tools()
-        assert len(tools) == 1
-        assert tools[0].name == "web_search"
+        assert tools == []
 
-        # Call tool
-        result = await provider.call_tool("web_search", {"q": "python"})
-        assert result.success is True
-        assert "python" in result.output
-
-        # Unknown tool
-        result = await provider.call_tool("unknown", {})
+        # Unknown tool fails gracefully
+        result = await provider.call_tool("nonexistent", {})
         assert result.success is False
 
     @pytest.mark.asyncio
