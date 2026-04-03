@@ -154,9 +154,23 @@ This section documents what was delivered, what deviated from the original requi
 
 **Deviation from roadmap:** Subtasks execute as direct LLM calls, not as tool calls or sub-agent spawns. The `assigned_to` field exists on `SubTask` but is not used for routing — all subtasks get the same LLM-call execution. This was sufficient for analysis/writing tasks but means orchestrated subtasks cannot use tools, access memory, or run multi-iteration loops. See backlog BL-005 for the enhancement to wire `assigned_to` to actual tool/agent execution.
 
+### Post-V2P4 Addendum
+
+- **Per-Agent Tool Scoping (Req 2, 3):** `allowed_mcp_servers` field on `AgentConfig` controls which MCP servers' tools an agent sees (null = all, [] = none, ["filesystem"] = only filesystem). `allowed_tools` field provides explicit tool name whitelisting. Both filters apply at schema level — the LLM only sees allowed tools. Core tools (memory, spawner, orchestration) are never filtered by MCP scoping. Child agents inherit parent's tool scope; template overrides parent.
+- **Agent Templates:** Pre-defined agent roles with per-agent tool scoping: `researcher` (no MCP tools), `writer` (no MCP), `editor` (no MCP), `critic` (no MCP), `coder` (filesystem + shell), `hitl-worker` (all tools, HITL enabled), `non-hitl-worker` (all tools, autonomous).
+- **Configuration Guide:** Comprehensive `docs/CONFIGURATION_GUIDE.md` covering all config surfaces (.env, lyra.config.json, agent JSON, agent prompts, system prompts, skills), the four-level resolution chain, and examples for common agent roles.
+
+### Post-V2P7 Addendum
+
+- **Skills System (Req 2):** Replaced database-backed prompt macros with filesystem-based skills. Skills are `.md` files in `skills/` with YAML frontmatter (name, description, parameters) and a template body with `{{param}}` placeholders. `SkillProvider` scans the directory at startup and registers each skill as a tool. Skills execute via LLM sub-call using the calling agent's model. `create_skill` tool allows agents to create new skills at runtime by writing `.md` files. Removed `SqliteMacroRepo`, `macro_routes.py`, and database table.
+- **Starter Skills:** Three bundled skills: `summarize` (bullet-point summaries), `translate` (language translation), `code-review` (code quality review).
+- **Skills API:** Read-only `GET /skills` and `GET /skills/{name}` endpoints.
+- **Simplified agent_id Injection:** Runtime now injects `agent_id` into all tool calls (not a hardcoded whitelist), supporting dynamic skill names.
+- **Config Editor UI:** Web-based configuration editor at `/config` with sidebar file browser (Platform Config, Agent Configs, Agent Prompts, System Prompts, Skills), inline text editor with save/cancel, delete with inline confirmation (protected for platform config and system prompts), and cursor-aware context help bar showing descriptions for config keys.
+
 ### Not yet delivered
 
-- **Per-Agent Tool Scoping (V2P4):** Per-agent MCP server config, scoped tool registries, token optimization. Currently all agents share one global tool registry (38+ tools), inflating context size and cost on every LLM call regardless of what the agent needs.
 - **Multi-Agent UI (V2P5):** Agent topology graph, communication flow visualization
-- **Self-Evolution (V3):** Agents cannot create new tools at runtime
+- **Orchestration Subtask Dispatch (V2P6):** Subtasks routed to tools or sub-agents via `assigned_to` field
+- **Self-Evolution (V3):** Skill validation, versioning, MCP server scaffolding
 - **Model Case (V3):** Full end-to-end capability acquisition loop
