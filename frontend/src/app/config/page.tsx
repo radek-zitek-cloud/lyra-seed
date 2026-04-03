@@ -12,14 +12,16 @@ interface FileEntry {
 
 interface FileTree {
   platform: FileEntry[];
-  agents: FileEntry[];
+  agent_configs: FileEntry[];
+  agent_prompts: FileEntry[];
   system_prompts: FileEntry[];
   skills: FileEntry[];
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
   platform: "Platform Config",
-  agents: "Agent Configs & Prompts",
+  agent_configs: "Agent Configs",
+  agent_prompts: "Agent Prompts",
   system_prompts: "System Prompts",
   skills: "Skills",
 };

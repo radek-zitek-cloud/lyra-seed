@@ -69,11 +69,23 @@ async def list_config_files():
                 else 0,
             },
         ],
-        "agents": _list_files(root / "prompts", ".json")
-        + _list_files(root / "prompts", ".md"),
-        "system_prompts": _list_files(
-            root / "prompts" / "system", ".md"
-        ),
+        "agent_configs": [
+            f
+            for f in _list_files(root / "prompts", ".json")
+            if "/" not in f["name"]
+        ],
+        "agent_prompts": [
+            f
+            for f in _list_files(root / "prompts", ".md")
+            if "/" not in f["name"]
+        ],
+        "system_prompts": [
+            f
+            for f in _list_files(
+                root / "prompts" / "system", ".md"
+            )
+            if "/" not in f["name"]
+        ],
         "skills": _list_files(root / "skills", ".md"),
     }
 
