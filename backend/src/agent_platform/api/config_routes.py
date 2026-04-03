@@ -144,3 +144,34 @@ async def write_config_file(req: FileUpdate):
     file_path.write_text(req.content, encoding="utf-8")
 
     return {"status": "saved", "path": req.path}
+
+
+@router.delete("/file")
+async def delete_config_file(path: str):
+    """Delete a configuration file."""
+    root = _get_project_root()
+    file_path = root / path
+
+    # Security: ensure path stays within project root
+    try:
+        file_path.resolve().relative_to(root.resolve())
+    except ValueError:
+        raise HTTPException(403, "Path outside project root")
+
+    # Only allow deleting agent configs, agent prompts, and skills
+    deletable_prefixes = ("prompts/", "skills/")
+    non_deletable = ("prompts/system/",)
+    if not any(path.startswith(p) for p in deletable_prefixes):
+        raise HTTPException(
+            403, "Can only delete agent configs, prompts, and skills"
+        )
+    if any(path.startswith(p) for p in non_deletable):
+        raise HTTPException(
+            403, "Cannot delete system prompts"
+        )
+
+    if not file_path.exists():
+        raise HTTPException(404, "File not found")
+
+    file_path.unlink()
+    return {"status": "deleted", "path": path}

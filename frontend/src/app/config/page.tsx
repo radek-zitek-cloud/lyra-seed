@@ -80,6 +80,45 @@ export default function ConfigPage() {
     setSaving(false);
   }, [selected, content]);
 
+  const cancel = useCallback(() => {
+    setContent(original);
+    setStatus(null);
+  }, [original]);
+
+  const deletable =
+    selected &&
+    !selected.startsWith("lyra.config") &&
+    !selected.startsWith(".env") &&
+    !selected.startsWith("prompts/system/");
+
+  const deleteFile = useCallback(async () => {
+    if (!selected || !deletable) return;
+    if (!confirm(`Delete ${selected}?`)) return;
+    setStatus(null);
+    try {
+      const res = await fetch(
+        `${API}/config/file?path=${encodeURIComponent(selected)}`,
+        { method: "DELETE" },
+      );
+      if (res.ok) {
+        setSelected(null);
+        setContent("");
+        setOriginal("");
+        setStatus("Deleted");
+        // Refresh file tree
+        fetch(`${API}/config/files`)
+          .then((r) => r.json())
+          .then(setTree);
+        setTimeout(() => setStatus(null), 2000);
+      } else {
+        const err = await res.json();
+        setStatus(`Error: ${err.detail}`);
+      }
+    } catch {
+      setStatus("Failed to delete");
+    }
+  }, [selected, deletable]);
+
   const dirty = content !== original;
 
   return (
@@ -207,6 +246,22 @@ export default function ConfigPage() {
               {status}
             </span>
           )}
+          {dirty && (
+            <button
+              onClick={cancel}
+              style={{
+                fontSize: 11,
+                padding: "3px 12px",
+                border: "1px solid #333",
+                borderRadius: 2,
+                background: "#1a1a1a",
+                color: "#e8a",
+                cursor: "pointer",
+              }}
+            >
+              CANCEL
+            </button>
+          )}
           <button
             onClick={save}
             disabled={!dirty || saving}
@@ -225,6 +280,22 @@ export default function ConfigPage() {
           >
             {saving ? "SAVING..." : "SAVE"}
           </button>
+          {deletable && !dirty && (
+            <button
+              onClick={deleteFile}
+              style={{
+                fontSize: 11,
+                padding: "3px 12px",
+                border: "1px solid #422",
+                borderRadius: 2,
+                background: "#1a1a1a",
+                color: "#e66",
+                cursor: "pointer",
+              }}
+            >
+              DELETE
+            </button>
+          )}
         </div>
 
         {/* Text area */}
