@@ -19,6 +19,7 @@ export function MessageEdge({
   label,
   data,
 }: EdgeProps) {
+  // Use high curvature so message edges arc away from straight parent-child lines
   const [edgePath, labelX, labelY] = getBezierPath({
     sourceX,
     sourceY,
@@ -26,6 +27,7 @@ export function MessageEdge({
     targetY,
     sourcePosition,
     targetPosition,
+    curvature: 0.4,
   });
 
   const messageType = (data?.messageType as string) ?? "task";

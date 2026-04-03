@@ -652,6 +652,26 @@ V2P1 proved that sub-agents can spawn and execute with full tool access. However
 
 ---
 
+### V2 Phase 6: Orchestration Subtasks with Tool & Agent Execution
+
+> Promoted from BL-005. Prerequisite for V3 — the capability acquisition loop (V3P3) requires orchestrated subtasks to spawn agents and call tools, not just make standalone LLM calls.
+
+**Deliverables:**
+
+- `_execute_subtask()` branches on `subtask.assigned_to`:
+  - `"spawn_agent"` — spawns a child agent with the subtask description as task, waits for result, extracts the agent's response as subtask output
+  - Known tool name (matches a tool in `ToolRegistry`) — calls the tool directly via `tool_registry.call_tool()`, uses tool result as subtask output
+  - Anything else (including `"llm"` or unknown) — falls back to current direct LLM call behavior
+- Parallel strategy respects mixed subtask types (some LLM, some tool, some agent) running concurrently
+- Pipeline strategy passes previous output as context regardless of subtask type
+- Failure policies (retry, reassign, skip, escalate) work for all three execution modes
+- Spawned sub-agents inherit parent's config (model, tool scoping) by default
+- Concurrency guard: max parallel agent spawns configurable (default 5) to prevent resource exhaustion
+
+**Exit Criteria:** An orchestrated task with `assigned_to: "spawn_agent"` subtasks spawns actual child agents, waits for their results, and synthesizes the output. Tool-assigned subtasks execute via the registry. Mixed plans (LLM + tool + agent subtasks) work in all three strategies. All existing orchestration smoke tests still pass.
+
+---
+
 ## 6. V3 — Self-Evolution & Capability Acquisition
 
 **Goal:** Agents can identify capability gaps and fill them by creating new tools. The system becomes self-improving.

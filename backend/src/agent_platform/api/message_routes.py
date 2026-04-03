@@ -104,7 +104,7 @@ async def send_message_to_agent(agent_id: str, req: SendMessageRequest):
     return _msg_to_dict(msg)
 
 
-_ACTIONABLE_MSG_TYPES = {"task", "question", "guidance"}
+_ACTIONABLE_MSG_TYPES = {"task", "question", "guidance", "result", "answer"}
 
 
 async def _wake_idle_agent(agent_id: str, msg: AgentMessage) -> None:

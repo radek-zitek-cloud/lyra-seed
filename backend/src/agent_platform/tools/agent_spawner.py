@@ -594,7 +594,7 @@ class AgentSpawnerProvider:
             duration_ms=int((time.monotonic() - start) * 1000),
         )
 
-    _ACTIONABLE_MSG_TYPES = {"task", "question", "guidance"}
+    _ACTIONABLE_MSG_TYPES = {"task", "question", "guidance", "result", "answer"}
 
     async def _wake_idle_agent(self, agent_id: str, msg: AgentMessage) -> None:
         """If agent is idle and message is actionable, trigger a background runtime turn."""

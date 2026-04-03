@@ -104,105 +104,21 @@ Frontend (Next.js)          Backend (FastAPI)
 
 ## User Testing / Showcase Guide
 
-Open the UI at `http://localhost:3000`. This guide walks through Lyra's capabilities from the simplest interactions to complex multi-agent orchestration — use it to verify the platform works and to showcase what it can do.
+Open the UI at `http://localhost:3000`. Detailed step-by-step use cases are in `docs/agent-drive/`:
 
-### 1. Create an Agent and Chat
+| UC | Title | What it showcases |
+|----|-------|-------------------|
+| [UC-001](docs/agent-drive/UC-001-greeting-memory.md) | Greeting & Memory | Basic chat, auto-extraction, memory recall |
+| [UC-002](docs/agent-drive/UC-002-hitl-approval-flow.md) | HITL Approval Flow | Human-in-the-loop approve/deny gates |
+| [UC-003](docs/agent-drive/UC-003-tool-system.md) | Tool System | MCP filesystem/shell tools, prompt macros |
+| [UC-004](docs/agent-drive/UC-004-memory-system.md) | Memory System | Remember/recall/forget, cross-agent sharing, decay |
+| [UC-005](docs/agent-drive/UC-005-multi-agent-orchestration.md) | Multi-Agent Orchestration | Sub-agent spawning, lifecycle, all 3 orchestration strategies |
+| [UC-006](docs/agent-drive/UC-006-inter-agent-communication.md) | Inter-Agent Communication | Message types, auto-wake, stop vs dismiss, reusable workers |
+| [UC-007](docs/agent-drive/UC-007-orchestration-patterns.md) | Orchestration Patterns | Decompose, sequential/parallel/pipeline execution |
+| [UC-008](docs/agent-drive/UC-008-per-agent-tool-scoping.md) | Per-Agent Tool Scoping | MCP server filtering, tool whitelists |
+| [UC-009](docs/agent-drive/UC-009-graph-view.md) | Graph View | Agent network graph, orchestration subtasks, dashboard |
 
-1. Type a name (e.g., "assistant") and click **CREATE**
-2. Click the agent card to open its detail page
-3. Type a message in the prompt bar and press Enter
-4. Watch the **EVENTS** panel update in real-time — you'll see `llm_request`, `llm_response` events
-5. The **CONVERSATION** panel shows the dialog
-6. Click any event to expand its payload
-
-### 2. Test Tool Usage
-
-If you have MCP servers configured (filesystem, shell):
-
-> List the files in /home
-
-The agent should call filesystem tools. Watch the events panel for `tool_call` and `tool_result` events with expandable details showing input/output.
-
-### 3. Test Memory
-
-Ask the agent to remember something:
-
-> Remember that our project deadline is next Friday
-
-Then in a new message:
-
-> What do you know about our project?
-
-The agent should recall the deadline. Check the events panel for `memory_write` and `memory_read` events.
-
-Navigate to **MEMORIES** in the top nav to browse all stored memories. You can search semantically, filter by type, and archive/delete entries.
-
-### 4. Test HITL (Human-in-the-Loop)
-
-Create an agent named "hitl-test" (requires `prompts/hitl-test.json` with `{"hitl_policy": "always_ask"}`).
-
-Ask it to do something that uses tools:
-
-> List files in /tmp
-
-The agent will pause with a **WAITING FOR APPROVAL** banner. The HITL panel appears with **OK** / **NO** buttons. Approve or deny to continue.
-
-### 5. Test Sub-Agent Spawning
-
-> Spawn a worker sub-agent using the "worker" template and ask it to wait for instructions
-
-A **SUB-AGENTS** bar appears showing the child. Then:
-
-> Send the worker a task to report disk usage
-
-Watch the flow:
-- Parent calls `send_message` (check events)
-- Worker auto-wakes and executes the task
-- Worker sends result back via `send_message`
-- Parent auto-wakes and reports the result
-- The **MESSAGES** panel on both agents shows the exchange
-
-Click the child in the SUB-AGENTS bar to see its conversation and events. Click **PARENT** to navigate back.
-
-### 6. Test Reusable Workers
-
-Without creating a new worker, send another task:
-
-> Ask the worker to report memory usage
-
-The same worker handles both tasks, accumulating conversation history.
-
-### 7. Test Cross-Agent Memory
-
-> Remember that we use Python 3.14 for this project
-
-Navigate to the worker agent and ask:
-
-> What programming language does the project use?
-
-The worker should find the shared fact from the parent agent's memory (facts are public by default).
-
-### 8. Test Autonomous Coder
-
-> Spawn a sub-agent using the "coder" template with this task: Create a Python tool that calculates the first N prime numbers and writes them to a file.
-
-The coder agent runs autonomously through a 7-phase workflow (requirements, plan, environment, TDD, implementation, testing, validation) using filesystem and shell tools. Check its conversation and events for the full execution trace. Output appears in `work/coder/`.
-
-### 9. Test Orchestration — Simple Plan
-
-> Create a plan to compare the pros and cons of Python vs Rust for CLI tools. Break it into subtasks: research Python strengths, research Rust strengths, then synthesize a recommendation.
-
-The agent decomposes the task into subtasks, executes them (in parallel where possible), and auto-synthesizes a final result. Watch the events panel for `orchestration.plan_created`, `orchestration.subtask_started`, `orchestration.subtask_completed`, and `orchestration.synthesis_completed` events.
-
-### 10. Test Orchestration — Complex Multi-Step
-
-> Orchestrate a code review workflow: first analyze the project structure, then review the architecture for anti-patterns, then check for security concerns, and finally produce a summary report that incorporates all findings.
-
-This showcases sequential dependencies — each subtask builds on previous results. The synthesis step combines all subtask outputs into a coherent report.
-
-### 11. Connection Control
-
-Click **LIVE** in the header to disconnect from the SSE event stream. Click **OFFLINE** to reconnect. Useful when you want to stop real-time updates.
+Each UC includes preconditions, step-by-step instructions, expected results, and success criteria. Execution reports (with timestamps and cost data) are in the same directory with `-2026-04-03` suffix.
 
 ## Project Structure
 
@@ -246,13 +162,15 @@ lyra-seed/
 - **V1 Complete:** 8 phases (skeleton, events, runtime, tools, memory, UI, HITL, hardening)
 - **V2P1 Complete:** Sub-agent spawning with full tool access
 - **V2P2 Complete:** Async spawn, message bus, reusable lifecycle, auto-wake
-- **V2P3 Complete:** Orchestration patterns (plan-execute, parallel/sequential subtasks, auto-synthesis)
-- **104 smoke tests** all passing
-- **Next:** V2 Phase 4 (Per-Agent Tool Scoping)
+- **V2P1–P5 Complete:** Sub-agent spawning, messaging, orchestration, tool scoping, graph UI
+- **140 smoke tests** all passing (121 backend + 19 frontend)
+- **Next:** V2P6 (Orchestration with tool/agent subtasks), then V3
 
 ## Documentation
 
 - [Roadmap](docs/ROADMAP.md) — Full version/phase plan
 - [Requirements](docs/REQUIREMENTS.md) — Feature specifications with delivery status
 - [Development Methodology](docs/DEVELOPMENT_METHODOLOGY.md) — Phase-driven smoke-test workflow
-- [Post-V1 Report](docs/POST_V1_REPORT.md) — Completion report with V2 progress
+- [Post-V1 Report](docs/POST_V1_REPORT.md) — V1 completion report
+- [Post-V2 Report](docs/POST_V2_REPORT.md) — V2 completion report
+- [Configuration Guide](docs/CONFIGURATION_GUIDE.md) — All configuration surfaces with examples

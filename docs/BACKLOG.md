@@ -14,15 +14,9 @@ Items for future consideration, not tied to a specific phase.
 
 ---
 
-### BL-002: Per-agent MCP server configuration
+### ~~BL-002: Per-agent MCP server configuration~~ DONE
 
-**Context:** MCP servers are currently configured system-wide in `lyra.config.json` and shared by all agents via a single `ToolRegistry`. Every agent sees every tool. Consider allowing per-agent MCP server definitions in `prompts/{name}.json` so different agents get different tool sets (e.g., a coder agent gets filesystem+shell, a research agent gets web search, a restricted agent gets nothing).
-
-**Scope:** Add optional `mcpServers` field to `AgentFileConfig`. On agent creation, merge agent-specific MCP servers with (or instead of) system-wide ones. May require per-agent `ToolRegistry` instances rather than a shared singleton — significant architectural change.
-
-**Priority:** Medium — becomes important as agent specialization increases and for security (least-privilege tool access). Additional motivation: every tool in the registry adds to the tools schema sent to the LLM on every call, inflating context size and token costs. A worker that only needs filesystem tools currently receives 38+ tool definitions. Per-agent tool scoping would significantly reduce per-call token overhead.
-
-**Scheduled:** V2 Phase 4 (see `ROADMAP.md`). DONE
+Delivered in V2 Phase 4 as `allowed_mcp_servers` and `allowed_tools` config fields. See `ROADMAP.md` V2P4 and `docs/CONFIGURATION_GUIDE.md`.
 
 ---
 
@@ -46,27 +40,15 @@ Items for future consideration, not tied to a specific phase.
 
 ---
 
-### BL-005: Orchestration subtasks can use tools or spawn sub-agents
+### ~~BL-005: Orchestration subtasks can use tools or spawn sub-agents~~ SCHEDULED
 
-**Context:** Orchestration subtasks currently execute as single LLM calls — prompt in, text out. They have no tool access, no memory, no conversation history. The `assigned_to` field on each `SubTask` exists in the model but is ignored during execution; every subtask runs the same way regardless of what it's assigned to.
-
-The original V2P3 roadmap specified "each subtask mapped to: existing tool, existing skill, or new sub-agent" but the implementation took the simpler direct-LLM approach, which proved sufficient for knowledge-work tasks (analysis, research, writing).
-
-**Scope:** When `assigned_to` is a tool name (e.g., `shell`, `read_file`), execute it via the `ToolRegistry` instead of an LLM call. When `assigned_to` is `spawn_agent`, create an actual child agent with full runtime capabilities (tools, memory, multi-iteration loop) and collect its result. This would allow orchestrated subtasks to interact with the filesystem, run commands, query APIs, or perform complex multi-step work.
-
-**Considerations:**
-- Sub-agent subtasks would be significantly slower (full runtime loop vs single LLM call)
-- Parallel sub-agent spawning needs concurrency limits to avoid resource exhaustion
-- Tool-based subtasks need input/output mapping (tool arguments from subtask description, tool result as subtask output)
-- HITL policies on sub-agent subtasks need to be defined (inherit parent? independent?)
-
-**Priority:** Medium — the current LLM-only approach handles analysis/writing tasks well, but tool access would unlock orchestration of tasks that require real-world interaction (code generation, file processing, API calls).
+Promoted to V2 Phase 6 (see `ROADMAP.md`). Prerequisite for V3 — the capability acquisition loop requires orchestrated subtasks to spawn agents and call tools.
 
 ---
 
-### BL-006: Live orchestration graph visualization
+### ~~BL-006: Live orchestration graph visualization~~ DONE
 
-**Absorbed into V2 Phase 5** (see `ROADMAP.md`). Basic and Enhanced tiers are now deliverables 5.1–5.3. The Full tier's timeline scrubber is split out as BL-007.
+Delivered in V2 Phase 5 (deliverables 5.1–5.3). The Full tier's timeline scrubber split out as BL-007.
 
 ---
 

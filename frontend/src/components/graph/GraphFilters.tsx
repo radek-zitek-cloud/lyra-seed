@@ -4,6 +4,8 @@ import { MESSAGE_TYPE_COLORS, type GraphFilters as Filters } from "./graphUtils"
 
 const MESSAGE_TYPES = ["task", "result", "question", "answer", "guidance", "status_update"];
 const TIME_RANGES = [
+  { label: "1m", value: 1 },
+  { label: "5m", value: 5 },
   { label: "15m", value: 15 },
   { label: "1h", value: 60 },
   { label: "6h", value: 360 },

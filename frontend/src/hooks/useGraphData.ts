@@ -27,6 +27,7 @@ export function useGraphData() {
   const sourceRef = useRef<EventSource | null>(null);
   const manualDisconnect = useRef(false);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const agentRefreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const loadAgents = useCallback(async () => {
     try {
@@ -136,34 +137,33 @@ export function useGraphData() {
     source.onmessage = (raw) => {
       const evt: EventItem = JSON.parse(raw.data);
 
-      // Update graph based on event type
+      // Update graph based on event type — any event that may change agent status
+      // Debounced to avoid spamming fetches on rapid events (e.g. multiple llm_request per turn)
       if (
         evt.event_type === "agent_spawn" ||
         evt.event_type === "agent_complete" ||
-        evt.event_type === "error"
+        evt.event_type === "error" ||
+        evt.event_type === "llm_request" ||
+        evt.event_type === "hitl_request" ||
+        evt.event_type === "hitl_response"
       ) {
-        loadAgents();
+        if (agentRefreshTimer.current) clearTimeout(agentRefreshTimer.current);
+        agentRefreshTimer.current = setTimeout(() => loadAgents(), 200);
       }
 
-      if (
-        evt.event_type === "message_sent" ||
-        evt.event_type === "message_received"
-      ) {
-        // Add message edge from event payload
-        if (evt.event_type === "message_sent") {
-          const payload = evt.payload;
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: (payload.message_id as string) ?? "",
-              from_agent_id: evt.agent_id,
-              to_agent_id: (payload.to_agent_id as string) ?? "",
-              content: (payload.content_preview as string) ?? "",
-              message_type: (payload.message_type as string) ?? "",
-              timestamp: new Date().toISOString(),
-            },
-          ]);
-        }
+      if (evt.event_type === "message_sent") {
+        const payload = evt.payload;
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: (payload.message_id as string) ?? "",
+            from_agent_id: evt.agent_id,
+            to_agent_id: (payload.to_agent_id as string) ?? "",
+            content: (payload.content_preview as string) ?? "",
+            message_type: (payload.message_type as string) ?? "",
+            timestamp: new Date().toISOString(),
+          },
+        ]);
       }
 
       if (evt.module?.startsWith("orchestration.")) {
@@ -190,6 +190,10 @@ export function useGraphData() {
       clearTimeout(reconnectTimer.current);
       reconnectTimer.current = null;
     }
+    if (agentRefreshTimer.current) {
+      clearTimeout(agentRefreshTimer.current);
+      agentRefreshTimer.current = null;
+    }
     if (sourceRef.current) {
       sourceRef.current.close();
       sourceRef.current = null;
@@ -201,9 +205,17 @@ export function useGraphData() {
   useEffect(() => {
     refresh();
     connect();
+
+    // Re-render periodically so short time range filters stay current
+    const refreshInterval = setInterval(() => {
+      setMessages((prev) => [...prev]);
+    }, 5_000);
+
     return () => {
       manualDisconnect.current = true;
       if (reconnectTimer.current) clearTimeout(reconnectTimer.current);
+      if (agentRefreshTimer.current) clearTimeout(agentRefreshTimer.current);
+      clearInterval(refreshInterval);
       sourceRef.current?.close();
     };
   }, [refresh, connect]);

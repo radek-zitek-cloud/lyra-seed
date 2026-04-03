@@ -119,6 +119,8 @@ export function buildEdges(
         id: `pc-${agent.parent_agent_id}-${agent.id}`,
         source: agent.parent_agent_id,
         target: agent.id,
+        sourceHandle: "bottom",
+        targetHandle: "top",
         type: "parentChild",
         data: { childStatus: agent.status },
       });
@@ -154,6 +156,8 @@ export function buildEdges(
         id: `msg-${msg.id}`,
         source: msg.from_agent_id,
         target: msg.to_agent_id,
+        sourceHandle: "msg-source",
+        targetHandle: "msg-target",
         type: "message",
         animated: isRecent,
         label: count > 1 ? `${msg.message_type} (${count})` : msg.message_type,

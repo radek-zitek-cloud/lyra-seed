@@ -32,7 +32,9 @@ function AgentNodeComponent({ data }: { data: AgentNodeData }) {
         cursor: "pointer",
       }}
     >
-      <Handle type="target" position={Position.Top} style={{ background: "#333" }} />
+      <Handle type="target" position={Position.Top} id="top" style={{ background: "#333" }} />
+      <Handle type="target" position={Position.Left} id="msg-target" style={{ background: "#333" }} />
+      <Handle type="source" position={Position.Right} id="msg-source" style={{ background: "#333" }} />
 
       {/* Header */}
       <div
@@ -133,7 +135,7 @@ function AgentNodeComponent({ data }: { data: AgentNodeData }) {
         </div>
       )}
 
-      <Handle type="source" position={Position.Bottom} style={{ background: "#333" }} />
+      <Handle type="source" position={Position.Bottom} id="bottom" style={{ background: "#333" }} />
     </div>
   );
 }
