@@ -22,7 +22,7 @@ Items for future consideration, not tied to a specific phase.
 
 **Priority:** Medium — becomes important as agent specialization increases and for security (least-privilege tool access). Additional motivation: every tool in the registry adds to the tools schema sent to the LLM on every call, inflating context size and token costs. A worker that only needs filesystem tools currently receives 38+ tool definitions. Per-agent tool scoping would significantly reduce per-call token overhead.
 
-**Scheduled:** V2 Phase 4 (see `ROADMAP.md`).
+**Scheduled:** V2 Phase 4 (see `ROADMAP.md`). DONE
 
 ---
 
@@ -66,22 +66,20 @@ The original V2P3 roadmap specified "each subtask mapped to: existing tool, exis
 
 ### BL-006: Live orchestration graph visualization
 
-**Context:** Orchestration runs take 1–2 minutes and involve multiple parallel/sequential LLM calls, sub-agent spawns, and message flows. Currently the only way to observe progress is the event timeline — a flat chronological list of events. A graph view would make the orchestration structure, dependencies, progress, and agent relationships immediately visible.
+**Absorbed into V2 Phase 5** (see `ROADMAP.md`). Basic and Enhanced tiers are now deliverables 5.1–5.3. The Full tier's timeline scrubber is split out as BL-007.
 
-**Concept:** A real-time node-edge graph where:
-- Each agent is a container box showing name, model, and status
-- Orchestration subtasks appear as nodes inside the agent box, colored by status (pending/running/completed/failed/skipped)
-- Dependency edges connect subtasks within an agent (from the plan's `dependencies` field)
-- Parent-child relationships link agent boxes (from `parent_agent_id`)
-- Inter-agent messages show as labeled edges between agent boxes (from message events)
-- Auto-synthesis by the platform shown as a final node after all subtasks converge
-- Everything updates in real-time as SSE events arrive
+---
 
-**Tech:** React Flow (compound nodes, custom styling, animated edges, Dagre/ELK auto-layout). All required data already streams via SSE — no backend changes needed for the basic version.
+### BL-007: Orchestration timeline scrubber and historical replay
 
-**Scope tiers:**
-1. Basic — agent boxes with subtask nodes, dependency edges, real-time status colors
-2. Enhanced — parent-child agent links, message flow edges, spawn animations, pipeline progress
-3. Full — timeline scrubber for historical replay, click-to-expand agent details, duration overlays
+**Context:** The graph view (V2P5) shows live orchestration state. A timeline scrubber would allow rewinding to any point in a past orchestration run — useful for post-mortem analysis, demos, and understanding how a complex multi-agent task unfolded step by step.
 
-**Priority:** Low — quality of life. The event timeline works for debugging; this is about making orchestration intuitive and visually impressive.
+**Scope:** Add a scrubber control to the graph view that replays historical SSE events at adjustable speed. At each point in time, the graph reflects the state as it was: agent statuses, subtask progress, message flows, and spawn events. Clicking on a node at any replay point opens the agent detail at that moment. Duration overlays show how long each subtask and agent turn took.
+
+**Considerations:**
+- Requires persisted event history with precise timestamps (already available via `GET /agents/{id}/events`)
+- Graph state must be reconstructable from events alone (no snapshots needed — events are the source of truth)
+- Playback speed control: 1x, 2x, 5x, 10x, and step-by-step
+- May need a "session" concept to group events belonging to one orchestration run
+
+**Priority:** Low — quality of life for debugging and demos. The live graph from V2P5 covers the primary use case.

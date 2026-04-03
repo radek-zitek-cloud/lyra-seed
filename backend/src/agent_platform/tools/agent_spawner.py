@@ -580,8 +580,7 @@ class AgentSpawnerProvider:
             )
         )
 
-        # Auto-wake idle target agent on actionable messages
-        # Any message to an idle agent triggers a turn
+        # Auto-wake idle target on actionable messages (task, question, guidance)
         await self._wake_idle_agent(to_id, msg)
 
         return ToolResult(
@@ -595,11 +594,17 @@ class AgentSpawnerProvider:
             duration_ms=int((time.monotonic() - start) * 1000),
         )
 
+    _ACTIONABLE_MSG_TYPES = {"task", "question", "guidance"}
+
     async def _wake_idle_agent(self, agent_id: str, msg: AgentMessage) -> None:
-        """If agent is idle, trigger a background runtime turn."""
+        """If agent is idle and message is actionable, trigger a background runtime turn."""
         try:
             agent = await self._agent_repo.get(agent_id)
             if agent is None or agent.status != AgentStatus.IDLE:
+                return
+
+            # Only actionable messages trigger auto-wake
+            if msg.message_type.value not in self._ACTIONABLE_MSG_TYPES:
                 return
 
             prompt = (

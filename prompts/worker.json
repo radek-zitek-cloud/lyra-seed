@@ -1,6 +1,0 @@
-{
-  "temperature": 0.3,
-  "max_iterations": 20,
-  "hitl_policy": "never",
-  "auto_extract": false
-}

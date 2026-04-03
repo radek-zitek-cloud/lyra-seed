@@ -47,15 +47,19 @@ async def send_message_to_agent(agent_id: str, req: SendMessageRequest):
     if repo is None:
         raise HTTPException(status_code=500, detail="Message repo not configured")
 
+    # Validate target agent exists and can receive messages
+    agent_repo = get_agent_repo()
+    agent = await agent_repo.get(agent_id)
+    if agent is None:
+        raise HTTPException(status_code=404, detail=f"Agent {agent_id} not found")
+    if agent.status in (AgentStatus.COMPLETED, AgentStatus.FAILED):
+        raise HTTPException(
+            status_code=409,
+            detail=f"Agent {agent_id} is {agent.status.value} and cannot receive messages",
+        )
+
     # Resolve sender: explicit > agent's parent > "human"
-    from_id = req.from_agent_id
-    if not from_id:
-        agent_repo = get_agent_repo()
-        agent = await agent_repo.get(agent_id)
-        if agent and agent.parent_agent_id:
-            from_id = agent.parent_agent_id
-        else:
-            from_id = "human"
+    from_id = req.from_agent_id or agent.parent_agent_id or "human"
 
     msg = AgentMessage(
         from_agent_id=from_id,
@@ -94,20 +98,27 @@ async def send_message_to_agent(agent_id: str, req: SendMessageRequest):
         )
     )
 
-    # Any message to an idle agent triggers a turn
+    # Only actionable messages (task, question, guidance) trigger auto-wake
     await _wake_idle_agent(agent_id, msg)
 
     return _msg_to_dict(msg)
 
 
+_ACTIONABLE_MSG_TYPES = {"task", "question", "guidance"}
+
+
 async def _wake_idle_agent(agent_id: str, msg: AgentMessage) -> None:
-    """If the target agent is idle, trigger a background runtime turn."""
+    """If the target agent is idle and message is actionable, trigger a background runtime turn."""
     from agent_platform.api._deps import get_agent_repo, get_message_repo, get_runtime
 
     try:
         repo = get_agent_repo()
         agent = await repo.get(agent_id)
         if agent is None or agent.status != AgentStatus.IDLE:
+            return
+
+        # Only actionable messages trigger auto-wake
+        if msg.message_type.value not in _ACTIONABLE_MSG_TYPES:
             return
 
         runtime = get_runtime()

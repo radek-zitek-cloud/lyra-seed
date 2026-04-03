@@ -620,23 +620,35 @@ V2P1 proved that sub-agents can spawn and execute with full tool access. However
 
 ---
 
-### V2 Phase 5: Observation UI — Multi-Agent
+### V2 Phase 5: Observation UI — Multi-Agent & Orchestration Graph
+
+> **Important:** This phase adds a new **graph view** as a separate visualization alongside the existing event timeline and agent detail views. The current observation UI (event timeline, conversation panel, HITL panel, memory browser) is working well and must not be disrupted. The graph view is an additional perspective on the same data, not a replacement.
 
 **Deliverables:**
 
-- Agent network graph:
-  - Interactive node-edge visualization (parent-child relationships)
-  - Node color/size indicates status and activity
-  - Click node to drill into agent detail view
-- Communication flow view:
-  - Message sequence diagram showing inter-agent messages over time
+- 5.1 Agent network graph:
+  - Interactive node-edge visualization of parent-child agent relationships (React Flow)
+  - Agent nodes as compound containers showing name, model, and status
+  - Node color indicates status (idle/running/waiting/completed/failed)
+  - Click node to drill into existing agent detail view
+  - Real-time updates via SSE events
+- 5.2 Orchestration subtask visualization (incorporates BL-006 Basic + Enhanced):
+  - Orchestration subtask nodes rendered inside agent containers
+  - Subtask status coloring (pending/running/completed/failed/skipped)
+  - Dependency edges between subtasks within an agent (from plan's `dependencies` field)
+  - Auto-synthesis shown as a final converging node
+  - Pipeline progress visualization for pipeline-strategy orchestrations
+- 5.3 Communication flow:
+  - Inter-agent message edges with labels (message type, direction)
   - Filterable by agent pair, message type, time range
-- Spawn agent from UI:
-  - Form to create a new agent with config
-  - Can be a root agent or attached as child to existing agent
-- Dashboard view:
-  - Overview of all active agents, their statuses, recent events
-  - Aggregate metrics: total events, active agents, pending HITL, tool calls
+  - Spawn animations when new child agents appear
+- 5.4 Dashboard & agent spawning:
+  - Dashboard overview: active agents, statuses, recent events, aggregate metrics (total events, pending HITL, tool calls)
+  - Spawn agent from UI: form to create a new root or child agent with config
+
+**Tech:** React Flow with compound nodes, custom styling, animated edges, and Dagre/ELK auto-layout. All required data already streams via SSE — no backend changes needed for the graph view.
+
+**Exit Criteria:** Graph view shows live agent hierarchy with orchestration subtasks updating in real-time. Existing event timeline and agent detail views unchanged. Dashboard shows aggregate platform state. Agents can be spawned from the UI.
 
 ---
 

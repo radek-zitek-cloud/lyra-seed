@@ -175,6 +175,21 @@ class TestV1Phase3:
         messages = call_args[0][0]  # first positional arg
         assert "Long article here..." in messages[-1].content
 
+        # Verify LLM config is passed through when set
+        from agent_platform.llm.models import LLMConfig
+
+        mock_llm.reset_mock()
+        mock_llm.complete.return_value = LLMResponse(
+            content="Summary with config.",
+            usage={"prompt_tokens": 20, "completion_tokens": 5},
+        )
+        provider._llm_config = LLMConfig(model="test/model", temperature=0.5)
+        result = await provider.call_tool("summarize", {"text": "Some text"})
+        assert result.success is True
+        _, kwargs = mock_llm.complete.call_args
+        assert kwargs["config"].model == "test/model"
+        assert kwargs["config"].temperature == 0.5
+
     @pytest.mark.asyncio
     async def test_st_3_4_macro_sqlite_repo(self, tmp_path):
         """ST-3.4: Prompt macro SQLite repository."""

@@ -6,7 +6,7 @@ from uuid import uuid4
 
 from pydantic import BaseModel, Field
 
-from agent_platform.llm.models import LLMResponse, Message, MessageRole
+from agent_platform.llm.models import LLMConfig, LLMResponse, Message, MessageRole
 from agent_platform.tools.models import Tool, ToolResult, ToolType
 
 
@@ -27,6 +27,7 @@ class PromptMacroProvider:
     def __init__(self, llm_provider: Any) -> None:
         self._llm = llm_provider
         self._macros: dict[str, PromptMacro] = {}
+        self._llm_config: LLMConfig | None = None
 
     def add_macro(self, macro: PromptMacro) -> None:
         """Register a prompt macro."""
@@ -78,7 +79,9 @@ class PromptMacroProvider:
 
         start = time.monotonic()
         try:
-            response: LLMResponse = await self._llm.complete(messages)
+            response: LLMResponse = await self._llm.complete(
+                messages, config=self._llm_config
+            )
             duration_ms = int((time.monotonic() - start) * 1000)
             return ToolResult(
                 success=True,

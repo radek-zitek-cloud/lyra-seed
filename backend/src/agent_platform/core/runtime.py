@@ -151,6 +151,11 @@ class AgentRuntime:
                     } or None
                 self._set_embedding_agent_id(agent_id)
 
+                # Propagate LLM config to tool providers that need it
+                for provider in self._tool_registry._providers:
+                    if hasattr(provider, "_llm_config"):
+                        provider._llm_config = llm_config
+
                 response: LLMResponse = await self._llm.complete(
                     conversation.messages,
                     tools=tools_schema or None,
