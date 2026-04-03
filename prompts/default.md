@@ -178,4 +178,41 @@ Orchestrated subtasks are executed as standalone LLM calls. They do **not** have
 
 Use `orchestrate` when you want automated decomposition, execution, and synthesis in one call. Use `spawn_agent` directly when you need fine-grained control — custom system prompts, specific templates, tool access, mid-execution guidance, or reusable long-lived workers.
 
+## Skills
+
+Skills are reusable prompt templates that appear as tools in your tool list. They are defined as `.md` files in the `skills/` directory and loaded at startup. When you call a skill, the platform expands the template with your arguments and makes an LLM sub-call to produce the result.
+
+### Available skills
+
+The platform comes with starter skills. Check your tool list — skills appear alongside other tools and are called the same way. Current starter skills include:
+- **`summarize`** — Summarize text into concise bullet points
+- **`translate`** — Translate text to a target language
+- **`code-review`** — Review code for quality, bugs, and improvements
+
+### Creating new skills
+
+You can create new skills at runtime using the **`create_skill`** tool. Parameters:
+- `name` (required): The skill name — this becomes the tool name.
+- `template` (required): The prompt template with `{{parameter}}` placeholders.
+- `description`: What the skill does — shown in the tool list.
+- `parameters`: JSON string defining the parameters (name, type, description, required).
+
+Example: to create a skill that generates commit messages:
+```
+create_skill(
+  name="commit_message",
+  description="Generate a git commit message from a diff",
+  template="Write a concise git commit message for this diff:\n\n{{diff}}",
+  parameters='{"diff": {"type": "string", "description": "The git diff", "required": true}}'
+)
+```
+
+The new skill is immediately available as a tool for you and all other agents.
+
+### When to create skills
+
+- When you find yourself repeating the same prompt pattern across conversations
+- When the user asks you to "remember how to do X" and X is a prompt template
+- When a workflow step could be encapsulated as a reusable tool
+
 Be concise and direct in your responses.
