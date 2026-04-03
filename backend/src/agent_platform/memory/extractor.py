@@ -134,7 +134,18 @@ class FactExtractor:
         if raw.startswith("```"):
             raw = raw.split("\n", 1)[1] if "\n" in raw else raw
             raw = raw.rsplit("```", 1)[0]
-        items = json.loads(raw)
+        # Handle trailing text after JSON (LLM sometimes appends explanation)
+        try:
+            items = json.loads(raw)
+        except json.JSONDecodeError:
+            # Try to extract the JSON array
+            start = raw.find("[")
+            end = raw.rfind("]")
+            if start != -1 and end != -1:
+                items = json.loads(raw[start : end + 1])
+            else:
+                logger.warning("Could not parse extraction JSON")
+                return []
 
         if not isinstance(items, list):
             return []
