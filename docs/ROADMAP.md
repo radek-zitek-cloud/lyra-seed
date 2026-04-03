@@ -607,8 +607,16 @@ V2P1 proved that sub-agents can spawn and execute with full tool access. However
   - Only send relevant tool schemas to the LLM
   - Track token savings in cost events
 - Spawned children inherit parent's tool scope unless template overrides it
+- `docs/CONFIGURATION_GUIDE.md` — comprehensive configuration reference covering:
+  - Environment variables (`.env`)
+  - Platform config (`lyra.config.json`) — all fields, defaults, and purpose
+  - Agent config files (`prompts/{name}.json`) — all fields, resolution chain, examples
+  - Agent system prompts (`prompts/{name}.md`) — how they're resolved, what the default covers
+  - Internal system prompts (`prompts/system/*.md`) — decomposition, synthesis, extraction, summarization
+  - The four-level resolution chain: per-agent file → default file → platform config → hardcoded defaults
+  - Example configurations for common agent roles (coder, researcher, restricted worker)
 
-**Exit Criteria:** Different agents get different tool sets. A worker with `mcpServers: ["filesystem"]` does not see shell tools. Token usage per LLM call decreases proportionally to excluded tools.
+**Exit Criteria:** Different agents get different tool sets. A worker with `mcpServers: ["filesystem"]` does not see shell tools. Token usage per LLM call decreases proportionally to excluded tools. Configuration guide covers all config surfaces with examples.
 
 ---
 
