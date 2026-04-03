@@ -72,9 +72,7 @@ async def _execute_subtask(
         )
     else:
         # Default: direct LLM call (backward compatible)
-        result = await _execute_via_llm(
-            subtask, llm_provider, previous_output, model
-        )
+        result = await _execute_via_llm(subtask, llm_provider, previous_output, model)
 
     subtask.status = SubTaskStatus.COMPLETED
     subtask.result = result
@@ -127,9 +125,7 @@ async def _execute_via_llm(
             )
         )
 
-    messages.append(
-        Message(role=MessageRole.HUMAN, content=subtask.description)
-    )
+    messages.append(Message(role=MessageRole.HUMAN, content=subtask.description))
 
     config = LLMConfig(temperature=0.5)
     if model:
@@ -190,9 +186,7 @@ async def _execute_via_tool(
     # Call the tool
     tool_result = await tool_registry.call_tool(tool_name, args)
     if not tool_result.success:
-        raise RuntimeError(
-            f"Tool '{tool_name}' failed: {tool_result.error}"
-        )
+        raise RuntimeError(f"Tool '{tool_name}' failed: {tool_result.error}")
 
     return tool_result.output or ""
 

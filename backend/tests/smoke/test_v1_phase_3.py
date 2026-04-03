@@ -131,23 +131,23 @@ class TestV1Phase3:
         assert "function" in schema[0]
 
     @pytest.mark.asyncio
-    async def test_st_3_3_prompt_macro_provider(self):
-        """ST-3.3: PromptMacro model and provider."""
+    async def test_st_3_3_skill_provider(self, tmp_path):
+        """ST-3.3: SkillProvider loads and executes skills."""
         from agent_platform.llm.models import LLMResponse
-        from agent_platform.tools.prompt_macro import (
-            PromptMacro,
-            PromptMacroProvider,
+        from agent_platform.tools.skill_provider import (
+            SkillProvider,
         )
 
-        macro = PromptMacro(
-            name="summarize",
-            description="Summarize text",
-            template="Please summarize the following:\n\n{{text}}",
-            parameters={
-                "type": "object",
-                "properties": {"text": {"type": "string"}},
-                "required": ["text"],
-            },
+        # Write a skill file
+        skill_file = tmp_path / "summarize.md"
+        skill_file.write_text(
+            "---\nname: summarize\n"
+            "description: Summarize text\n"
+            "parameters:\n"
+            "  text:\n"
+            "    type: string\n"
+            "---\n\n"
+            "Please summarize the following:\n\n{{text}}"
         )
 
         mock_llm = AsyncMock()
@@ -156,158 +156,121 @@ class TestV1Phase3:
             usage={"prompt_tokens": 20, "completion_tokens": 5},
         )
 
-        provider = PromptMacroProvider(llm_provider=mock_llm)
-        provider.add_macro(macro)
+        provider = SkillProvider(
+            skills_dir=str(tmp_path),
+            llm_provider=mock_llm,
+        )
 
-        # List tools
+        # List tools — skill + create_skill
         tools = await provider.list_tools()
-        assert len(tools) == 1
-        assert tools[0].name == "summarize"
+        skill_names = [t.name for t in tools if t.name != "create_skill"]
+        assert "summarize" in skill_names
 
-        # Call tool — should expand template and call LLM
-        result = await provider.call_tool("summarize", {"text": "Long article here..."})
+        # Call skill
+        result = await provider.call_tool(
+            "summarize",
+            {"text": "Long article here..."},
+        )
         assert result.success is True
         assert "summary" in result.output.lower()
         mock_llm.complete.assert_called_once()
 
-        # Verify template was expanded in the LLM call
+        # Verify template was expanded
         call_args = mock_llm.complete.call_args
-        messages = call_args[0][0]  # first positional arg
+        messages = call_args[0][0]
         assert "Long article here..." in messages[-1].content
 
-        # Verify LLM config is passed through when set
-        from agent_platform.llm.models import LLMConfig
-
-        mock_llm.reset_mock()
-        mock_llm.complete.return_value = LLMResponse(
-            content="Summary with config.",
-            usage={"prompt_tokens": 20, "completion_tokens": 5},
-        )
-        provider._llm_config = LLMConfig(model="test/model", temperature=0.5)
-        result = await provider.call_tool("summarize", {"text": "Some text"})
-        assert result.success is True
-        _, kwargs = mock_llm.complete.call_args
-        assert kwargs["config"].model == "test/model"
-        assert kwargs["config"].temperature == 0.5
-
     @pytest.mark.asyncio
-    async def test_st_3_4_macro_sqlite_repo(self, tmp_path):
-        """ST-3.4: Prompt macro SQLite repository."""
-        from agent_platform.db.sqlite_macro_repo import SqliteMacroRepo
-        from agent_platform.tools.prompt_macro import PromptMacro
-
-        db_path = str(tmp_path / "test_macros.db")
-        repo = SqliteMacroRepo(db_path)
-        await repo.initialize()
-
-        macro = PromptMacro(
-            name="translate",
-            description="Translate text",
-            template="Translate to {{lang}}: {{text}}",
-            parameters={
-                "type": "object",
-                "properties": {
-                    "lang": {"type": "string"},
-                    "text": {"type": "string"},
-                },
-            },
+    async def test_st_3_4_skill_file_format(self, tmp_path):
+        """ST-3.4: Skill file parsing with YAML frontmatter."""
+        from agent_platform.tools.skill_provider import (
+            parse_skill_file,
         )
 
-        # Create
-        created = await repo.create(macro)
-        assert created.id == macro.id
+        skill_file = tmp_path / "translate.md"
+        skill_file.write_text(
+            "---\n"
+            "name: translate\n"
+            "description: Translate text\n"
+            "parameters:\n"
+            "  lang:\n"
+            "    type: string\n"
+            "    required: true\n"
+            "  text:\n"
+            "    type: string\n"
+            "    required: true\n"
+            "---\n\n"
+            "Translate to {{lang}}: {{text}}"
+        )
 
-        # Get
-        fetched = await repo.get(macro.id)
-        assert fetched is not None
-        assert fetched.name == "translate"
-        assert "{{lang}}" in fetched.template
-
-        # List
-        all_macros = await repo.list()
-        assert len(all_macros) == 1
-
-        # Update
-        macro.description = "Translate text to any language"
-        await repo.update(macro.id, macro)
-        fetched = await repo.get(macro.id)
-        assert fetched is not None
-        assert fetched.description == "Translate text to any language"
-
-        # Delete
-        deleted = await repo.delete(macro.id)
-        assert deleted is True
-        assert await repo.get(macro.id) is None
-
-        await repo.close()
+        skill = parse_skill_file(skill_file)
+        assert skill.name == "translate"
+        assert skill.description == "Translate text"
+        assert "lang" in skill.parameters
+        assert "text" in skill.parameters
+        assert "{{lang}}" in skill.template
+        assert "{{text}}" in skill.template
 
     @pytest.mark.asyncio
-    async def test_st_3_5_macro_crud_api(self, tmp_path):
-        """ST-3.5: Prompt macro CRUD API."""
+    async def test_st_3_5_skills_api(self, tmp_path):
+        """ST-3.5: Skills API (read-only)."""
         import httpx as httpx_mod
 
         from agent_platform.api.main import create_app
         from agent_platform.core.config import Settings
 
-        settings = Settings(
-            openrouter_api_key="sk-test",  # type: ignore[arg-type]
+        # Create skills + prompts dirs
+        skills_dir = tmp_path / "skills"
+        skills_dir.mkdir()
+        (skills_dir / "greet.md").write_text(
+            "---\nname: greet\n"
+            "description: Generate a greeting\n"
+            "parameters:\n"
+            "  name:\n    type: string\n"
+            "---\n\nSay hello to {{name}}"
         )
-        app = create_app(settings, db_dir=str(tmp_path))
+        prompts_dir = tmp_path / "prompts"
+        prompts_dir.mkdir()
+        (prompts_dir / "default.md").write_text("You are a helpful assistant.")
+        (tmp_path / "lyra.config.json").write_text(
+            '{"dataDir": "'
+            + str(tmp_path / "data")
+            + '", "systemPromptsDir": "'
+            + str(prompts_dir)
+            + '", "skillsDir": "'
+            + str(skills_dir)
+            + '", "defaultModel": "test"}'
+        )
+
+        settings = Settings(
+            openrouter_api_key="sk-test",
+        )
+        app = create_app(
+            settings,
+            db_dir=str(tmp_path / "data"),
+            project_root=tmp_path,
+        )
 
         async with app.router.lifespan_context(app):
             transport = httpx_mod.ASGITransport(app=app)
             async with httpx_mod.AsyncClient(
-                transport=transport, base_url="http://test"
+                transport=transport,
+                base_url="http://test",
             ) as client:
-                # POST /macros
-                resp = await client.post(
-                    "/macros",
-                    json={
-                        "name": "greet",
-                        "description": "Generate a greeting",
-                        "template": "Say hello to {{name}}",
-                        "parameters": {
-                            "type": "object",
-                            "properties": {"name": {"type": "string"}},
-                        },
-                    },
-                )
-                assert resp.status_code == 201
-                macro_data = resp.json()
-                macro_id = macro_data["id"]
-
-                # GET /macros
-                resp = await client.get("/macros")
+                # GET /skills
+                resp = await client.get("/skills")
                 assert resp.status_code == 200
-                macros = resp.json()
-                assert len(macros) >= 1
+                skills = resp.json()
+                names = [s["name"] for s in skills]
+                assert "greet" in names
 
-                # GET /macros/{id}
-                resp = await client.get(f"/macros/{macro_id}")
+                # GET /skills/{name}
+                resp = await client.get("/skills/greet")
                 assert resp.status_code == 200
                 assert resp.json()["name"] == "greet"
 
-                # PUT /macros/{id}
-                resp = await client.put(
-                    f"/macros/{macro_id}",
-                    json={
-                        "name": "greet",
-                        "description": "Updated greeting",
-                        "template": "Say hello to {{name}}!",
-                        "parameters": {
-                            "type": "object",
-                            "properties": {"name": {"type": "string"}},
-                        },
-                    },
-                )
-                assert resp.status_code == 200
-
-                # DELETE /macros/{id}
-                resp = await client.delete(f"/macros/{macro_id}")
-                assert resp.status_code == 200
-
-                # Verify deleted
-                resp = await client.get(f"/macros/{macro_id}")
+                # GET /skills/{unknown} → 404
+                resp = await client.get("/skills/nonexistent")
                 assert resp.status_code == 404
 
     @pytest.mark.asyncio
@@ -434,7 +397,9 @@ class TestV1Phase3:
         assert response.content == "Python is a programming language."
 
         # Verify tool was called through registry
-        mock_provider.call_tool.assert_called_once_with("lookup", {"topic": "Python"})
+        call_args = mock_provider.call_tool.call_args
+        assert call_args[0][0] == "lookup"
+        assert call_args[0][1]["topic"] == "Python"
 
         # Verify LLM received tool list
         first_call = mock_llm.complete.call_args_list[0]

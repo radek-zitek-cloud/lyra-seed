@@ -19,8 +19,11 @@ pytestmark = [
 
 
 def _write_skill(
-    skills_dir: Path, name: str, description: str,
-    params: dict, template: str,
+    skills_dir: Path,
+    name: str,
+    description: str,
+    params: dict,
+    template: str,
 ) -> Path:
     """Write a skill .md file with YAML frontmatter."""
     lines = ["---"]
@@ -50,9 +53,16 @@ class TestV2Phase7:
         )
 
         skill_path = _write_skill(
-            tmp_path, "summarize",
+            tmp_path,
+            "summarize",
             "Summarize text into bullet points",
-            {"text": {"type": "string", "description": "Text to summarize", "required": "true"}},
+            {
+                "text": {
+                    "type": "string",
+                    "description": "Text to summarize",
+                    "required": "true",
+                }
+            },
             "Summarize into 3-5 bullet points:\n\n{{text}}",
         )
 
@@ -64,7 +74,8 @@ class TestV2Phase7:
 
     @pytest.mark.asyncio
     async def test_st_v2_7_2_provider_loads_from_directory(
-        self, tmp_path,
+        self,
+        tmp_path,
     ):
         """ST-V2-7.2: SkillProvider loads skills from directory."""
         from agent_platform.tools.skill_provider import (
@@ -72,11 +83,16 @@ class TestV2Phase7:
         )
 
         _write_skill(
-            tmp_path, "summarize", "Summarize text",
-            {"text": {"type": "string"}}, "Summarize:\n{{text}}",
+            tmp_path,
+            "summarize",
+            "Summarize text",
+            {"text": {"type": "string"}},
+            "Summarize:\n{{text}}",
         )
         _write_skill(
-            tmp_path, "translate", "Translate text",
+            tmp_path,
+            "translate",
+            "Translate text",
             {"text": {"type": "string"}, "language": {"type": "string"}},
             "Translate to {{language}}:\n{{text}}",
         )
@@ -87,16 +103,20 @@ class TestV2Phase7:
         )
 
         tools = await provider.list_tools()
-        assert len(tools) == 2
+        # 2 skills + create_skill
+        assert len(tools) == 3
         names = {t.name for t in tools}
-        assert names == {"summarize", "translate"}
+        assert "summarize" in names
+        assert "translate" in names
+        assert "create_skill" in names
         for t in tools:
             assert t.tool_type.value == "prompt_macro"
             assert t.source == "skill"
 
     @pytest.mark.asyncio
     async def test_st_v2_7_3_provider_executes_skill(
-        self, tmp_path,
+        self,
+        tmp_path,
     ):
         """ST-V2-7.3: SkillProvider executes a skill."""
         from agent_platform.tools.skill_provider import (
@@ -104,14 +124,17 @@ class TestV2Phase7:
         )
 
         _write_skill(
-            tmp_path, "greet", "Generate a greeting",
+            tmp_path,
+            "greet",
+            "Generate a greeting",
             {"name": {"type": "string"}},
             "Write a friendly greeting for {{name}}.",
         )
 
         mock_llm = AsyncMock()
         mock_llm.complete.return_value = LLMResponse(
-            content="Hello, World!", usage={},
+            content="Hello, World!",
+            usage={},
         )
 
         provider = SkillProvider(
@@ -120,7 +143,8 @@ class TestV2Phase7:
         )
 
         result = await provider.call_tool(
-            "greet", {"name": "Radek"},
+            "greet",
+            {"name": "Radek"},
         )
         assert result.success
         assert result.output == "Hello, World!"
@@ -151,12 +175,14 @@ class TestV2Phase7:
                 "name": "my_skill",
                 "description": "A custom skill",
                 "template": "Do something with {{input}}",
-                "parameters": json.dumps({
-                    "input": {
-                        "type": "string",
-                        "description": "The input",
-                    },
-                }),
+                "parameters": json.dumps(
+                    {
+                        "input": {
+                            "type": "string",
+                            "description": "The input",
+                        },
+                    }
+                ),
             },
         )
         assert result.success
@@ -184,7 +210,8 @@ class TestV2Phase7:
 
     @pytest.mark.asyncio
     async def test_st_v2_7_5_skills_api_endpoints(
-        self, tmp_path,
+        self,
+        tmp_path,
     ):
         """ST-V2-7.5: Skills API endpoints."""
         import httpx
@@ -196,7 +223,9 @@ class TestV2Phase7:
         skills_dir = tmp_path / "skills"
         skills_dir.mkdir()
         _write_skill(
-            skills_dir, "test_skill", "A test skill",
+            skills_dir,
+            "test_skill",
+            "A test skill",
             {"text": {"type": "string"}},
             "Process: {{text}}",
         )
@@ -209,12 +238,14 @@ class TestV2Phase7:
         )
 
         (tmp_path / "lyra.config.json").write_text(
-            json.dumps({
-                "dataDir": str(tmp_path / "data"),
-                "systemPromptsDir": str(prompts_dir),
-                "skillsDir": str(skills_dir),
-                "defaultModel": "test-model",
-            }),
+            json.dumps(
+                {
+                    "dataDir": str(tmp_path / "data"),
+                    "systemPromptsDir": str(prompts_dir),
+                    "skillsDir": str(skills_dir),
+                    "defaultModel": "test-model",
+                }
+            ),
         )
 
         settings = Settings(
@@ -229,7 +260,8 @@ class TestV2Phase7:
         async with app.router.lifespan_context(app):
             transport = httpx.ASGITransport(app=app)
             async with httpx.AsyncClient(
-                transport=transport, base_url="http://test",
+                transport=transport,
+                base_url="http://test",
             ) as client:
                 # GET /skills
                 resp = await client.get("/skills")
@@ -282,9 +314,7 @@ class TestV2Phase7:
             parse_skill_file,
         )
 
-        project_root = (
-            Path(__file__).resolve().parent.parent.parent.parent
-        )
+        project_root = Path(__file__).resolve().parent.parent.parent.parent
         skills_dir = project_root / "skills"
 
         for name in ("summarize", "translate", "code-review"):
@@ -297,7 +327,8 @@ class TestV2Phase7:
 
     @pytest.mark.asyncio
     async def test_st_v2_7_9_skill_uses_agent_model(
-        self, tmp_path,
+        self,
+        tmp_path,
     ):
         """ST-V2-7.9: Skill execution uses agent's model."""
         from agent_platform.core.models import Agent, AgentConfig
@@ -320,7 +351,9 @@ class TestV2Phase7:
         skills_dir = tmp_path / "skills"
         skills_dir.mkdir()
         _write_skill(
-            skills_dir, "test_skill", "Test",
+            skills_dir,
+            "test_skill",
+            "Test",
             {"text": {"type": "string"}},
             "Process: {{text}}",
         )
@@ -357,11 +390,13 @@ class TestV2Phase7:
                 assert config is not None
                 assert config.model == "my-special-model"
                 return LLMResponse(
-                    content="Processed", usage={},
+                    content="Processed",
+                    usage={},
                 )
             else:
                 return LLMResponse(
-                    content="Done", usage={},
+                    content="Done",
+                    usage={},
                 )
 
         mock_llm.complete = track_model
@@ -407,7 +442,9 @@ class TestV2Phase7:
         skills_dir = tmp_path / "skills"
         skills_dir.mkdir()
         _write_skill(
-            skills_dir, "app_skill", "Integration test skill",
+            skills_dir,
+            "app_skill",
+            "Integration test skill",
             {"input": {"type": "string"}},
             "Process: {{input}}",
         )
@@ -419,12 +456,14 @@ class TestV2Phase7:
         )
 
         (tmp_path / "lyra.config.json").write_text(
-            json.dumps({
-                "dataDir": str(tmp_path / "data"),
-                "systemPromptsDir": str(prompts_dir),
-                "skillsDir": str(skills_dir),
-                "defaultModel": "test-model",
-            }),
+            json.dumps(
+                {
+                    "dataDir": str(tmp_path / "data"),
+                    "systemPromptsDir": str(prompts_dir),
+                    "skillsDir": str(skills_dir),
+                    "defaultModel": "test-model",
+                }
+            ),
         )
 
         settings = Settings(
@@ -439,7 +478,8 @@ class TestV2Phase7:
         async with app.router.lifespan_context(app):
             transport = httpx.ASGITransport(app=app)
             async with httpx.AsyncClient(
-                transport=transport, base_url="http://test",
+                transport=transport,
+                base_url="http://test",
             ) as client:
                 # Skill should appear in tools
                 resp = await client.get("/tools")
@@ -451,9 +491,7 @@ class TestV2Phase7:
                 # Skill should appear in skills API
                 resp = await client.get("/skills")
                 assert resp.status_code == 200
-                skill_names = [
-                    s["name"] for s in resp.json()
-                ]
+                skill_names = [s["name"] for s in resp.json()]
                 assert "app_skill" in skill_names
 
                 # /macros should not exist
