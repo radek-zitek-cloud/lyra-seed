@@ -1,8 +1,140 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+
+// ── Help dictionary ──────────────────────────────────────
+
+const HELP: Record<string, string> = {
+  // .env
+  LYRA_OPENROUTER_API_KEY: "OpenRouter API key for LLM and embedding calls (required)",
+  LYRA_HOST: "Backend server bind address (default: 0.0.0.0)",
+  LYRA_PORT: "Backend server bind port (default: 8000)",
+  // lyra.config.json — top level
+  dataDir: "Directory for SQLite databases and memory storage (default: ./data)",
+  systemPromptsDir: "Directory containing agent prompt and config files (default: ./prompts)",
+  skillsDir: "Directory containing skill .md files (default: ./skills)",
+  defaultModel: "Default LLM model for agent reasoning",
+  embeddingModel: "Model for memory embeddings",
+  summaryModel: "Model for context compression summaries (cheaper model recommended)",
+  extractionModel: "Model for automatic fact extraction (cheaper model recommended)",
+  orchestrationModel: "Model for orchestration LLM calls — decomposition, subtask execution, synthesis. Falls back to agent's own model if not set",
+  maxSubtasks: "Maximum subtasks the decomposer can produce per orchestration call (default: 10)",
+  mcpServers: "MCP server definitions. Each entry defines a server providing tools to agents",
+  modelCosts: "Per-model costs as [input_per_Mtok, output_per_Mtok] in USD for cost tracking",
+  defaultModelCost: "Fallback cost for models not in modelCosts (default: [1.0, 4.0])",
+  orchestrationTemperature: "Temperature for orchestration LLM calls (default: 0.3)",
+  mcpRequestTimeout: "Timeout in seconds for MCP server requests (default: 30)",
+  maxSpawnDepth: "Maximum sub-agent spawn depth to prevent runaway recursion (default: 3)",
+  // lyra.config.json — retry
+  "retry": "LLM API retry configuration",
+  "retry.max_retries": "Maximum retry attempts (default: 3)",
+  "retry.base_delay": "Base delay in seconds for exponential backoff (default: 1.0)",
+  "retry.max_delay": "Maximum delay between retries in seconds (default: 30.0)",
+  "retry.timeout": "Per-request timeout in seconds (default: 60.0)",
+  // lyra.config.json — hitl
+  "hitl": "Human-in-the-loop gate configuration",
+  "hitl.timeout_seconds": "How long an agent waits for human approval before timing out (default: 300)",
+  // lyra.config.json — memoryGC
+  "memoryGC": "Memory garbage collection configuration",
+  "memoryGC.prune_threshold": "Decay score below which memories are pruned (default: 0.1)",
+  "memoryGC.max_entries": "Maximum memories per agent before pruning (default: 500)",
+  "memoryGC.dedup_threshold": "Similarity threshold for memory deduplication, 0.0-1.0 (default: 0.9)",
+  "memoryGC.half_life_days": "Half-life for memory decay in days (default: 7.0)",
+  "memoryGC.decay_weights": "Weights for decay scoring [recency, importance, access_count] (default: [0.6, 0.2, 0.2])",
+  // lyra.config.json — context
+  "context": "Context compression configuration",
+  "context.max_tokens": "Maximum context tokens before compression kicks in (default: 100000)",
+  "context.memory_top_k": "Number of relevant memories to inject per turn (default: 5)",
+  // agent .json — fields
+  model: "LLM model for this agent's reasoning (inherits from defaultModel if not set)",
+  temperature: "LLM temperature — higher = more creative, lower = more precise (default: 0.7)",
+  max_iterations: "Maximum tool-call loop iterations per prompt (default: 10)",
+  hitl_policy: "HITL approval policy: 'always_ask', 'dangerous_only', or 'never' (default: never)",
+  auto_extract: "Automatically extract facts from conversations to memory (default: true)",
+  summary_model: "Model for context compression (inherits from platform summaryModel)",
+  extraction_model: "Model for fact extraction (inherits from platform extractionModel)",
+  orchestration_model: "Model for orchestration LLM calls (inherits from platform orchestrationModel)",
+  max_subtasks: "Maximum subtasks per orchestration call (inherits from platform maxSubtasks)",
+  allowed_mcp_servers: "Which MCP servers this agent can access. null = all, [] = none, ['filesystem'] = only filesystem",
+  allowed_tools: "Explicit tool name whitelist. [] = no restriction. When set, only listed tools are visible",
+  memory_sharing: "Default visibility per memory type. Values: 'public', 'private', 'team'",
+  // skill frontmatter
+  name: "Skill name — used as the tool name agents call",
+  description: "What the skill does — shown to the LLM in the tool list",
+  parameters: "Skill parameters — each becomes a tool argument",
+  required: "Whether this parameter is required (true/false)",
+  type: "Parameter type (string, number, boolean)",
+};
+
+// ── Key resolution from cursor position ──────────────────
+
+function getKeyAtCursor(text: string, cursorPos: number, filePath: string): string | null {
+  if (filePath.endsWith(".env") || filePath === ".env") {
+    return getEnvKey(text, cursorPos);
+  }
+  if (filePath.endsWith(".json")) {
+    return getJsonKey(text, cursorPos);
+  }
+  if (filePath.endsWith(".md") && text.startsWith("---")) {
+    return getYamlKey(text, cursorPos);
+  }
+  return null;
+}
+
+function getEnvKey(text: string, pos: number): string | null {
+  const line = getLineAt(text, pos);
+  const m = line.match(/^([A-Z_]+)\s*=/);
+  return m ? m[1] : null;
+}
+
+function getJsonKey(text: string, pos: number): string | null {
+  const lines = text.substring(0, pos).split("\n");
+  const currentLine = getLineAt(text, pos);
+
+  // Extract key from current line
+  const keyMatch = currentLine.match(/^\s*"([^"]+)"\s*:/);
+  if (!keyMatch) return null;
+
+  const key = keyMatch[1];
+  const indent = currentLine.search(/\S/);
+
+  // If top-level (indent <= 2), return key directly
+  if (indent <= 2) return key;
+
+  // Walk backward to find parent key
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i];
+    const lineIndent = line.search(/\S/);
+    if (lineIndent < 0) continue;
+    if (lineIndent < indent) {
+      const parentMatch = line.match(/^\s*"([^"]+)"\s*:/);
+      if (parentMatch) {
+        return `${parentMatch[1]}.${key}`;
+      }
+      break;
+    }
+  }
+
+  return key;
+}
+
+function getYamlKey(text: string, pos: number): string | null {
+  const line = getLineAt(text, pos);
+  // Inside frontmatter
+  const m = line.match(/^\s*(\w+)\s*:/);
+  return m ? m[1] : null;
+}
+
+function getLineAt(text: string, pos: number): string {
+  const start = text.lastIndexOf("\n", pos - 1) + 1;
+  let end = text.indexOf("\n", pos);
+  if (end === -1) end = text.length;
+  return text.substring(start, end);
+}
+
+// ── Component ────────────────────────────────────────────
 
 interface FileEntry {
   name: string;
@@ -34,6 +166,9 @@ export default function ConfigPage() {
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [helpText, setHelpText] = useState<string | null>(null);
+  const [helpKey, setHelpKey] = useState<string | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Load file tree
   useEffect(() => {
@@ -47,6 +182,9 @@ export default function ConfigPage() {
   const loadFile = useCallback((path: string) => {
     setSelected(path);
     setStatus(null);
+    setHelpText(null);
+    setHelpKey(null);
+    setConfirmDelete(false);
     fetch(`${API}/config/file?path=${encodeURIComponent(path)}`)
       .then((r) => r.json())
       .then((d) => {
@@ -119,6 +257,15 @@ export default function ConfigPage() {
     }
   }, [selected, deletable]);
 
+  // Cursor tracking for context help
+  const updateHelp = useCallback(() => {
+    if (!selected || !textareaRef.current) return;
+    const pos = textareaRef.current.selectionStart;
+    const key = getKeyAtCursor(content, pos, selected);
+    setHelpKey(key);
+    setHelpText(key ? HELP[key] || null : null);
+  }, [selected, content]);
+
   const dirty = content !== original;
 
   return (
@@ -169,9 +316,7 @@ export default function ConfigPage() {
                       fontSize: 12,
                       cursor: "pointer",
                       color:
-                        selected === f.path
-                          ? "#e0e0e0"
-                          : "#888",
+                        selected === f.path ? "#e0e0e0" : "#888",
                       background:
                         selected === f.path
                           ? "#1a1a2e"
@@ -336,8 +481,14 @@ export default function ConfigPage() {
         {/* Text area */}
         {selected ? (
           <textarea
+            ref={textareaRef}
             value={content}
-            onChange={(e) => setContent(e.target.value)}
+            onChange={(e) => {
+              setContent(e.target.value);
+              setTimeout(updateHelp, 0);
+            }}
+            onClick={updateHelp}
+            onKeyUp={updateHelp}
             spellCheck={false}
             style={{
               flex: 1,
@@ -368,6 +519,39 @@ export default function ConfigPage() {
             }}
           >
             Select a file from the sidebar to view and edit
+          </div>
+        )}
+
+        {/* Context help bar */}
+        {selected && (
+          <div
+            style={{
+              padding: "5px 12px",
+              borderTop: "1px solid #222",
+              fontSize: 11,
+              color: helpText ? "#aaa" : "#444",
+              background: "#0d0d0d",
+              flexShrink: 0,
+              minHeight: 24,
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+            }}
+          >
+            {helpKey && (
+              <span style={{ color: "#6a8", fontFamily: "monospace" }}>
+                {helpKey}
+              </span>
+            )}
+            {helpText ? (
+              <span>{helpText}</span>
+            ) : helpKey ? (
+              <span style={{ color: "#555", fontStyle: "italic" }}>
+                No description available
+              </span>
+            ) : (
+              <span>Place cursor on a config key for help</span>
+            )}
           </div>
         )}
       </div>
