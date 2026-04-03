@@ -370,7 +370,8 @@ class SkillProvider:
         if query and self._embedder:
             await self._ensure_embeddings()
             try:
-                query_vec = await self._embedder.embed_query(query)
+                vecs = await self._embedder.embed([query])
+                query_vec = vecs[0]
                 scored = []
                 for s in skills_list:
                     vec = self._embeddings.get(s.name)
