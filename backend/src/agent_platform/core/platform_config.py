@@ -46,6 +46,11 @@ class MemoryGCConfig(BaseModel):
     prune_threshold: float = 0.1
     max_entries: int = 500
     dedup_threshold: float = 0.9
+    half_life_days: float = 7.0
+    decay_weights: list[float] = Field(
+        default_factory=lambda: [0.6, 0.2, 0.2],
+        description="Weights for [base_decay, access_boost, importance_boost]",
+    )
 
 
 class ContextConfig(BaseModel):
@@ -81,6 +86,9 @@ class PlatformConfig(BaseModel):
     extractionModel: str = "openai/gpt-4.1-nano"
     orchestrationModel: str | None = None
     maxSubtasks: int = 10
+    orchestrationTemperature: float = 0.3
+    mcpRequestTimeout: float = 30.0
+    maxSpawnDepth: int = 3
     skillsDir: str = "./skills"
 
 

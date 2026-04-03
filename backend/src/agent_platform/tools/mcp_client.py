@@ -140,11 +140,13 @@ class MCPStdioClient:
         command: str,
         args: list[str] | None = None,
         env: dict[str, str] | None = None,
+        request_timeout: float = 30.0,
     ) -> None:
         self._server_name = server_name
         self._command = command
         self._args = args or []
         self._env = env or {}
+        self._request_timeout = request_timeout
         self._process: asyncio.subprocess.Process | None = None
         self._request_id = 0
         self._tools: list[Tool] = []
@@ -291,7 +293,8 @@ class MCPStdioClient:
             # Read response — skip notifications, wait for matching id
             while True:
                 response_line = await asyncio.wait_for(
-                    self._process.stdout.readline(), timeout=30.0
+                    self._process.stdout.readline(),
+                    timeout=self._request_timeout,
                 )
                 if not response_line:
                     stderr_output = ""

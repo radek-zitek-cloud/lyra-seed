@@ -33,6 +33,7 @@ class ResultSynthesizer:
         results: dict[str, str],
         llm: LLMProvider,
         model: str | None = None,
+        temperature: float | None = None,
     ) -> str:
         results_text = "\n".join(
             f"- {subtask_id}: {result}" for subtask_id, result in results.items()
@@ -52,7 +53,7 @@ class ResultSynthesizer:
             ),
         ]
 
-        config = LLMConfig(temperature=0.3)
+        config = LLMConfig(temperature=temperature or 0.3)
         if model:
             config.model = model
         response = await llm.complete(messages, config=config)

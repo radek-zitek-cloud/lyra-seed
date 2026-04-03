@@ -57,6 +57,7 @@ class TaskDecomposer:
         llm: LLMProvider,
         model: str | None = None,
         max_subtasks: int = 10,
+        temperature: float | None = None,
     ) -> TaskPlan:
         tool_descriptions = ", ".join(
             f"{t.name}: {t.description}" for t in available_tools
@@ -73,7 +74,7 @@ class TaskDecomposer:
             ),
         ]
 
-        config = LLMConfig(temperature=0.3)
+        config = LLMConfig(temperature=temperature or 0.3)
         if model:
             config.model = model
         response = await llm.complete(messages, config=config)

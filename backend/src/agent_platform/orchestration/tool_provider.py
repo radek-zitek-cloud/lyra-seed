@@ -45,6 +45,7 @@ class OrchestrationToolProvider:
         decompose_prompt: str | None = None,
         synthesize_prompt: str | None = None,
         agent_spawner: AgentSpawnerProvider | None = None,
+        orchestration_temperature: float = 0.3,
     ) -> None:
         self._llm = llm_provider
         self._tool_registry = tool_registry
@@ -52,6 +53,7 @@ class OrchestrationToolProvider:
         self._conv_repo = conversation_repo
         self._event_bus = event_bus
         self._agent_spawner = agent_spawner
+        self._temperature = orchestration_temperature
         self._decomposer = TaskDecomposer(
             system_prompt=decompose_prompt,
         )
@@ -145,6 +147,7 @@ class OrchestrationToolProvider:
                 self._llm,
                 model=model,
                 max_subtasks=max_subtasks,
+                temperature=self._temperature,
             )
 
             await self._event_bus.emit(
@@ -206,6 +209,7 @@ class OrchestrationToolProvider:
                 self._llm,
                 model=model,
                 max_subtasks=max_subtasks,
+                temperature=self._temperature,
             )
 
             if strategy_override:
@@ -255,6 +259,7 @@ class OrchestrationToolProvider:
                     orch_result.results,
                     self._llm,
                     model=model,
+                    temperature=self._temperature,
                 )
                 orch_result.synthesized_response = synthesized
 

@@ -133,6 +133,7 @@ def create_app(
             command=server_cfg.command,
             args=server_cfg.args,
             env=server_cfg.env,
+            request_timeout=platform_config.mcpRequestTimeout,
         )
         mcp_provider.add_client(client)
 
@@ -148,11 +149,18 @@ def create_app(
         event_bus=event_bus,
         timeout=retry_cfg.timeout,
     )
-    dedup_threshold = platform_config.memoryGC.dedup_threshold
+    gc_cfg = platform_config.memoryGC
+    from agent_platform.memory.decay import TimeDecayStrategy
+
+    decay_strategy = TimeDecayStrategy(
+        half_life_days=gc_cfg.half_life_days,
+        decay_weights=gc_cfg.decay_weights,
+    )
     memory_store = ChromaMemoryStore(
         persist_dir=memory_dir,
         embedding_fn=embedding_provider,
-        dedup_threshold=dedup_threshold,
+        dedup_threshold=gc_cfg.dedup_threshold,
+        decay_strategy=decay_strategy,
     )
     memory_provider = MemoryToolProvider(memory_store=memory_store, event_bus=event_bus)
     tool_registry.register_provider(memory_provider)
@@ -202,6 +210,7 @@ def create_app(
         agent_config_resolver=config_resolver,
         tool_registry=tool_registry,
         message_repo=message_repo,
+        max_spawn_depth=platform_config.maxSpawnDepth,
     )
     tool_registry.register_provider(agent_spawner)
 
@@ -217,6 +226,7 @@ def create_app(
         decompose_prompt=decompose_prompt,
         synthesize_prompt=synthesize_prompt,
         agent_spawner=agent_spawner,
+        orchestration_temperature=platform_config.orchestrationTemperature,
     )
     tool_registry.register_provider(orchestration_provider)
 
@@ -296,7 +306,11 @@ def create_app(
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+        allow_origins=[
+            o.strip()
+            for o in settings.cors_origins.split(",")
+            if o.strip()
+        ],
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
