@@ -93,6 +93,18 @@ export default function AgentPage() {
     ) {
       fetchAgentMessages(agentId).then(setAgentMessages).catch(() => {});
     }
+
+    // Refresh conversation when agent completes a turn
+    if (
+      eventType === "agent_complete" ||
+      eventType === "llm_response"
+    ) {
+      fetchAgentConversations(agentId)
+        .then((convos: { messages: { role: string; content: string }[] }[]) => {
+          if (convos.length > 0) setMessages(convos[0].messages);
+        })
+        .catch(() => {});
+    }
   }, [liveEvents, agentId]);
 
   const handlePrompt = async (message: string) => {

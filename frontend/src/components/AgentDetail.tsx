@@ -124,7 +124,13 @@ export function ConversationPanel({ messages }: { messages: Message[] }) {
           if (msg.role === "assistant" && msg.tool_calls && !msg.content) return false;
           return true;
         }).map((msg, i) => {
-          const roleColor = ROLE_COLORS[msg.role] ?? "#888";
+          // Detect auto-wake messages (injected by message bus)
+          const content = String(msg.content ?? "");
+          const isAgentMessage =
+            msg.role === "human" &&
+            /^\[(?:task|result|guidance|question|answer|status_update) from /.test(content);
+          const displayRole = isAgentMessage ? "message" : msg.role;
+          const roleColor = isAgentMessage ? "#ffaa00" : (ROLE_COLORS[msg.role] ?? "#888");
           return (
             <div
               key={i}
@@ -143,7 +149,7 @@ export function ConversationPanel({ messages }: { messages: Message[] }) {
             >
               <div style={{ flex: 1, minWidth: 0 }}>
                 <span style={{ color: roleColor, fontWeight: 700, fontSize: "10px", letterSpacing: "0.5px", textTransform: "uppercase", marginRight: "6px" }}>
-                  {msg.role}:
+                  {displayRole}:
                 </span>
                 <span style={{ color: "#d0d0d0", whiteSpace: "pre-wrap" }}>
                   {msg.content}
