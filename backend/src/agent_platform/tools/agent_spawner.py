@@ -597,7 +597,7 @@ class AgentSpawnerProvider:
     _ACTIONABLE_MSG_TYPES = {"task", "question", "guidance", "result", "answer"}
 
     async def _wake_idle_agent(self, agent_id: str, msg: AgentMessage) -> None:
-        """If agent is idle and message is actionable, trigger a background runtime turn."""
+        """If idle and message is actionable, trigger a runtime turn."""
         try:
             agent = await self._agent_repo.get(agent_id)
             if agent is None or agent.status != AgentStatus.IDLE:

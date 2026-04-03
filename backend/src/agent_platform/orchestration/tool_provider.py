@@ -1,9 +1,11 @@
 """Orchestration tool provider — exposes decompose_task and orchestrate as tools."""
 
+from __future__ import annotations
+
 import json
 import logging
 import time
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from agent_platform.db.sqlite_agent_repo import SqliteAgentRepo
 from agent_platform.db.sqlite_conversation_repo import SqliteConversationRepo
@@ -24,6 +26,9 @@ from agent_platform.orchestration.synthesizer import ResultSynthesizer
 from agent_platform.tools.models import Tool, ToolResult, ToolType
 from agent_platform.tools.registry import ToolRegistry
 
+if TYPE_CHECKING:
+    from agent_platform.tools.agent_spawner import AgentSpawnerProvider
+
 logger = logging.getLogger(__name__)
 
 
@@ -39,12 +44,14 @@ class OrchestrationToolProvider:
         event_bus: InProcessEventBus,
         decompose_prompt: str | None = None,
         synthesize_prompt: str | None = None,
+        agent_spawner: AgentSpawnerProvider | None = None,
     ) -> None:
         self._llm = llm_provider
         self._tool_registry = tool_registry
         self._agent_repo = agent_repo
         self._conv_repo = conversation_repo
         self._event_bus = event_bus
+        self._agent_spawner = agent_spawner
         self._decomposer = TaskDecomposer(
             system_prompt=decompose_prompt,
         )
@@ -227,6 +234,7 @@ class OrchestrationToolProvider:
                 event_bus=self._event_bus,
                 parent_agent_id=agent_id,
                 model=model,
+                agent_spawner=self._agent_spawner,
             )
 
             if plan.strategy == OrchestrationStrategyType.SEQUENTIAL:
