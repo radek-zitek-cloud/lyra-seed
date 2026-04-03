@@ -162,9 +162,9 @@ lyra-seed/
 - **V1 Complete:** 8 phases (skeleton, events, runtime, tools, memory, UI, HITL, hardening)
 - **V2P1 Complete:** Sub-agent spawning with full tool access
 - **V2P2 Complete:** Async spawn, message bus, reusable lifecycle, auto-wake
-- **V2P1–P5 Complete:** Sub-agent spawning, messaging, orchestration, tool scoping, graph UI
-- **140 smoke tests** all passing (121 backend + 19 frontend)
-- **Next:** V2P6 (Orchestration with tool/agent subtasks), then V3
+- **V2 Complete:** 6 phases (spawning, messaging, orchestration, tool scoping, graph UI, subtask dispatch)
+- **151 smoke tests** all passing (132 backend + 19 frontend)
+- **Next:** V3 (Self-Evolution & Capability Acquisition)
 
 ## Documentation
 

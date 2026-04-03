@@ -40,9 +40,9 @@ Delivered in V2 Phase 4 as `allowed_mcp_servers` and `allowed_tools` config fiel
 
 ---
 
-### ~~BL-005: Orchestration subtasks can use tools or spawn sub-agents~~ SCHEDULED
+### ~~BL-005: Orchestration subtasks can use tools or spawn sub-agents~~ DONE
 
-Promoted to V2 Phase 6 (see `ROADMAP.md`). Prerequisite for V3 — the capability acquisition loop requires orchestrated subtasks to spawn agents and call tools.
+Delivered in V2 Phase 6. `_execute_subtask()` dispatches on `assigned_to`: `"spawn_agent"` spawns child agents, tool names call via registry, everything else falls back to LLM.
 
 ---
 
