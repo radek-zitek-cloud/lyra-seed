@@ -533,5 +533,17 @@ Delivered synchronous sub-agent spawning, then upgraded to full AgentRuntime exe
 - Platform config reloads from disk on each agent creation
 - Memory deduplication (cosine similarity threshold)
 - Auto-wake sender resolves to parent_agent_id, not "default"
+- All V2P2 tools added to agent_id injection list (send_message, receive_messages, etc.)
+- Auto-wake expanded to all message types (not just TASK/GUIDANCE)
+- Runtime injects all pending message types (not just GUIDANCE)
+- TASK/QUESTION messages include "send result back" instruction
+- Conversation panel refreshes in real-time on llm_response/agent_complete events
+- Agent-bus messages styled as "MESSAGE" (amber) instead of "HUMAN" (blue)
+- SUB-AGENTS bar refreshes on message/spawn events
+- Memory injection deduplication — strips old memory system messages before injecting fresh ones
+- Extraction retry on empty result (small models non-deterministic)
+- Memory visibility removed from LLM control (always uses type defaults)
+- include_public hardcoded to true in recall (always sees shared memories)
+- Worker prompt template (worker.md/json) with message bus instructions
 
 ### Current Test Suite: 98 backend + 6 frontend = 104 total smoke tests
