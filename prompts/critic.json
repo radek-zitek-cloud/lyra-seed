@@ -1,0 +1,7 @@
+{
+  "temperature": 0.4,
+  "max_iterations": 10,
+  "hitl_policy": "never",
+  "auto_extract": false,
+  "allowed_mcp_servers": []
+}
