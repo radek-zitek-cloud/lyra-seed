@@ -78,6 +78,7 @@ async def list_config_files():
             f
             for f in _list_files(root / "prompts", ".md")
             if "/" not in f["name"]
+            and f["name"] != "README.md"
         ],
         "system_prompts": [
             f
