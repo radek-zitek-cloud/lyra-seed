@@ -55,7 +55,10 @@ async def send_message_to_agent(agent_id: str, req: SendMessageRequest):
     if agent.status in (AgentStatus.COMPLETED, AgentStatus.FAILED):
         raise HTTPException(
             status_code=409,
-            detail=f"Agent {agent_id} is {agent.status.value} and cannot receive messages",
+            detail=(
+                f"Agent {agent_id} is {agent.status.value}"
+                " and cannot receive messages"
+            ),
         )
 
     # Resolve sender: explicit > agent's parent > "human"
@@ -108,7 +111,7 @@ _ACTIONABLE_MSG_TYPES = {"task", "question", "guidance", "result", "answer"}
 
 
 async def _wake_idle_agent(agent_id: str, msg: AgentMessage) -> None:
-    """If the target agent is idle and message is actionable, trigger a background runtime turn."""
+    """If idle and message is actionable, trigger a runtime turn."""
     from agent_platform.api._deps import get_agent_repo, get_message_repo, get_runtime
 
     try:

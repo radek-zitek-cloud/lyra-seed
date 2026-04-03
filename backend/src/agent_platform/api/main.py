@@ -213,6 +213,7 @@ def create_app(
         event_bus=event_bus,
         decompose_prompt=decompose_prompt,
         synthesize_prompt=synthesize_prompt,
+        agent_spawner=agent_spawner,
     )
     tool_registry.register_provider(orchestration_provider)
 

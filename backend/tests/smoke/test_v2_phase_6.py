@@ -400,18 +400,15 @@ class TestV2Phase6:
     @pytest.mark.asyncio
     async def test_st_v2_6_9_skip_agent_failure(self, deps):
         """ST-V2-6.9: Failure policy skip works for agent subtask."""
-        # Make LLM raise on the agent subtask execution
-        call_count = 0
+        # Use a mock spawner whose spawn_agent fails
+        mock_spawner = AsyncMock(spec=AgentSpawnerProvider)
+        mock_spawner.call_tool.return_value = ToolResult(
+            success=False, error="Spawn failed"
+        )
 
-        async def fail_on_agent(messages, *a, **kw):
-            nonlocal call_count
-            call_count += 1
-            if call_count <= 2:
-                # First calls are for the spawn_agent subtask — make it fail
-                raise Exception("Agent spawn failed")
-            return LLMResponse(content="Second task done", usage={})
-
-        deps["llm"].complete.side_effect = fail_on_agent
+        deps["llm"].complete.return_value = LLMResponse(
+            content="Second task done", usage={}
+        )
 
         plan = TaskPlan(
             original_task="Skip test",
@@ -438,7 +435,7 @@ class TestV2Phase6:
             conversation_repo=deps["conv_repo"],
             event_bus=deps["event_bus"],
             parent_agent_id=deps["parent"].id,
-            agent_spawner=deps["spawner"],
+            agent_spawner=mock_spawner,
         )
 
         await strategy.execute(plan)

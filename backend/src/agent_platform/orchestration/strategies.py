@@ -1,7 +1,11 @@
 """Orchestration strategies — sequential, parallel, and pipeline execution."""
 
+from __future__ import annotations
+
 import asyncio
+import json
 import logging
+from typing import TYPE_CHECKING
 
 from agent_platform.db.sqlite_agent_repo import SqliteAgentRepo
 from agent_platform.db.sqlite_conversation_repo import SqliteConversationRepo
@@ -18,6 +22,9 @@ from agent_platform.orchestration.models import (
 )
 from agent_platform.tools.registry import ToolRegistry
 
+if TYPE_CHECKING:
+    from agent_platform.tools.agent_spawner import AgentSpawnerProvider
+
 logger = logging.getLogger(__name__)
 
 
@@ -28,8 +35,10 @@ async def _execute_subtask(
     parent_agent_id: str,
     previous_output: str | None = None,
     model: str | None = None,
+    tool_registry: ToolRegistry | None = None,
+    agent_spawner: AgentSpawnerProvider | None = None,
 ) -> str:
-    """Execute a single subtask using the LLM."""
+    """Execute a single subtask, dispatching by assigned_to type."""
     subtask.status = SubTaskStatus.RUNNING
 
     await event_bus.emit(
@@ -45,37 +54,27 @@ async def _execute_subtask(
         )
     )
 
-    messages = [
-        Message(
-            role=MessageRole.SYSTEM,
-            content=(
-                "You are executing a subtask as part of "
-                "a larger orchestrated plan. "
-                "Complete the following task thoroughly."
-            ),
-        ),
-    ]
+    # --- Dispatch based on assigned_to ---
 
-    if previous_output:
-        messages.append(
-            Message(
-                role=MessageRole.SYSTEM,
-                content=f"Context from previous stage:\n{previous_output}",
-            )
+    assigned = subtask.assigned_to
+
+    if assigned == "spawn_agent" and agent_spawner is not None:
+        result = await _execute_via_agent(
+            subtask, agent_spawner, parent_agent_id, previous_output
         )
-
-    messages.append(
-        Message(
-            role=MessageRole.HUMAN,
-            content=subtask.description,
+    elif (
+        assigned not in ("llm", "spawn_agent")
+        and tool_registry is not None
+        and await _is_registered_tool(assigned, tool_registry)
+    ):
+        result = await _execute_via_tool(
+            subtask, tool_registry, llm_provider, previous_output, model
         )
-    )
-
-    config = LLMConfig(temperature=0.5)
-    if model:
-        config.model = model
-    response = await llm_provider.complete(messages, config=config)
-    result = response.content or ""
+    else:
+        # Default: direct LLM call (backward compatible)
+        result = await _execute_via_llm(
+            subtask, llm_provider, previous_output, model
+        )
 
     subtask.status = SubTaskStatus.COMPLETED
     subtask.result = result
@@ -96,6 +95,155 @@ async def _execute_subtask(
     return result
 
 
+async def _is_registered_tool(name: str, tool_registry: ToolRegistry) -> bool:
+    """Check if a tool name exists in the registry."""
+    tools = await tool_registry.list_tools()
+    return any(t.name == name for t in tools)
+
+
+async def _execute_via_llm(
+    subtask: SubTask,
+    llm_provider: LLMProvider,
+    previous_output: str | None = None,
+    model: str | None = None,
+) -> str:
+    """Execute subtask as a direct LLM call (original behavior)."""
+    messages = [
+        Message(
+            role=MessageRole.SYSTEM,
+            content=(
+                "You are executing a subtask as part of "
+                "a larger orchestrated plan. "
+                "Complete the following task thoroughly."
+            ),
+        ),
+    ]
+
+    if previous_output:
+        messages.append(
+            Message(
+                role=MessageRole.SYSTEM,
+                content=f"Context from previous stage:\n{previous_output}",
+            )
+        )
+
+    messages.append(
+        Message(role=MessageRole.HUMAN, content=subtask.description)
+    )
+
+    config = LLMConfig(temperature=0.5)
+    if model:
+        config.model = model
+    response = await llm_provider.complete(messages, config=config)
+    return response.content or ""
+
+
+async def _execute_via_tool(
+    subtask: SubTask,
+    tool_registry: ToolRegistry,
+    llm_provider: LLMProvider,
+    previous_output: str | None = None,
+    model: str | None = None,
+) -> str:
+    """Execute subtask by calling a registered tool.
+
+    Uses an LLM pre-call to extract structured arguments from the
+    natural-language subtask description.
+    """
+    tool_name = subtask.assigned_to
+
+    # Get the tool schema for argument extraction
+    tools = await tool_registry.list_tools()
+    tool = next((t for t in tools if t.name == tool_name), None)
+    schema_str = json.dumps(tool.input_schema) if tool else "{}"
+
+    # LLM extracts structured args from description
+    prompt = (
+        f"Extract the arguments for the tool '{tool_name}' "
+        f"from this task description.\n"
+        f"Tool schema: {schema_str}\n"
+    )
+    if previous_output:
+        prompt += f"Context from previous stage:\n{previous_output}\n"
+    prompt += (
+        f"Task: {subtask.description}\n\n"
+        "Return ONLY a JSON object with the arguments. No explanation."
+    )
+
+    config = LLMConfig(temperature=0.1)
+    if model:
+        config.model = model
+    arg_response = await llm_provider.complete(
+        [Message(role=MessageRole.HUMAN, content=prompt)], config=config
+    )
+
+    # Parse extracted args
+    try:
+        raw = arg_response.content or "{}"
+        # Strip markdown fences
+        if raw.startswith("```"):
+            raw = raw.split("\n", 1)[1].rsplit("```", 1)[0]
+        args = json.loads(raw)
+    except (json.JSONDecodeError, IndexError):
+        args = {}
+
+    # Call the tool
+    tool_result = await tool_registry.call_tool(tool_name, args)
+    if not tool_result.success:
+        raise RuntimeError(
+            f"Tool '{tool_name}' failed: {tool_result.error}"
+        )
+
+    return tool_result.output or ""
+
+
+async def _execute_via_agent(
+    subtask: SubTask,
+    agent_spawner: AgentSpawnerProvider,
+    parent_agent_id: str,
+    previous_output: str | None = None,
+) -> str:
+    """Execute subtask by spawning a child agent and waiting for its result."""
+    task_prompt = subtask.description
+    if previous_output:
+        task_prompt = (
+            f"Context from previous stage:\n{previous_output}\n\n"
+            f"Task: {subtask.description}"
+        )
+
+    # Spawn child agent
+    spawn_result = await agent_spawner.call_tool(
+        "spawn_agent",
+        {
+            "name": f"subtask-{subtask.id[:8]}",
+            "task": task_prompt,
+            "agent_id": parent_agent_id,
+        },
+    )
+    if not spawn_result.success:
+        raise RuntimeError(f"Failed to spawn agent: {spawn_result.error}")
+
+    spawn_data = json.loads(spawn_result.output)
+    child_id = spawn_data["child_agent_id"]
+
+    # Wait for child to complete
+    wait_result = await agent_spawner.call_tool(
+        "wait_for_agent",
+        {
+            "child_agent_id": child_id,
+            "timeout": 300,
+            "agent_id": parent_agent_id,
+        },
+    )
+
+    if not wait_result.success:
+        raise RuntimeError(f"Agent subtask failed: {wait_result.error}")
+
+    # Extract child's response
+    wait_data = json.loads(wait_result.output)
+    return wait_data.get("content", wait_data.get("result", ""))
+
+
 async def _handle_failure(
     subtask: SubTask,
     error: Exception,
@@ -104,6 +252,8 @@ async def _handle_failure(
     parent_agent_id: str,
     previous_output: str | None = None,
     model: str | None = None,
+    tool_registry: ToolRegistry | None = None,
+    agent_spawner: AgentSpawnerProvider | None = None,
 ) -> str | None:
     """Apply failure policy to a failed subtask. Returns result if recovered."""
     subtask.error = str(error)
@@ -125,6 +275,8 @@ async def _handle_failure(
                 parent_agent_id,
                 previous_output,
                 model=model,
+                tool_registry=tool_registry,
+                agent_spawner=agent_spawner,
             )
         # Exhausted retries
         subtask.status = SubTaskStatus.FAILED
@@ -150,6 +302,8 @@ async def _handle_failure(
             parent_agent_id,
             previous_output,
             model=model,
+            tool_registry=tool_registry,
+            agent_spawner=agent_spawner,
         )
 
     else:  # ESCALATE
@@ -169,6 +323,7 @@ class SequentialOrchestration:
         event_bus: InProcessEventBus,
         parent_agent_id: str,
         model: str | None = None,
+        agent_spawner: AgentSpawnerProvider | None = None,
     ) -> None:
         self._llm = llm_provider
         self._tool_registry = tool_registry
@@ -177,6 +332,7 @@ class SequentialOrchestration:
         self._event_bus = event_bus
         self._parent_agent_id = parent_agent_id
         self._model = model
+        self._agent_spawner = agent_spawner
 
     async def execute(self, plan: TaskPlan) -> OrchestrationResult:
         plan.status = SubTaskStatus.RUNNING
@@ -190,6 +346,8 @@ class SequentialOrchestration:
                     self._event_bus,
                     self._parent_agent_id,
                     model=self._model,
+                    tool_registry=self._tool_registry,
+                    agent_spawner=self._agent_spawner,
                 )
                 results[subtask.id] = result
             except Exception as e:
@@ -200,11 +358,12 @@ class SequentialOrchestration:
                     self._event_bus,
                     self._parent_agent_id,
                     model=self._model,
+                    tool_registry=self._tool_registry,
+                    agent_spawner=self._agent_spawner,
                 )
                 if recovered is not None:
                     results[subtask.id] = recovered
                 elif subtask.status == SubTaskStatus.FAILED:
-                    # ESCALATE — stop orchestration
                     plan.status = SubTaskStatus.FAILED
                     return OrchestrationResult(
                         plan_id=plan.id,
@@ -238,6 +397,7 @@ class ParallelOrchestration:
         event_bus: InProcessEventBus,
         parent_agent_id: str,
         model: str | None = None,
+        agent_spawner: AgentSpawnerProvider | None = None,
     ) -> None:
         self._llm = llm_provider
         self._tool_registry = tool_registry
@@ -246,6 +406,7 @@ class ParallelOrchestration:
         self._event_bus = event_bus
         self._parent_agent_id = parent_agent_id
         self._model = model
+        self._agent_spawner = agent_spawner
 
     async def execute(self, plan: TaskPlan) -> OrchestrationResult:
         plan.status = SubTaskStatus.RUNNING
@@ -259,6 +420,8 @@ class ParallelOrchestration:
                     self._event_bus,
                     self._parent_agent_id,
                     model=self._model,
+                    tool_registry=self._tool_registry,
+                    agent_spawner=self._agent_spawner,
                 )
                 return subtask.id, result
             except Exception as e:
@@ -269,6 +432,8 @@ class ParallelOrchestration:
                     self._event_bus,
                     self._parent_agent_id,
                     model=self._model,
+                    tool_registry=self._tool_registry,
+                    agent_spawner=self._agent_spawner,
                 )
                 return subtask.id, recovered
 
@@ -303,6 +468,7 @@ class PipelineOrchestration:
         event_bus: InProcessEventBus,
         parent_agent_id: str,
         model: str | None = None,
+        agent_spawner: AgentSpawnerProvider | None = None,
     ) -> None:
         self._llm = llm_provider
         self._tool_registry = tool_registry
@@ -311,6 +477,7 @@ class PipelineOrchestration:
         self._event_bus = event_bus
         self._parent_agent_id = parent_agent_id
         self._model = model
+        self._agent_spawner = agent_spawner
 
     async def execute(self, plan: TaskPlan) -> OrchestrationResult:
         plan.status = SubTaskStatus.RUNNING
@@ -326,6 +493,8 @@ class PipelineOrchestration:
                     self._parent_agent_id,
                     previous_output=previous_output,
                     model=self._model,
+                    tool_registry=self._tool_registry,
+                    agent_spawner=self._agent_spawner,
                 )
                 results[subtask.id] = result
                 previous_output = result
@@ -338,6 +507,8 @@ class PipelineOrchestration:
                     self._parent_agent_id,
                     previous_output=previous_output,
                     model=self._model,
+                    tool_registry=self._tool_registry,
+                    agent_spawner=self._agent_spawner,
                 )
                 if recovered is not None:
                     results[subtask.id] = recovered
