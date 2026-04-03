@@ -88,17 +88,23 @@ class TestV2Phase4:
         """ST-V2-4.3: ToolRegistry filters by allowed_mcp_servers."""
         registry = ToolRegistry()
 
-        fs_tools = FakeProvider([
-            _mcp_tool("read_file", "filesystem"),
-            _mcp_tool("write_file", "filesystem"),
-        ])
-        shell_tools = FakeProvider([
-            _mcp_tool("run_command", "shell"),
-        ])
-        core = FakeProvider([
-            _core_tool("remember"),
-            _core_tool("recall"),
-        ])
+        fs_tools = FakeProvider(
+            [
+                _mcp_tool("read_file", "filesystem"),
+                _mcp_tool("write_file", "filesystem"),
+            ]
+        )
+        shell_tools = FakeProvider(
+            [
+                _mcp_tool("run_command", "shell"),
+            ]
+        )
+        core = FakeProvider(
+            [
+                _core_tool("remember"),
+                _core_tool("recall"),
+            ]
+        )
 
         registry.register_provider(fs_tools)
         registry.register_provider(shell_tools)
@@ -141,12 +147,16 @@ class TestV2Phase4:
     async def test_st_v2_4_4_registry_filters_by_allowed_tools(self):
         """ST-V2-4.4: ToolRegistry filters by allowed_tools."""
         registry = ToolRegistry()
-        registry.register_provider(FakeProvider([
-            _core_tool("remember"),
-            _core_tool("recall"),
-            _core_tool("forget"),
-            _mcp_tool("read_file", "filesystem"),
-        ]))
+        registry.register_provider(
+            FakeProvider(
+                [
+                    _core_tool("remember"),
+                    _core_tool("recall"),
+                    _core_tool("forget"),
+                    _mcp_tool("read_file", "filesystem"),
+                ]
+            )
+        )
 
         filtered = await registry.list_tools(
             allowed_tools=["remember", "recall"],
@@ -164,12 +174,16 @@ class TestV2Phase4:
     async def test_st_v2_4_5_combined_filtering(self):
         """ST-V2-4.5: Combined MCP server and tool name filtering."""
         registry = ToolRegistry()
-        registry.register_provider(FakeProvider([
-            _mcp_tool("read_file", "filesystem"),
-            _mcp_tool("write_file", "filesystem"),
-            _mcp_tool("run_command", "shell"),
-            _core_tool("remember"),
-        ]))
+        registry.register_provider(
+            FakeProvider(
+                [
+                    _mcp_tool("read_file", "filesystem"),
+                    _mcp_tool("write_file", "filesystem"),
+                    _mcp_tool("run_command", "shell"),
+                    _core_tool("remember"),
+                ]
+            )
+        )
 
         filtered = await registry.list_tools(
             allowed_mcp_servers=["filesystem"],
@@ -188,6 +202,7 @@ class TestV2Phase4:
     @pytest.mark.asyncio
     async def test_st_v2_4_6_runtime_uses_agent_scope(self, tmp_path):
         """ST-V2-4.6: Runtime uses agent's allowed_mcp_servers."""
+        from agent_platform.core.runtime import AgentRuntime
         from agent_platform.db.sqlite_agent_repo import (
             SqliteAgentRepo,
         )
@@ -197,7 +212,6 @@ class TestV2Phase4:
         from agent_platform.observation.in_process_event_bus import (
             InProcessEventBus,
         )
-        from agent_platform.core.runtime import AgentRuntime
 
         db = str(tmp_path / "test.db")
         agent_repo = SqliteAgentRepo(db)
@@ -207,11 +221,15 @@ class TestV2Phase4:
         await conv_repo.initialize()
 
         registry = ToolRegistry()
-        registry.register_provider(FakeProvider([
-            _mcp_tool("read_file", "filesystem"),
-            _mcp_tool("run_command", "shell"),
-            _core_tool("remember"),
-        ]))
+        registry.register_provider(
+            FakeProvider(
+                [
+                    _mcp_tool("read_file", "filesystem"),
+                    _mcp_tool("run_command", "shell"),
+                    _core_tool("remember"),
+                ]
+            )
+        )
 
         agent = Agent(
             name="scoped",
@@ -223,9 +241,7 @@ class TestV2Phase4:
         await agent_repo.create(agent)
 
         mock_llm = AsyncMock()
-        mock_llm.complete.return_value = LLMResponse(
-            content="Done", usage={}
-        )
+        mock_llm.complete.return_value = LLMResponse(content="Done", usage={})
 
         runtime = AgentRuntime(
             agent_repo=agent_repo,
@@ -252,9 +268,7 @@ class TestV2Phase4:
         await conv_repo.close()
 
     @pytest.mark.asyncio
-    async def test_st_v2_4_7_config_resolution_from_file(
-        self, tmp_path
-    ):
+    async def test_st_v2_4_7_config_resolution_from_file(self, tmp_path):
         """ST-V2-4.7: Agent creation resolves allowed_mcp_servers."""
         import httpx
 
@@ -265,22 +279,24 @@ class TestV2Phase4:
         prompts_dir = tmp_path / "prompts"
         prompts_dir.mkdir()
         (prompts_dir / "scoped-agent.json").write_text(
-            json.dumps({
-                "allowed_mcp_servers": ["filesystem"],
-                "temperature": 0.5,
-            })
+            json.dumps(
+                {
+                    "allowed_mcp_servers": ["filesystem"],
+                    "temperature": 0.5,
+                }
+            )
         )
-        (prompts_dir / "default.md").write_text(
-            "You are a helpful assistant."
-        )
+        (prompts_dir / "default.md").write_text("You are a helpful assistant.")
 
         # Create platform config
         (tmp_path / "lyra.config.json").write_text(
-            json.dumps({
-                "dataDir": str(tmp_path / "data"),
-                "systemPromptsDir": str(prompts_dir),
-                "defaultModel": "test-model",
-            })
+            json.dumps(
+                {
+                    "dataDir": str(tmp_path / "data"),
+                    "systemPromptsDir": str(prompts_dir),
+                    "defaultModel": "test-model",
+                }
+            )
         )
 
         settings = Settings(
@@ -303,15 +319,12 @@ class TestV2Phase4:
                 )
                 assert resp.status_code == 201
                 data = resp.json()
-                assert data["config"]["allowed_mcp_servers"] == [
-                    "filesystem"
-                ]
+                assert data["config"]["allowed_mcp_servers"] == ["filesystem"]
 
     @pytest.mark.asyncio
-    async def test_st_v2_4_8_allowed_tools_enforcement(
-        self, tmp_path
-    ):
+    async def test_st_v2_4_8_allowed_tools_enforcement(self, tmp_path):
         """ST-V2-4.8: allowed_tools whitelist scopes tool schema."""
+        from agent_platform.core.runtime import AgentRuntime
         from agent_platform.db.sqlite_agent_repo import (
             SqliteAgentRepo,
         )
@@ -321,7 +334,6 @@ class TestV2Phase4:
         from agent_platform.observation.in_process_event_bus import (
             InProcessEventBus,
         )
-        from agent_platform.core.runtime import AgentRuntime
 
         db = str(tmp_path / "test.db")
         agent_repo = SqliteAgentRepo(db)
@@ -331,12 +343,16 @@ class TestV2Phase4:
         await conv_repo.initialize()
 
         registry = ToolRegistry()
-        registry.register_provider(FakeProvider([
-            _core_tool("remember"),
-            _core_tool("recall"),
-            _core_tool("spawn_agent"),
-            _mcp_tool("read_file", "filesystem"),
-        ]))
+        registry.register_provider(
+            FakeProvider(
+                [
+                    _core_tool("remember"),
+                    _core_tool("recall"),
+                    _core_tool("spawn_agent"),
+                    _mcp_tool("read_file", "filesystem"),
+                ]
+            )
+        )
 
         agent = Agent(
             name="restricted",
@@ -348,9 +364,7 @@ class TestV2Phase4:
         await agent_repo.create(agent)
 
         mock_llm = AsyncMock()
-        mock_llm.complete.return_value = LLMResponse(
-            content="Done", usage={}
-        )
+        mock_llm.complete.return_value = LLMResponse(content="Done", usage={})
 
         runtime = AgentRuntime(
             agent_repo=agent_repo,
@@ -373,9 +387,7 @@ class TestV2Phase4:
         await conv_repo.close()
 
     @pytest.mark.asyncio
-    async def test_st_v2_4_9_child_inherits_parent_scope(
-        self, tmp_path
-    ):
+    async def test_st_v2_4_9_child_inherits_parent_scope(self, tmp_path):
         """ST-V2-4.9: Child inherits parent's tool scope."""
         from agent_platform.db.sqlite_agent_repo import (
             SqliteAgentRepo,
@@ -412,9 +424,7 @@ class TestV2Phase4:
         await agent_repo.create(parent)
 
         mock_llm = AsyncMock()
-        mock_llm.complete.return_value = LLMResponse(
-            content="Done", usage={}
-        )
+        mock_llm.complete.return_value = LLMResponse(content="Done", usage={})
 
         spawner = AgentSpawnerProvider(
             agent_repo=agent_repo,
@@ -447,10 +457,11 @@ class TestV2Phase4:
         await msg_repo.close()
 
     @pytest.mark.asyncio
-    async def test_st_v2_4_10_child_template_overrides_scope(
-        self, tmp_path
-    ):
+    async def test_st_v2_4_10_child_template_overrides_scope(self, tmp_path):
         """ST-V2-4.10: Child template overrides parent scope."""
+        from agent_platform.core.platform_config import (
+            AgentFileConfig,
+        )
         from agent_platform.db.sqlite_agent_repo import (
             SqliteAgentRepo,
         )
@@ -462,9 +473,6 @@ class TestV2Phase4:
         )
         from agent_platform.observation.in_process_event_bus import (
             InProcessEventBus,
-        )
-        from agent_platform.core.platform_config import (
-            AgentFileConfig,
         )
         from agent_platform.tools.agent_spawner import (
             AgentSpawnerProvider,
@@ -489,9 +497,7 @@ class TestV2Phase4:
         await agent_repo.create(parent)
 
         mock_llm = AsyncMock()
-        mock_llm.complete.return_value = LLMResponse(
-            content="Done", usage={}
-        )
+        mock_llm.complete.return_value = LLMResponse(content="Done", usage={})
 
         def mock_config_resolver(name):
             if name == "full-access":
@@ -546,9 +552,7 @@ class TestV2Phase4:
             / "docs"
             / "CONFIGURATION_GUIDE.md"
         )
-        assert guide_path.exists(), (
-            f"CONFIGURATION_GUIDE.md not found at {guide_path}"
-        )
+        assert guide_path.exists(), f"CONFIGURATION_GUIDE.md not found at {guide_path}"
 
         content = guide_path.read_text(encoding="utf-8")
         assert ".env" in content

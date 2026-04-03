@@ -203,12 +203,8 @@ def create_app(
     tool_registry.register_provider(agent_spawner)
 
     # Orchestration tools (decompose_task, orchestrate)
-    decompose_prompt = load_system_prompt(
-        "decompose_task", project_root
-    )
-    synthesize_prompt = load_system_prompt(
-        "synthesize_results", project_root
-    )
+    decompose_prompt = load_system_prompt("decompose_task", project_root)
+    synthesize_prompt = load_system_prompt("synthesize_results", project_root)
     orchestration_provider = OrchestrationToolProvider(
         llm_provider=llm_provider,
         tool_registry=tool_registry,

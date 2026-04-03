@@ -119,8 +119,11 @@ async def _handle_failure(
             )
             subtask.status = SubTaskStatus.PENDING
             return await _execute_subtask(
-                subtask, llm_provider, event_bus,
-                parent_agent_id, previous_output,
+                subtask,
+                llm_provider,
+                event_bus,
+                parent_agent_id,
+                previous_output,
                 model=model,
             )
         # Exhausted retries
@@ -141,8 +144,11 @@ async def _handle_failure(
         subtask.retry_count += 1
         subtask.status = SubTaskStatus.PENDING
         return await _execute_subtask(
-            subtask, llm_provider, event_bus,
-            parent_agent_id, previous_output,
+            subtask,
+            llm_provider,
+            event_bus,
+            parent_agent_id,
+            previous_output,
             model=model,
         )
 
@@ -179,14 +185,21 @@ class SequentialOrchestration:
         for subtask in plan.subtasks:
             try:
                 result = await _execute_subtask(
-                    subtask, self._llm, self._event_bus,
-                    self._parent_agent_id, model=self._model,
+                    subtask,
+                    self._llm,
+                    self._event_bus,
+                    self._parent_agent_id,
+                    model=self._model,
                 )
                 results[subtask.id] = result
             except Exception as e:
                 recovered = await _handle_failure(
-                    subtask, e, self._llm, self._event_bus,
-                    self._parent_agent_id, model=self._model,
+                    subtask,
+                    e,
+                    self._llm,
+                    self._event_bus,
+                    self._parent_agent_id,
+                    model=self._model,
                 )
                 if recovered is not None:
                     results[subtask.id] = recovered
@@ -241,14 +254,21 @@ class ParallelOrchestration:
         async def run_subtask(subtask: SubTask) -> tuple[str, str | None]:
             try:
                 result = await _execute_subtask(
-                    subtask, self._llm, self._event_bus,
-                    self._parent_agent_id, model=self._model,
+                    subtask,
+                    self._llm,
+                    self._event_bus,
+                    self._parent_agent_id,
+                    model=self._model,
                 )
                 return subtask.id, result
             except Exception as e:
                 recovered = await _handle_failure(
-                    subtask, e, self._llm, self._event_bus,
-                    self._parent_agent_id, model=self._model,
+                    subtask,
+                    e,
+                    self._llm,
+                    self._event_bus,
+                    self._parent_agent_id,
+                    model=self._model,
                 )
                 return subtask.id, recovered
 
@@ -328,8 +348,7 @@ class PipelineOrchestration:
                         plan_id=plan.id,
                         results=results,
                         synthesized_response=(
-                            f"Pipeline failed at: "
-                            f"{subtask.description}"
+                            f"Pipeline failed at: {subtask.description}"
                         ),
                         status=SubTaskStatus.FAILED,
                     )

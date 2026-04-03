@@ -29,16 +29,12 @@ class ToolRegistry:
             provider_tools = await provider.list_tools()
             for tool in provider_tools:
                 self._tool_map[tool.name] = provider
-                if not _tool_passes_filters(
-                    tool, allowed_mcp_servers, allowed_tools
-                ):
+                if not _tool_passes_filters(tool, allowed_mcp_servers, allowed_tools):
                     continue
                 tools.append(tool)
         return tools
 
-    async def call_tool(
-        self, name: str, arguments: dict[str, Any]
-    ) -> ToolResult:
+    async def call_tool(self, name: str, arguments: dict[str, Any]) -> ToolResult:
         """Route a tool call to the correct provider."""
         if not self._tool_map:
             await self.list_tools()
