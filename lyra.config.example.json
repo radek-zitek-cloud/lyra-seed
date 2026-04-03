@@ -22,6 +22,7 @@
     }
   },
   "systemPromptsDir": "./prompts",
+  "skillsDir": "./skills",
   "modelCosts": {
     "openai/gpt-4.1": [2.0, 8.0],
     "openai/gpt-4.1-mini": [0.4, 1.6],

@@ -21,6 +21,7 @@
 
   "dataDir": "./data",
   "systemPromptsDir": "./prompts",
+  "skillsDir": "./skills",
 
   "defaultModel": "openai/gpt-5.4",
 
