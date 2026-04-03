@@ -156,9 +156,7 @@ async def _wake_idle_agent(agent_id: str, msg: AgentMessage) -> None:
             msg.message_type.value,
         )
     except Exception:
-        logger.exception(
-            "Error in _wake_idle_agent for %s", agent_id
-        )
+        logger.exception("Error in _wake_idle_agent for %s", agent_id)
 
 
 def _msg_to_dict(m: AgentMessage) -> dict:

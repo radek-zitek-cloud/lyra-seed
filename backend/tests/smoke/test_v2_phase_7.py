@@ -103,12 +103,12 @@ class TestV2Phase7:
         )
 
         tools = await provider.list_tools()
-        # 2 skills + list_skills + create_skill
-        assert len(tools) == 4
+        # 2 skills + management tools
         names = {t.name for t in tools}
         assert "summarize" in names
         assert "translate" in names
         assert "create_skill" in names
+        assert "list_skills" in names
         for t in tools:
             assert t.tool_type.value == "prompt_macro"
             assert t.source == "skill"

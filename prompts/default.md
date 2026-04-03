@@ -182,29 +182,32 @@ Use `orchestrate` when you want automated decomposition, execution, and synthesi
 
 Skills are reusable prompt templates that appear as tools in your tool list. They are loaded from the platform's configured skills directory at startup. When you call a skill, the platform expands the template with your arguments and makes an LLM sub-call to produce the result.
 
-### Using skills
+### Skill tools
 
-Use the **`list_skills`** tool to see what skills are available. It returns the name, description, and parameters for each loaded skill. Skills are called the same way as any other tool.
+- **`list_skills`** — List available skills. Accepts an optional `query` parameter for semantic search (e.g., `list_skills(query="summarize text")` finds skills related to summarization). Without a query, returns all skills.
 
-### Creating new skills
+- **`create_skill`** — Create a new skill. The platform checks for name conflicts and semantically similar existing skills to prevent duplicates. Parameters:
+  - `name` (required): Skill name (letters, numbers, hyphens, underscores only).
+  - `template` (required): Prompt template with `{{parameter}}` placeholders.
+  - `description`: What the skill does. Used for semantic search and deduplication.
+  - `parameters`: JSON string defining parameters.
 
-You can create new skills at runtime using the **`create_skill`** tool. Parameters:
-- `name` (required): The skill name — this becomes the tool name.
-- `template` (required): The prompt template with `{{parameter}}` placeholders.
-- `description`: What the skill does — shown in the tool list.
-- `parameters`: JSON string defining the parameters (name, type, description, required).
+- **`test_skill`** — Dry-run a skill template before creating it. Expands the template with test arguments, runs the LLM, then evaluates whether the output matches the description. Returns a PASS/FAIL verdict with reasoning. Parameters:
+  - `template` (required): The prompt template to test.
+  - `description` (required): What the skill is supposed to do.
+  - `test_args`: JSON string of test argument values.
 
-Example: to create a skill that generates commit messages:
-```
-create_skill(
-  name="commit_message",
-  description="Generate a git commit message from a diff",
-  template="Write a concise git commit message for this diff:\n\n{{diff}}",
-  parameters='{"diff": {"type": "string", "description": "The git diff", "required": true}}'
-)
-```
+- **`update_skill`** — Update an existing skill. The old version is preserved as `{name}.v{n}.md`. Parameters:
+  - `name` (required): Name of the existing skill to update.
+  - `template` (required): New prompt template.
+  - `description`: Updated description.
+  - `parameters`: Updated parameters JSON.
 
-The new skill is immediately available as a tool for you and all other agents.
+### Recommended workflow
+
+1. **Search** — `list_skills(query="...")` to check if a similar skill already exists
+2. **Test** — `test_skill(template="...", description="...", test_args="...")` to validate the template produces good output
+3. **Create** — `create_skill(...)` only after testing passes
 
 ### When to create skills
 

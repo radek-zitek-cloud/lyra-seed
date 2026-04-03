@@ -5,7 +5,6 @@ All LLM and embedding calls are mocked.
 """
 
 import json
-import math
 from pathlib import Path
 from unittest.mock import AsyncMock
 
@@ -44,7 +43,9 @@ class FakeEmbedding:
             else:
                 # Deterministic hash-based vector
                 h = hash(t) % 1000
-                results.append([h / 1000, (h * 7 % 1000) / 1000, (h * 13 % 1000) / 1000])
+                results.append(
+                    [h / 1000, (h * 7 % 1000) / 1000, (h * 13 % 1000) / 1000]
+                )
         return results
 
     async def embed_query(self, text: str) -> list[float]:
@@ -72,10 +73,14 @@ class TestV3Phase1:
             nonlocal call_count
             call_count += 1
             if call_count == 1:
-                return LLMResponse(content="Here are 3 bullet points about AI.", usage={})
+                return LLMResponse(
+                    content="Here are 3 bullet points about AI.", usage={}
+                )
             else:
                 return LLMResponse(
-                    content=json.dumps({"verdict": "PASS", "reasoning": "Output matches description."}),
+                    content=json.dumps(
+                        {"verdict": "PASS", "reasoning": "Output matches description."}
+                    ),
                     usage={},
                 )
 
@@ -226,8 +231,16 @@ class TestV3Phase1:
             llm_provider=AsyncMock(),
         )
 
-        reserved = ["remember", "recall", "forget", "spawn_agent",
-                     "list_skills", "create_skill", "test_skill", "update_skill"]
+        reserved = [
+            "remember",
+            "recall",
+            "forget",
+            "spawn_agent",
+            "list_skills",
+            "create_skill",
+            "test_skill",
+            "update_skill",
+        ]
 
         for name in reserved:
             result = await provider.call_tool(
@@ -305,9 +318,12 @@ class TestV3Phase1:
         )
 
         tools = await provider.list_tools()
-        skill_names = [t.name for t in tools
-                       if t.name not in ("list_skills", "create_skill",
-                                         "test_skill", "update_skill")]
+        skill_names = [
+            t.name
+            for t in tools
+            if t.name
+            not in ("list_skills", "create_skill", "test_skill", "update_skill")
+        ]
         assert skill_names == ["foo"]
 
     @pytest.mark.asyncio
@@ -315,17 +331,35 @@ class TestV3Phase1:
         """ST-V3-1.9: list_skills semantic search."""
         from agent_platform.tools.skill_provider import SkillProvider
 
-        _write_skill(tmp_path, "summarize", "Summarize text into bullet points", "Summarize: {{text}}")
-        _write_skill(tmp_path, "translate", "Translate text to another language", "Translate: {{text}}")
-        _write_skill(tmp_path, "review", "Review code for bugs and quality", "Review: {{text}}")
+        _write_skill(
+            tmp_path,
+            "summarize",
+            "Summarize text into bullet points",
+            "Summarize: {{text}}",
+        )
+        _write_skill(
+            tmp_path,
+            "translate",
+            "Translate text to another language",
+            "Translate: {{text}}",
+        )
+        _write_skill(
+            tmp_path, "review", "Review code for bugs and quality", "Review: {{text}}"
+        )
 
         # Embeddings: make "summarize" description close to query
-        embeddings = FakeEmbedding({
-            "Summarize text into bullet points": [1.0, 0.0, 0.0],
-            "Translate text to another language": [0.0, 1.0, 0.0],
-            "Review code for bugs and quality": [0.0, 0.0, 1.0],
-            "condense text into key points": [0.95, 0.05, 0.0],  # close to summarize
-        })
+        embeddings = FakeEmbedding(
+            {
+                "Summarize text into bullet points": [1.0, 0.0, 0.0],
+                "Translate text to another language": [0.0, 1.0, 0.0],
+                "Review code for bugs and quality": [0.0, 0.0, 1.0],
+                "condense text into key points": [
+                    0.95,
+                    0.05,
+                    0.0,
+                ],  # close to summarize
+            }
+        )
 
         provider = SkillProvider(
             skills_dir=str(tmp_path),
@@ -354,14 +388,25 @@ class TestV3Phase1:
         """ST-V3-1.10: create_skill deduplication."""
         from agent_platform.tools.skill_provider import SkillProvider
 
-        _write_skill(tmp_path, "summarize", "Summarize text into bullet points", "Summarize: {{text}}")
+        _write_skill(
+            tmp_path,
+            "summarize",
+            "Summarize text into bullet points",
+            "Summarize: {{text}}",
+        )
 
         # Make new description very similar to existing
-        embeddings = FakeEmbedding({
-            "Summarize text into bullet points": [1.0, 0.0, 0.0],
-            "Condense text into concise bullet points": [0.99, 0.01, 0.0],  # very similar
-            "Translate text to French": [0.0, 1.0, 0.0],  # different
-        })
+        embeddings = FakeEmbedding(
+            {
+                "Summarize text into bullet points": [1.0, 0.0, 0.0],
+                "Condense text into concise bullet points": [
+                    0.99,
+                    0.01,
+                    0.0,
+                ],  # very similar
+                "Translate text to French": [0.0, 1.0, 0.0],  # different
+            }
+        )
 
         provider = SkillProvider(
             skills_dir=str(tmp_path),
@@ -410,9 +455,7 @@ class TestV3Phase1:
         assert result.success
 
         # list_skills with query returns all (no crash)
-        result = await provider.call_tool(
-            "list_skills", {"query": "greeting"}
-        )
+        result = await provider.call_tool("list_skills", {"query": "greeting"})
         assert result.success
 
         # create_skill works (no dedup crash)

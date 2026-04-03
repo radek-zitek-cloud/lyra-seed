@@ -79,9 +79,7 @@ async def spawn_agent(
     duration = int((time.monotonic() - start) * 1000)
     return ToolResult(
         success=True,
-        output=json.dumps(
-            {"child_agent_id": child.id, "status": "running"}
-        ),
+        output=json.dumps({"child_agent_id": child.id, "status": "running"}),
         duration_ms=duration,
     )
 
@@ -105,9 +103,7 @@ async def _run_child_background(
                 payload={
                     "parent_agent_id": parent_id,
                     "content_preview": (
-                        response.content[:200]
-                        if response.content
-                        else None
+                        response.content[:200] if response.content else None
                     ),
                 },
                 duration_ms=duration,
@@ -196,15 +192,11 @@ async def check_agent_status(
         )
 
     content_preview = None
-    convos = await provider._conv_repo.list(
-        filters={"agent_id": child_id}
-    )
+    convos = await provider._conv_repo.list(filters={"agent_id": child_id})
     if convos:
         for msg in reversed(convos[0].messages):
             if msg.role == MessageRole.ASSISTANT:
-                content_preview = (
-                    str(msg.content)[:100] if msg.content else None
-                )
+                content_preview = str(msg.content)[:100] if msg.content else None
                 break
 
     return ToolResult(
@@ -283,9 +275,7 @@ async def get_agent_result(
         )
 
     content = None
-    convos = await provider._conv_repo.list(
-        filters={"agent_id": child_id}
-    )
+    convos = await provider._conv_repo.list(filters={"agent_id": child_id})
     if convos:
         for msg in reversed(convos[0].messages):
             if msg.role == MessageRole.ASSISTANT:
@@ -337,9 +327,7 @@ async def list_child_agents(
 # ── Helpers ────────────────────────────────────────
 
 
-async def get_spawn_depth(
-    provider: AgentSpawnerProvider, agent_id: str | None
-) -> int:
+async def get_spawn_depth(provider: AgentSpawnerProvider, agent_id: str | None) -> int:
     """Count how many parent levels exist above this agent."""
     depth = 0
     current_id = agent_id
@@ -357,9 +345,7 @@ async def resolve_child_config(
 ) -> AgentConfig:
     """Resolve child config from template, parent, and overrides."""
     parent_id = args.get("agent_id")
-    parent = (
-        await provider._agent_repo.get(parent_id) if parent_id else None
-    )
+    parent = await provider._agent_repo.get(parent_id) if parent_id else None
     child_config = AgentConfig()
     template = args.get("template")
 
@@ -389,17 +375,13 @@ async def resolve_child_config(
             if child_config.temperature == AgentConfig().temperature:
                 child_config.temperature = parent.config.temperature
             if child_config.allowed_mcp_servers is None:
-                child_config.allowed_mcp_servers = (
-                    parent.config.allowed_mcp_servers
-                )
+                child_config.allowed_mcp_servers = parent.config.allowed_mcp_servers
             if not child_config.allowed_tools:
                 child_config.allowed_tools = parent.config.allowed_tools
     elif parent:
         child_config.model = parent.config.model
         child_config.temperature = parent.config.temperature
-        child_config.allowed_mcp_servers = (
-            parent.config.allowed_mcp_servers
-        )
+        child_config.allowed_mcp_servers = parent.config.allowed_mcp_servers
         child_config.allowed_tools = parent.config.allowed_tools
 
     # Explicit overrides
