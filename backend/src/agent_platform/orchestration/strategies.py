@@ -47,7 +47,11 @@ async def _execute_subtask(
     messages = [
         Message(
             role=MessageRole.SYSTEM,
-            content="You are executing a subtask as part of a larger orchestrated plan. Complete the following task thoroughly.",
+            content=(
+                "You are executing a subtask as part of "
+                "a larger orchestrated plan. "
+                "Complete the following task thoroughly."
+            ),
         ),
     ]
 
@@ -176,7 +180,11 @@ class SequentialOrchestration:
                     return OrchestrationResult(
                         plan_id=plan.id,
                         results=results,
-                        synthesized_response=f"Orchestration failed: subtask '{subtask.description}' failed: {e}",
+                        synthesized_response=(
+                            f"Orchestration failed: "
+                            f"subtask '{subtask.description}'"
+                            f" failed: {e}"
+                        ),
                         status=SubTaskStatus.FAILED,
                     )
 
@@ -295,7 +303,10 @@ class PipelineOrchestration:
                     return OrchestrationResult(
                         plan_id=plan.id,
                         results=results,
-                        synthesized_response=f"Pipeline failed at: {subtask.description}",
+                        synthesized_response=(
+                            f"Pipeline failed at: "
+                            f"{subtask.description}"
+                        ),
                         status=SubTaskStatus.FAILED,
                     )
 

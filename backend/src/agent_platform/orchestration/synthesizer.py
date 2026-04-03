@@ -7,14 +7,18 @@ from agent_platform.llm.provider import LLMProvider
 
 logger = logging.getLogger(__name__)
 
-SYNTHESIS_PROMPT = """You are a result synthesis engine. Combine the results from multiple subtasks into a single unified response that addresses the original task.
-
-Original task: {task}
-
-Subtask results:
-{results}
-
-Produce a clear, coherent response that integrates all the subtask outputs. Do not mention subtasks or orchestration — present the result as a unified answer."""
+SYNTHESIS_PROMPT = (
+    "You are a result synthesis engine. "
+    "Combine the results from multiple subtasks "
+    "into a single unified response that "
+    "addresses the original task.\n\n"
+    "Original task: {task}\n\n"
+    "Subtask results:\n{results}\n\n"
+    "Produce a clear, coherent response that "
+    "integrates all the subtask outputs. "
+    "Do not mention subtasks or orchestration "
+    "- present the result as a unified answer."
+)
 
 
 class ResultSynthesizer:

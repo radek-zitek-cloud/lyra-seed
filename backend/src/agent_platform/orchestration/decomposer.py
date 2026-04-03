@@ -15,31 +15,33 @@ from agent_platform.tools.models import Tool
 
 logger = logging.getLogger(__name__)
 
-DECOMPOSITION_PROMPT = """You are a task decomposition engine. Break the given task into subtasks.
-
-Available tools: {tools}
-
-Respond with ONLY valid JSON (no markdown, no explanation) in this format:
-{{
-  "subtasks": [
-    {{
-      "description": "What this subtask does",
-      "assigned_to": "spawn_agent",
-      "dependencies": [],
-      "failure_policy": "escalate"
-    }}
-  ],
-  "strategy": "sequential"
-}}
-
-Rules:
-- "assigned_to" should be "spawn_agent" for complex work, or a tool name for simple operations
-- "dependencies" is a list of zero-indexed subtask positions this subtask depends on
-- "failure_policy" is one of: "retry", "reassign", "escalate", "skip"
-- "strategy" is one of: "sequential" (ordered), "parallel" (independent), "pipeline" (chain outputs)
-- If subtasks have dependencies, use "sequential" or "pipeline"
-- If subtasks are independent, use "parallel"
-"""
+DECOMPOSITION_PROMPT = (
+    "You are a task decomposition engine. "
+    "Break the given task into subtasks.\n\n"
+    "Available tools: {tools}\n\n"
+    "Respond with ONLY valid JSON "
+    "(no markdown, no explanation) in this format:\n"
+    '{{\n  "subtasks": [\n    {{\n'
+    '      "description": "What this subtask does",\n'
+    '      "assigned_to": "spawn_agent",\n'
+    '      "dependencies": [],\n'
+    '      "failure_policy": "escalate"\n'
+    "    }}\n  ],\n"
+    '  "strategy": "sequential"\n}}\n\n'
+    "Rules:\n"
+    '- "assigned_to" should be "spawn_agent" for '
+    "complex work, or a tool name for simple ops\n"
+    '- "dependencies" is a list of zero-indexed '
+    "subtask positions this subtask depends on\n"
+    '- "failure_policy" is one of: '
+    '"retry", "reassign", "escalate", "skip"\n'
+    '- "strategy" is one of: "sequential" (ordered),'
+    ' "parallel" (independent), "pipeline" (chain)\n'
+    "- If subtasks have dependencies, "
+    'use "sequential" or "pipeline"\n'
+    "- If subtasks are independent, "
+    'use "parallel"'
+)
 
 
 class TaskDecomposer:

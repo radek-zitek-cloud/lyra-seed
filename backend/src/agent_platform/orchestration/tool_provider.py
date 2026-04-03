@@ -50,13 +50,18 @@ class OrchestrationToolProvider:
         return [
             Tool(
                 name="decompose_task",
-                description="Break a complex task into subtasks with an execution plan. Returns a TaskPlan with subtasks, strategy, and failure policies.",
+                description=(
+                    "Break a complex task into subtasks "
+                    "with an execution plan."
+                ),
                 input_schema={
                     "type": "object",
                     "properties": {
                         "task": {
                             "type": "string",
-                            "description": "The complex task to decompose into subtasks",
+                            "description": (
+                                "The complex task to decompose"
+                            ),
                         },
                     },
                     "required": ["task"],
@@ -66,7 +71,10 @@ class OrchestrationToolProvider:
             ),
             Tool(
                 name="orchestrate",
-                description="End-to-end orchestration: decompose a task, execute subtasks, and synthesize results into a unified response.",
+                description=(
+                    "End-to-end orchestration: decompose, "
+                    "execute, and synthesize results."
+                ),
                 input_schema={
                     "type": "object",
                     "properties": {
@@ -77,7 +85,10 @@ class OrchestrationToolProvider:
                         "strategy": {
                             "type": "string",
                             "enum": ["sequential", "parallel", "pipeline"],
-                            "description": "Override orchestration strategy (optional — LLM chooses if omitted)",
+                            "description": (
+                                "Override strategy "
+                                "(optional)"
+                            ),
                         },
                     },
                     "required": ["task"],

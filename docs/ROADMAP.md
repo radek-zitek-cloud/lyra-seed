@@ -584,7 +584,33 @@ V2P1 proved that sub-agents can spawn and execute with full tool access. However
 
 ---
 
-### V2 Phase 4: Observation UI — Multi-Agent
+### V2 Phase 4: Per-Agent Tool Scoping
+
+**Objective:** Allow each agent to have its own tool set instead of sharing a single global tool registry. Reduces token overhead, enforces least-privilege access, and enables agent specialization.
+
+**Background:** Currently all agents share one `ToolRegistry` containing every MCP server, memory tool, and spawner tool. Every LLM call sends the full 38+ tool schema regardless of what the agent actually needs. A filesystem worker pays the same token cost as a research agent. With orchestration patterns (V2P3) spawning more specialized sub-agents, this becomes a direct cost multiplier.
+
+**Deliverables:**
+
+- Per-agent `mcpServers` configuration in `prompts/{name}.json`:
+  - Optional field — if omitted, inherits system-wide tools from `lyra.config.json`
+  - If specified, agent gets only those MCP servers (plus core tools like memory, messaging)
+  - Example: `{"mcpServers": ["filesystem"]}` — only filesystem tools, not shell
+- Per-agent `ToolRegistry` instances:
+  - Each `AgentRuntime.run()` builds a scoped registry for the agent
+  - Core tools (memory, messaging, spawner) always included
+  - MCP tools filtered by agent config
+  - `allowed_tools` field in `AgentConfig` for explicit tool whitelist (already exists, needs enforcement)
+- Tool schema optimization:
+  - Only send relevant tool schemas to the LLM
+  - Track token savings in cost events
+- Spawned children inherit parent's tool scope unless template overrides it
+
+**Exit Criteria:** Different agents get different tool sets. A worker with `mcpServers: ["filesystem"]` does not see shell tools. Token usage per LLM call decreases proportionally to excluded tools.
+
+---
+
+### V2 Phase 5: Observation UI — Multi-Agent
 
 **Deliverables:**
 
@@ -758,7 +784,8 @@ V2P1 proved that sub-agents can spawn and execute with full tool access. However
 | V2.1      | Sub-agent spawning                       | Agent creates and manages children           |
 | V2.2      | Inter-agent communication                | Agents exchange messages                     |
 | V2.3      | Orchestration patterns                   | Task decomposition and delegation            |
-| V2.4      | Multi-agent UI                           | Agent graph, message flow visualization      |
+| V2.4      | Per-agent tool scoping                   | Scoped tool registries, token optimization   |
+| V2.5      | Multi-agent UI                           | Agent graph, message flow visualization      |
 | V3.1      | Tool creation (macros)                   | Agent creates reusable prompt macros         |
 | V3.2      | Tool creation (MCP servers)              | Agent scaffolds and deploys MCP servers      |
 | V3.3      | Capability acquisition                   | Full gap-analysis → build → use loop         |
