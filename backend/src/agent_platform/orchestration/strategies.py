@@ -27,6 +27,7 @@ async def _execute_subtask(
     event_bus: InProcessEventBus,
     parent_agent_id: str,
     previous_output: str | None = None,
+    model: str | None = None,
 ) -> str:
     """Execute a single subtask using the LLM."""
     subtask.status = SubTaskStatus.RUNNING
@@ -70,7 +71,10 @@ async def _execute_subtask(
         )
     )
 
-    response = await llm_provider.complete(messages, config=LLMConfig(temperature=0.5))
+    config = LLMConfig(temperature=0.5)
+    if model:
+        config.model = model
+    response = await llm_provider.complete(messages, config=config)
     result = response.content or ""
 
     subtask.status = SubTaskStatus.COMPLETED
@@ -99,6 +103,7 @@ async def _handle_failure(
     event_bus: InProcessEventBus,
     parent_agent_id: str,
     previous_output: str | None = None,
+    model: str | None = None,
 ) -> str | None:
     """Apply failure policy to a failed subtask. Returns result if recovered."""
     subtask.error = str(error)
@@ -114,7 +119,9 @@ async def _handle_failure(
             )
             subtask.status = SubTaskStatus.PENDING
             return await _execute_subtask(
-                subtask, llm_provider, event_bus, parent_agent_id, previous_output
+                subtask, llm_provider, event_bus,
+                parent_agent_id, previous_output,
+                model=model,
             )
         # Exhausted retries
         subtask.status = SubTaskStatus.FAILED
@@ -127,11 +134,16 @@ async def _handle_failure(
         return subtask.result
 
     elif subtask.failure_policy == FailurePolicy.REASSIGN:
-        logger.info("Reassigning subtask %s to a new execution", subtask.id)
+        logger.info(
+            "Reassigning subtask %s to a new execution",
+            subtask.id,
+        )
         subtask.retry_count += 1
         subtask.status = SubTaskStatus.PENDING
         return await _execute_subtask(
-            subtask, llm_provider, event_bus, parent_agent_id, previous_output
+            subtask, llm_provider, event_bus,
+            parent_agent_id, previous_output,
+            model=model,
         )
 
     else:  # ESCALATE
@@ -150,6 +162,7 @@ class SequentialOrchestration:
         conversation_repo: SqliteConversationRepo,
         event_bus: InProcessEventBus,
         parent_agent_id: str,
+        model: str | None = None,
     ) -> None:
         self._llm = llm_provider
         self._tool_registry = tool_registry
@@ -157,6 +170,7 @@ class SequentialOrchestration:
         self._conv_repo = conversation_repo
         self._event_bus = event_bus
         self._parent_agent_id = parent_agent_id
+        self._model = model
 
     async def execute(self, plan: TaskPlan) -> OrchestrationResult:
         plan.status = SubTaskStatus.RUNNING
@@ -165,12 +179,14 @@ class SequentialOrchestration:
         for subtask in plan.subtasks:
             try:
                 result = await _execute_subtask(
-                    subtask, self._llm, self._event_bus, self._parent_agent_id
+                    subtask, self._llm, self._event_bus,
+                    self._parent_agent_id, model=self._model,
                 )
                 results[subtask.id] = result
             except Exception as e:
                 recovered = await _handle_failure(
-                    subtask, e, self._llm, self._event_bus, self._parent_agent_id
+                    subtask, e, self._llm, self._event_bus,
+                    self._parent_agent_id, model=self._model,
                 )
                 if recovered is not None:
                     results[subtask.id] = recovered
@@ -208,6 +224,7 @@ class ParallelOrchestration:
         conversation_repo: SqliteConversationRepo,
         event_bus: InProcessEventBus,
         parent_agent_id: str,
+        model: str | None = None,
     ) -> None:
         self._llm = llm_provider
         self._tool_registry = tool_registry
@@ -215,6 +232,7 @@ class ParallelOrchestration:
         self._conv_repo = conversation_repo
         self._event_bus = event_bus
         self._parent_agent_id = parent_agent_id
+        self._model = model
 
     async def execute(self, plan: TaskPlan) -> OrchestrationResult:
         plan.status = SubTaskStatus.RUNNING
@@ -223,12 +241,14 @@ class ParallelOrchestration:
         async def run_subtask(subtask: SubTask) -> tuple[str, str | None]:
             try:
                 result = await _execute_subtask(
-                    subtask, self._llm, self._event_bus, self._parent_agent_id
+                    subtask, self._llm, self._event_bus,
+                    self._parent_agent_id, model=self._model,
                 )
                 return subtask.id, result
             except Exception as e:
                 recovered = await _handle_failure(
-                    subtask, e, self._llm, self._event_bus, self._parent_agent_id
+                    subtask, e, self._llm, self._event_bus,
+                    self._parent_agent_id, model=self._model,
                 )
                 return subtask.id, recovered
 
@@ -262,6 +282,7 @@ class PipelineOrchestration:
         conversation_repo: SqliteConversationRepo,
         event_bus: InProcessEventBus,
         parent_agent_id: str,
+        model: str | None = None,
     ) -> None:
         self._llm = llm_provider
         self._tool_registry = tool_registry
@@ -269,6 +290,7 @@ class PipelineOrchestration:
         self._conv_repo = conversation_repo
         self._event_bus = event_bus
         self._parent_agent_id = parent_agent_id
+        self._model = model
 
     async def execute(self, plan: TaskPlan) -> OrchestrationResult:
         plan.status = SubTaskStatus.RUNNING
@@ -283,6 +305,7 @@ class PipelineOrchestration:
                     self._event_bus,
                     self._parent_agent_id,
                     previous_output=previous_output,
+                    model=self._model,
                 )
                 results[subtask.id] = result
                 previous_output = result
@@ -294,6 +317,7 @@ class PipelineOrchestration:
                     self._event_bus,
                     self._parent_agent_id,
                     previous_output=previous_output,
+                    model=self._model,
                 )
                 if recovered is not None:
                     results[subtask.id] = recovered

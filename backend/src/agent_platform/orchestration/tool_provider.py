@@ -104,6 +104,13 @@ class OrchestrationToolProvider:
             ),
         ]
 
+    async def _resolve_model(self, agent_id: str) -> str | None:
+        """Look up the calling agent's model."""
+        if agent_id == "system":
+            return None
+        agent = await self._agent_repo.get(agent_id)
+        return agent.config.model if agent else None
+
     async def call_tool(self, name: str, arguments: dict[str, Any]) -> ToolResult:
         start = time.monotonic()
         if name == "decompose_task":
@@ -121,8 +128,11 @@ class OrchestrationToolProvider:
         agent_id = args.get("agent_id", "system")
 
         try:
+            model = await self._resolve_model(agent_id)
             tools = await self._tool_registry.list_tools()
-            plan = await self._decomposer.decompose(task, tools, self._llm)
+            plan = await self._decomposer.decompose(
+                task, tools, self._llm, model=model,
+            )
 
             await self._event_bus.emit(
                 Event(
@@ -173,8 +183,11 @@ class OrchestrationToolProvider:
 
         try:
             # 1. Decompose
+            model = await self._resolve_model(agent_id)
             tools = await self._tool_registry.list_tools()
-            plan = await self._decomposer.decompose(task, tools, self._llm)
+            plan = await self._decomposer.decompose(
+                task, tools, self._llm, model=model,
+            )
 
             if strategy_override:
                 plan.strategy = OrchestrationStrategyType(strategy_override)
@@ -201,6 +214,7 @@ class OrchestrationToolProvider:
                 conversation_repo=self._conv_repo,
                 event_bus=self._event_bus,
                 parent_agent_id=agent_id,
+                model=model,
             )
 
             if plan.strategy == OrchestrationStrategyType.SEQUENTIAL:
@@ -217,7 +231,8 @@ class OrchestrationToolProvider:
             # 3. Synthesize if execution succeeded
             if orch_result.status == SubTaskStatus.COMPLETED and orch_result.results:
                 synthesized = await self._synthesizer.synthesize(
-                    task, orch_result.results, self._llm
+                    task, orch_result.results, self._llm,
+                    model=model,
                 )
                 orch_result.synthesized_response = synthesized
 

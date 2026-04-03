@@ -34,6 +34,7 @@ class ResultSynthesizer:
         original_task: str,
         results: dict[str, str],
         llm: LLMProvider,
+        model: str | None = None,
     ) -> str:
         results_text = "\n".join(
             f"- {subtask_id}: {result}" for subtask_id, result in results.items()
@@ -53,5 +54,8 @@ class ResultSynthesizer:
             ),
         ]
 
-        response = await llm.complete(messages, config=LLMConfig(temperature=0.3))
+        config = LLMConfig(temperature=0.3)
+        if model:
+            config.model = model
+        response = await llm.complete(messages, config=config)
         return response.content or ""

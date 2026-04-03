@@ -57,6 +57,7 @@ class TaskDecomposer:
         task: str,
         available_tools: list[Tool],
         llm: LLMProvider,
+        model: str | None = None,
     ) -> TaskPlan:
         tool_descriptions = ", ".join(
             f"{t.name}: {t.description}" for t in available_tools
@@ -73,7 +74,10 @@ class TaskDecomposer:
             ),
         ]
 
-        response = await llm.complete(messages, config=LLMConfig(temperature=0.3))
+        config = LLMConfig(temperature=0.3)
+        if model:
+            config.model = model
+        response = await llm.complete(messages, config=config)
 
         content = response.content or "{}"
         # Strip markdown code fences if present
