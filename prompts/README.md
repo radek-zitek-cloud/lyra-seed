@@ -130,3 +130,9 @@ The `system/` subdirectory contains prompts used by the platform internally (not
 3. Use it via: `spawn_agent(name="my-agent", template="{name}", task="...")`
 
 Fields not set in the JSON file fall back to `default.json`, then `lyra.config.json`, then hardcoded defaults.
+
+---
+
+## Skills
+
+Skills (reusable prompt templates) are stored separately in the `skills/` directory, not here. See `docs/CONFIGURATION_GUIDE.md` section 7 for the skill file format and usage. Agents can list skills via the `list_skills` tool and create new ones via `create_skill`.

@@ -28,6 +28,7 @@ Platform-wide settings loaded once at startup from the project root. Changes req
 |-------|------|---------|-------------|
 | `dataDir` | string | `"./data"` | Directory for SQLite databases and memory storage |
 | `systemPromptsDir` | string | `"./prompts"` | Directory containing agent prompt and config files |
+| `skillsDir` | string | `"./skills"` | Directory containing skill `.md` files |
 | `defaultModel` | string | `"openai/gpt-4.1-mini"` | Default LLM model for agent reasoning |
 | `embeddingModel` | string | `"openai/text-embedding-3-large"` | Model for memory embeddings |
 
@@ -305,3 +306,112 @@ For tool scoping specifically:
 - Template's `allowed_mcp_servers` overrides parent's
 - If template doesn't set it, child inherits parent's scope
 - Same logic for `allowed_tools`
+
+---
+
+## 7. Skills (`skills/*.md`)
+
+Skills are reusable prompt templates that register as tools. Each skill is a `.md` file with YAML frontmatter defining metadata and a body containing the prompt template.
+
+### File format
+
+```markdown
+---
+name: summarize
+description: Summarize text into bullet points
+parameters:
+  text:
+    type: string
+    description: The text to summarize
+    required: true
+  bullet_count:
+    type: string
+    description: Number of bullet points (default 3-5)
+---
+
+Summarize the following text into {{bullet_count}} concise bullet points.
+
+{{text}}
+```
+
+**Frontmatter fields:**
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `name` | Yes | Tool name agents use to call this skill |
+| `description` | No | Shown to the LLM in the tool list |
+| `parameters` | No | Parameter definitions (name → type, description, required) |
+
+**Template body:** Everything after the second `---`. Use `{{parameter_name}}` for placeholders that get replaced with arguments at call time.
+
+### How skills work
+
+1. `SkillProvider` scans `skillsDir` at startup and registers each `.md` file as a tool
+2. When an agent calls a skill, the template is expanded with the provided arguments
+3. The expanded prompt is sent as a single LLM sub-call using the calling agent's model
+4. The LLM response is returned as the tool result
+
+### Agent tools for skills
+
+| Tool | Description |
+|------|-------------|
+| `list_skills` | Returns all loaded skills with descriptions and parameters |
+| `create_skill` | Creates a new skill `.md` file at runtime (immediately available) |
+| Individual skills | Each loaded skill appears as a callable tool |
+
+### API endpoints
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /skills` | List all loaded skills |
+| `GET /skills/{name}` | Get a skill with its template |
+
+### Applying changes
+
+Skills can be reloaded without a server restart using the **RELOAD CONFIG** button in the Config Editor UI, or via `POST /config/reload`.
+
+---
+
+## 8. Config Editor UI
+
+The web-based config editor is available at `/config` in the frontend. It provides a unified interface for viewing and editing all configuration files.
+
+### Sections
+
+| Section | Contents | Editable | Deletable |
+|---------|----------|----------|-----------|
+| Platform Config | `lyra.config.json`, `.env` | Yes | No |
+| Agent Configs | `prompts/*.json` | Yes | Yes |
+| Agent Prompts | `prompts/*.md` | Yes | Yes |
+| System Prompts | `prompts/system/*.md` | Yes | No |
+| Skills | `skills/*.md` | Yes | Yes |
+
+### Features
+
+- **Inline editor** with monospace font and tab support
+- **Save/Cancel** — save writes to disk immediately, cancel reverts to last saved state
+- **Delete** with inline confirmation (protected for platform config and system prompts)
+- **Context help** — a bar at the bottom shows documentation for the config key at the cursor position (works for JSON, `.env`, and skill YAML frontmatter)
+- **Reload Config** — reloads skills from disk without restarting the server
+- **Restart Server** — full server restart with inline confirmation and automatic reconnection polling
+
+### API endpoints
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /config/files` | List all config files grouped by category |
+| `GET /config/file?path=...` | Read a file's content |
+| `PUT /config/file` | Write/update a file |
+| `DELETE /config/file?path=...` | Delete a file (agent configs, prompts, skills only) |
+| `POST /config/reload` | Reload skills and refresh config |
+| `POST /config/restart` | Restart the backend server |
+
+### When to reload vs restart
+
+| Change | Action needed |
+|--------|---------------|
+| Edited a skill `.md` file | Reload |
+| Edited an agent prompt or config | No action (reloads per agent creation) |
+| Edited `lyra.config.json` | Restart (loaded once at startup) |
+| Changed MCP server configuration | Restart |
+| Changed `.env` variables | Restart |
