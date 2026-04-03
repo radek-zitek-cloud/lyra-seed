@@ -92,6 +92,12 @@ export default function AgentPage() {
       eventType === "message_received"
     ) {
       fetchAgentMessages(agentId).then(setAgentMessages).catch(() => {});
+      // Child status may have changed (sent task → running, got result → idle)
+      fetchAgentChildren(agentId).then(setChildren).catch(() => {});
+    }
+
+    if (eventType === "agent_spawn" || eventType === "agent_complete") {
+      fetchAgentChildren(agentId).then(setChildren).catch(() => {});
     }
 
     // Refresh conversation when agent completes a turn
