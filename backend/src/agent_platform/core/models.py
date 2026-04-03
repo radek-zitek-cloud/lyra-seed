@@ -57,6 +57,7 @@ class AgentConfig(BaseModel):
     max_subtasks: int = 10
     auto_extract: bool = True
     memory_sharing: dict[str, str] | None = None
+    allowed_mcp_servers: list[str] | None = None
 
 
 class Agent(BaseModel):

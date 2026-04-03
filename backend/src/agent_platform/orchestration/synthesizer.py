@@ -24,9 +24,7 @@ _DEFAULT_PROMPT = (
 class ResultSynthesizer:
     """Synthesizes multiple subtask results into a unified response."""
 
-    def __init__(
-        self, system_prompt: str | None = None
-    ) -> None:
+    def __init__(self, system_prompt: str | None = None) -> None:
         self._prompt = system_prompt or _DEFAULT_PROMPT
 
     async def synthesize(

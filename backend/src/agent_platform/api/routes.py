@@ -94,6 +94,10 @@ async def create_agent(req: CreateAgentRequest):
         config.auto_extract = file_config.auto_extract
     if file_config.memory_sharing is not None:
         config.memory_sharing = file_config.memory_sharing
+    if file_config.allowed_mcp_servers is not None:
+        config.allowed_mcp_servers = file_config.allowed_mcp_servers
+    if file_config.allowed_tools is not None:
+        config.allowed_tools = file_config.allowed_tools
 
     # Apply platform defaults for fields not set by file config
     pc = get_platform_config()

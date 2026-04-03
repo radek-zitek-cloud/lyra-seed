@@ -140,6 +140,8 @@ class AgentFileConfig(BaseModel):
     max_subtasks: int | None = None
     auto_extract: bool | None = None
     memory_sharing: dict[str, str] | None = None
+    allowed_mcp_servers: list[str] | None = None
+    allowed_tools: list[str] | None = None
 
 
 def _sanitize_name(agent_name: str) -> str:

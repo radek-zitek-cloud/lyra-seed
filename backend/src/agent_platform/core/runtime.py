@@ -114,7 +114,10 @@ class AgentRuntime:
                     model=agent.config.model,
                     temperature=agent.config.temperature,
                 )
-                tools_schema = await self._tool_registry.get_tools_schema()
+                tools_schema = await self._tool_registry.get_tools_schema(
+                    allowed_mcp_servers=agent.config.allowed_mcp_servers,
+                    allowed_tools=agent.config.allowed_tools or None,
+                )
 
                 # Emit LLM_REQUEST event
                 await self._event_bus.emit(

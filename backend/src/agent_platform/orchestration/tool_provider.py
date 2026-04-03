@@ -57,17 +57,14 @@ class OrchestrationToolProvider:
             Tool(
                 name="decompose_task",
                 description=(
-                    "Break a complex task into subtasks "
-                    "with an execution plan."
+                    "Break a complex task into subtasks with an execution plan."
                 ),
                 input_schema={
                     "type": "object",
                     "properties": {
                         "task": {
                             "type": "string",
-                            "description": (
-                                "The complex task to decompose"
-                            ),
+                            "description": ("The complex task to decompose"),
                         },
                     },
                     "required": ["task"],
@@ -91,10 +88,7 @@ class OrchestrationToolProvider:
                         "strategy": {
                             "type": "string",
                             "enum": ["sequential", "parallel", "pipeline"],
-                            "description": (
-                                "Override strategy "
-                                "(optional)"
-                            ),
+                            "description": ("Override strategy (optional)"),
                         },
                     },
                     "required": ["task"],
@@ -104,9 +98,7 @@ class OrchestrationToolProvider:
             ),
         ]
 
-    async def _resolve_agent_config(
-        self, agent_id: str
-    ) -> tuple[str | None, int]:
+    async def _resolve_agent_config(self, agent_id: str) -> tuple[str | None, int]:
         """Look up the calling agent's orchestration config.
 
         Returns (model, max_subtasks).
@@ -116,10 +108,7 @@ class OrchestrationToolProvider:
         agent = await self._agent_repo.get(agent_id)
         if not agent:
             return None, 10
-        model = (
-            agent.config.orchestration_model
-            or agent.config.model
-        )
+        model = agent.config.orchestration_model or agent.config.model
         return model, agent.config.max_subtasks
 
     async def call_tool(self, name: str, arguments: dict[str, Any]) -> ToolResult:
@@ -144,7 +133,9 @@ class OrchestrationToolProvider:
             )
             tools = await self._tool_registry.list_tools()
             plan = await self._decomposer.decompose(
-                task, tools, self._llm,
+                task,
+                tools,
+                self._llm,
                 model=model,
                 max_subtasks=max_subtasks,
             )
@@ -203,7 +194,9 @@ class OrchestrationToolProvider:
             )
             tools = await self._tool_registry.list_tools()
             plan = await self._decomposer.decompose(
-                task, tools, self._llm,
+                task,
+                tools,
+                self._llm,
                 model=model,
                 max_subtasks=max_subtasks,
             )
@@ -250,7 +243,9 @@ class OrchestrationToolProvider:
             # 3. Synthesize if execution succeeded
             if orch_result.status == SubTaskStatus.COMPLETED and orch_result.results:
                 synthesized = await self._synthesizer.synthesize(
-                    task, orch_result.results, self._llm,
+                    task,
+                    orch_result.results,
+                    self._llm,
                     model=model,
                 )
                 orch_result.synthesized_response = synthesized
