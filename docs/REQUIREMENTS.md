@@ -147,6 +147,7 @@ This section documents what was delivered, what deviated from the original requi
 ### Not yet delivered
 
 - **Orchestration Patterns (V2P3):** Task decomposition, sequential/parallel/pipeline patterns, result synthesis
-- **Multi-Agent UI (V2P4):** Agent topology graph, communication flow visualization
+- **Per-Agent Tool Scoping (V2P4):** Per-agent MCP server config, scoped tool registries, token optimization. Currently all agents share one global tool registry (38+ tools), inflating context size and cost on every LLM call regardless of what the agent needs.
+- **Multi-Agent UI (V2P5):** Agent topology graph, communication flow visualization
 - **Self-Evolution (V3):** Agents cannot create new tools at runtime
 - **Model Case (V3):** Full end-to-end capability acquisition loop

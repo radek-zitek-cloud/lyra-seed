@@ -36,6 +36,7 @@ from agent_platform.memory.context_manager import ContextManager
 from agent_platform.memory.extractor import FactExtractor
 from agent_platform.memory.memory_tools import MemoryToolProvider
 from agent_platform.observation.in_process_event_bus import InProcessEventBus
+from agent_platform.orchestration.tool_provider import OrchestrationToolProvider
 from agent_platform.tools.agent_spawner import AgentSpawnerProvider
 from agent_platform.tools.mcp_client import MCPClientProvider, MCPStdioClient
 from agent_platform.tools.prompt_macro import PromptMacroProvider
@@ -200,6 +201,16 @@ def create_app(
         message_repo=message_repo,
     )
     tool_registry.register_provider(agent_spawner)
+
+    # Orchestration tools (decompose_task, orchestrate)
+    orchestration_provider = OrchestrationToolProvider(
+        llm_provider=llm_provider,
+        tool_registry=tool_registry,
+        agent_repo=agent_repo,
+        conversation_repo=conv_repo,
+        event_bus=event_bus,
+    )
+    tool_registry.register_provider(orchestration_provider)
 
     runtime = AgentRuntime(
         agent_repo=agent_repo,

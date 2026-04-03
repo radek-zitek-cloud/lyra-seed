@@ -292,6 +292,8 @@ class AgentRuntime:
                         "check_agent_status",
                         "stop_agent",
                         "dismiss_agent",
+                        "decompose_task",
+                        "orchestrate",
                     ):
                         call_args["agent_id"] = agent_id
 
