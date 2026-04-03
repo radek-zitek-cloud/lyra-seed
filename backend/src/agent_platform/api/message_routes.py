@@ -56,8 +56,7 @@ async def send_message_to_agent(agent_id: str, req: SendMessageRequest):
         raise HTTPException(
             status_code=409,
             detail=(
-                f"Agent {agent_id} is {agent.status.value}"
-                " and cannot receive messages"
+                f"Agent {agent_id} is {agent.status.value} and cannot receive messages"
             ),
         )
 

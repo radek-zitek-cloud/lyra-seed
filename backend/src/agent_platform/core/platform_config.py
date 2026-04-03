@@ -81,6 +81,7 @@ class PlatformConfig(BaseModel):
     extractionModel: str = "openai/gpt-4.1-nano"
     orchestrationModel: str | None = None
     maxSubtasks: int = 10
+    skillsDir: str = "./skills"
 
 
 def load_platform_config(project_root: Path) -> PlatformConfig:

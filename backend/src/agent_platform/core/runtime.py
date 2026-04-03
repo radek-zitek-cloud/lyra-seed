@@ -284,26 +284,11 @@ class AgentRuntime:
                     )
                     events_emitted += 1
 
-                    # Inject agent_id for all agent-aware tools
-                    # (always override — LLM may hallucinate the name)
+                    # Inject agent_id for all tool calls
+                    # (harmless for tools that don't use it,
+                    # required for skills, memory, spawner, etc.)
                     call_args = dict(tool_call.arguments)
-                    if tool_call.name in (
-                        "remember",
-                        "recall",
-                        "forget",
-                        "spawn_agent",
-                        "wait_for_agent",
-                        "get_agent_result",
-                        "list_child_agents",
-                        "send_message",
-                        "receive_messages",
-                        "check_agent_status",
-                        "stop_agent",
-                        "dismiss_agent",
-                        "decompose_task",
-                        "orchestrate",
-                    ):
-                        call_args["agent_id"] = agent_id
+                    call_args["agent_id"] = agent_id
 
                     # Execute tool via registry
                     result = await self._tool_registry.call_tool(

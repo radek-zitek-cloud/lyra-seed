@@ -171,25 +171,11 @@ class TestV1Phase5:
         """ST-5.4: Tools list endpoint."""
         client, app = app_client
 
-        # Add a macro via the macro routes
-        await client.post(
-            "/macros",
-            json={
-                "name": "test_macro",
-                "description": "A test macro",
-                "template": "Do {{thing}}",
-                "parameters": {
-                    "type": "object",
-                    "properties": {"thing": {"type": "string"}},
-                },
-            },
-        )
-
         resp = await client.get("/tools")
         assert resp.status_code == 200
         tools = resp.json()
         assert isinstance(tools, list)
-        # At minimum, the endpoint returns a list (may be empty if no macros loaded)
+        # Tools list should contain at least core tools
         for tool in tools:
             assert "name" in tool
             assert "description" in tool

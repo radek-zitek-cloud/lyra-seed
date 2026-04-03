@@ -11,11 +11,11 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from agent_platform.api import _deps
-from agent_platform.api.macro_routes import router as macro_router
 from agent_platform.api.memory_routes import router as memory_router
 from agent_platform.api.message_routes import router as message_router
 from agent_platform.api.observation_routes import router as observation_router
 from agent_platform.api.routes import router
+from agent_platform.api.skill_routes import router as skill_router
 from agent_platform.api.ws_routes import router as ws_router
 from agent_platform.core.config import Settings
 from agent_platform.core.platform_config import (
@@ -27,7 +27,6 @@ from agent_platform.core.platform_config import (
 from agent_platform.core.runtime import AgentRuntime
 from agent_platform.db.sqlite_agent_repo import SqliteAgentRepo
 from agent_platform.db.sqlite_conversation_repo import SqliteConversationRepo
-from agent_platform.db.sqlite_macro_repo import SqliteMacroRepo
 from agent_platform.db.sqlite_message_repo import SqliteMessageRepo
 from agent_platform.llm.openrouter import OpenRouterProvider
 from agent_platform.llm.openrouter_embeddings import OpenRouterEmbeddingProvider
@@ -39,8 +38,8 @@ from agent_platform.observation.in_process_event_bus import InProcessEventBus
 from agent_platform.orchestration.tool_provider import OrchestrationToolProvider
 from agent_platform.tools.agent_spawner import AgentSpawnerProvider
 from agent_platform.tools.mcp_client import MCPClientProvider, MCPStdioClient
-from agent_platform.tools.prompt_macro import PromptMacroProvider
 from agent_platform.tools.registry import ToolRegistry
+from agent_platform.tools.skill_provider import SkillProvider
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +52,6 @@ async def _shutdown(
     mcp_provider,
     agent_repo,
     conv_repo,
-    macro_repo,
     message_repo,
     *,
     has_mcp,
@@ -64,7 +62,6 @@ async def _shutdown(
         await mcp_provider.close_all()
     await agent_repo.close()
     await conv_repo.close()
-    await macro_repo.close()
     if message_repo:
         await message_repo.close()
 
@@ -98,7 +95,6 @@ def create_app(
     event_bus = InProcessEventBus(db_path=db_path)
     agent_repo = SqliteAgentRepo(db_path)
     conv_repo = SqliteConversationRepo(db_path)
-    macro_repo = SqliteMacroRepo(db_path)
     message_repo = SqliteMessageRepo(db_path)
 
     # Configure retry defaults from platform config
@@ -118,9 +114,16 @@ def create_app(
     )
 
     # Tool system
-    macro_provider = PromptMacroProvider(llm_provider=llm_provider)
+    skills_dir_cfg = Path(platform_config.skillsDir)
+    if not skills_dir_cfg.is_absolute():
+        skills_dir_cfg = project_root / skills_dir_cfg
+    skill_provider = SkillProvider(
+        skills_dir=str(skills_dir_cfg),
+        llm_provider=llm_provider,
+        agent_repo=agent_repo,
+    )
     tool_registry = ToolRegistry()
-    tool_registry.register_provider(macro_provider)
+    tool_registry.register_provider(skill_provider)
 
     # MCP servers from config
     mcp_provider = MCPClientProvider()
@@ -234,13 +237,7 @@ def create_app(
         await event_bus.initialize()
         await agent_repo.initialize()
         await conv_repo.initialize()
-        await macro_repo.initialize()
         await message_repo.initialize()
-
-        # Load macros from DB into provider
-        macros = await macro_repo.list()
-        for macro in macros:
-            macro_provider.add_macro(macro)
 
         # Connect MCP servers
         if platform_config.mcpServers:
@@ -265,8 +262,7 @@ def create_app(
             conv_repo,
             event_bus,
             runtime,
-            macro_repo=macro_repo,
-            macro_provider=macro_provider,
+            skill_provider=skill_provider,
             tool_registry=tool_registry,
             system_prompt_resolver=prompt_resolver,
             agent_config_resolver=config_resolver,
@@ -288,7 +284,6 @@ def create_app(
                     mcp_provider,
                     agent_repo,
                     conv_repo,
-                    macro_repo,
                     message_repo,
                     has_mcp=bool(platform_config.mcpServers),
                 ),
@@ -314,7 +309,7 @@ def create_app(
     app.state.tool_registry = tool_registry
 
     app.include_router(router)
-    app.include_router(macro_router)
+    app.include_router(skill_router)
     app.include_router(observation_router)
     app.include_router(memory_router)
     app.include_router(message_router)

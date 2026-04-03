@@ -120,7 +120,10 @@ class TestV2Phase6:
             Tool(
                 name="test_tool",
                 description="A test tool",
-                input_schema={"type": "object", "properties": {"input": {"type": "string"}}},
+                input_schema={
+                    "type": "object",
+                    "properties": {"input": {"type": "string"}},
+                },
                 tool_type=ToolType.MCP,
                 source="test",
             )
@@ -135,7 +138,9 @@ class TestV2Phase6:
             content='{"input": "hello"}', usage={}
         )
 
-        subtask = SubTask(id="st-1", description="Process data", assigned_to="test_tool")
+        subtask = SubTask(
+            id="st-1", description="Process data", assigned_to="test_tool"
+        )
 
         result = await _execute_subtask(
             subtask=subtask,
@@ -274,7 +279,9 @@ class TestV2Phase6:
         )
         deps["tool_registry"].register_provider(mock_provider)
 
-        deps["llm"].complete.return_value = LLMResponse(content="Parallel LLM", usage={})
+        deps["llm"].complete.return_value = LLMResponse(
+            content="Parallel LLM", usage={}
+        )
 
         plan = TaskPlan(
             original_task="Parallel mixed",
@@ -322,7 +329,9 @@ class TestV2Phase6:
             subtasks=[
                 SubTask(id="st-1", description="Stage 1: gather", assigned_to="llm"),
                 SubTask(id="st-2", description="Stage 2: process", assigned_to="llm"),
-                SubTask(id="st-3", description="Stage 3: format", assigned_to="spawn_agent"),
+                SubTask(
+                    id="st-3", description="Stage 3: format", assigned_to="spawn_agent"
+                ),
             ],
             strategy=OrchestrationStrategyType.PIPELINE,
         )

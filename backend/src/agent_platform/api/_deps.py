@@ -9,18 +9,20 @@ from typing import Any
 
 from agent_platform.core.runtime import AgentRuntime
 from agent_platform.db.sqlite_agent_repo import SqliteAgentRepo
-from agent_platform.db.sqlite_conversation_repo import SqliteConversationRepo
-from agent_platform.db.sqlite_macro_repo import SqliteMacroRepo
-from agent_platform.observation.in_process_event_bus import InProcessEventBus
-from agent_platform.tools.prompt_macro import PromptMacroProvider
+from agent_platform.db.sqlite_conversation_repo import (
+    SqliteConversationRepo,
+)
+from agent_platform.observation.in_process_event_bus import (
+    InProcessEventBus,
+)
 from agent_platform.tools.registry import ToolRegistry
+from agent_platform.tools.skill_provider import SkillProvider
 
 _agent_repo: SqliteAgentRepo | None = None
 _conversation_repo: SqliteConversationRepo | None = None
 _event_bus: InProcessEventBus | None = None
 _runtime: AgentRuntime | None = None
-_macro_repo: SqliteMacroRepo | None = None
-_macro_provider: PromptMacroProvider | None = None
+_skill_provider: SkillProvider | None = None
 _tool_registry: ToolRegistry | None = None
 _system_prompt_resolver: Callable[[str], str] | None = None
 _agent_config_resolver: Callable | None = None
@@ -36,8 +38,7 @@ def configure(
     conversation_repo: SqliteConversationRepo,
     event_bus: InProcessEventBus,
     runtime: AgentRuntime,
-    macro_repo: SqliteMacroRepo | None = None,
-    macro_provider: PromptMacroProvider | None = None,
+    skill_provider: SkillProvider | None = None,
     tool_registry: ToolRegistry | None = None,
     system_prompt_resolver: Callable[[str], str] | None = None,
     agent_config_resolver: Callable | None = None,
@@ -48,16 +49,16 @@ def configure(
     message_repo: Any = None,
 ) -> None:
     global _agent_repo, _conversation_repo, _event_bus, _runtime
-    global _macro_repo, _macro_provider, _tool_registry
-    global _system_prompt_resolver, _agent_config_resolver, _default_model
+    global _skill_provider, _tool_registry
+    global _system_prompt_resolver, _agent_config_resolver
+    global _default_model
     global _memory_store, _message_repo
     global _platform_config, _project_root
     _agent_repo = agent_repo
     _conversation_repo = conversation_repo
     _event_bus = event_bus
     _runtime = runtime
-    _macro_repo = macro_repo
-    _macro_provider = macro_provider
+    _skill_provider = skill_provider
     _tool_registry = tool_registry
     _system_prompt_resolver = system_prompt_resolver
     _agent_config_resolver = agent_config_resolver
@@ -88,14 +89,9 @@ def get_runtime() -> AgentRuntime:
     return _runtime
 
 
-def get_macro_repo() -> SqliteMacroRepo:
-    assert _macro_repo is not None, "App not initialized"
-    return _macro_repo
-
-
-def get_macro_provider() -> PromptMacroProvider:
-    assert _macro_provider is not None, "App not initialized"
-    return _macro_provider
+def get_skill_provider() -> SkillProvider:
+    assert _skill_provider is not None, "App not initialized"
+    return _skill_provider
 
 
 def get_tool_registry() -> ToolRegistry:
@@ -120,7 +116,9 @@ def get_default_model() -> str:
 def get_platform_config():
     """Reload platform config from disk on every call."""
     if _project_root is not None:
-        from agent_platform.core.platform_config import load_platform_config
+        from agent_platform.core.platform_config import (
+            load_platform_config,
+        )
 
         return load_platform_config(_project_root)
     return _platform_config
