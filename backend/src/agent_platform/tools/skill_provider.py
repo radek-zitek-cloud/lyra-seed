@@ -175,7 +175,22 @@ class SkillProvider:
             )
             for skill in self._skills.values()
         ]
-        # Always include create_skill
+        # Always include list_skills and create_skill
+        tools.append(
+            Tool(
+                name="list_skills",
+                description=(
+                    "List all available skills with "
+                    "their descriptions and parameters."
+                ),
+                input_schema={
+                    "type": "object",
+                    "properties": {},
+                },
+                tool_type=ToolType.PROMPT_MACRO,
+                source="skill",
+            ),
+        )
         tools.append(
             Tool(
                 name="create_skill",
@@ -219,12 +234,34 @@ class SkillProvider:
         name: str,
         arguments: dict[str, Any],
     ) -> ToolResult:
-        """Execute a skill or create a new one."""
+        """Execute a skill, list skills, or create a new one."""
+        if name == "list_skills":
+            return self._list_skills()
         if name == "create_skill":
             return await self._create_skill(arguments)
         return await self._execute_skill(
             name,
             arguments,
+        )
+
+    def _list_skills(self) -> ToolResult:
+        """Return all loaded skills with descriptions."""
+        if not self._skills:
+            return ToolResult(
+                success=True,
+                output="No skills are currently loaded.",
+            )
+        skills_info = [
+            {
+                "name": s.name,
+                "description": s.description,
+                "parameters": list(s.parameters.keys()),
+            }
+            for s in self._skills.values()
+        ]
+        return ToolResult(
+            success=True,
+            output=json.dumps(skills_info, indent=2),
         )
 
     async def _execute_skill(

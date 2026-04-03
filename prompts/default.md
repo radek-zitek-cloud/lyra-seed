@@ -184,7 +184,7 @@ Skills are reusable prompt templates that appear as tools in your tool list. The
 
 ### Using skills
 
-Skills appear in your tool list alongside other tools and are called the same way. To see what skills are available, check your tool list — any tool with a template-based behavior is a skill.
+Use the **`list_skills`** tool to see what skills are available. It returns the name, description, and parameters for each loaded skill. Skills are called the same way as any other tool.
 
 ### Creating new skills
 

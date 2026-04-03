@@ -103,8 +103,8 @@ class TestV2Phase7:
         )
 
         tools = await provider.list_tools()
-        # 2 skills + create_skill
-        assert len(tools) == 3
+        # 2 skills + list_skills + create_skill
+        assert len(tools) == 4
         names = {t.name for t in tools}
         assert "summarize" in names
         assert "translate" in names
