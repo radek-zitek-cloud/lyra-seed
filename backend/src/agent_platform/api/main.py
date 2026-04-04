@@ -303,6 +303,13 @@ def create_app(
             logger.info("Connecting %d MCP servers...", len(platform_config.mcpServers))
             await mcp_provider.connect_all()
 
+        # Connect agent-managed MCP servers
+        connected = await mcp_server_manager.connect_deployed()
+        if connected:
+            logger.info(
+                "Connected %d agent-managed MCP servers: %s", len(connected), connected
+            )
+
         # Cleanup agents stuck from previous crash
         await runtime.cleanup_stuck_agents()
 
@@ -334,6 +341,8 @@ def create_app(
             message_repo=message_repo,
         )
         yield
+        # Shutdown — disconnect agent-managed MCP servers
+        await mcp_server_manager.disconnect_all()
         # Shutdown — cancel running child agents
         await agent_spawner.cancel_all_tasks()
         # Shutdown — with timeout to prevent hanging on reload

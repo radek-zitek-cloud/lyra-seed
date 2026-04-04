@@ -1,0 +1,20 @@
+{
+  "name": "microblog-api",
+  "description": "MCP server for the radekzitek.cz microblog API with tools for posts, tags, and profile operations",
+  "command": "uv",
+  "args": [
+    "run",
+    "--with",
+    "fastmcp",
+    "--with",
+    "httpx",
+    "python",
+    "server.py"
+  ],
+  "workdir": "/home/radek/Code/lyra-seed/mcp-servers/microblog-api",
+  "env": {
+    "MICROBLOG_API_KEY": "${MICROBLOG_API_KEY}"
+  },
+  "managed": true,
+  "deployed": true
+}

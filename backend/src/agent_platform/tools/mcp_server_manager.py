@@ -13,6 +13,7 @@ import re
 from pathlib import Path
 from typing import Any
 
+from agent_platform.tools.mcp_client import MCPStdioClient
 from agent_platform.tools.models import Tool, ToolResult, ToolType
 
 logger = logging.getLogger(__name__)
@@ -43,6 +44,7 @@ class MCPServerManager:
         self._mcp_provider = mcp_provider
         self._configs: dict[str, dict[str, Any]] = {}
         self._embeddings: dict[str, list[float]] = {}
+        self._connected: dict[str, MCPStdioClient] = {}
         self._load_configs()
 
     def _load_configs(self) -> None:
@@ -61,6 +63,66 @@ class MCPServerManager:
 
     def reload(self) -> None:
         self._load_configs()
+
+    async def connect_deployed(self) -> list[str]:
+        """Connect all deployed agent-managed servers.
+
+        Returns list of newly connected server names.
+        """
+        connected: list[str] = []
+        for name, cfg in self._configs.items():
+            if not cfg.get("deployed"):
+                continue
+            if name in self._connected:
+                continue
+
+            resolved_env = self.resolve_env(cfg.get("env", {}))
+            workdir = cfg.get("workdir")
+
+            client = MCPStdioClient(
+                server_name=name,
+                command=cfg.get("command", "python"),
+                args=cfg.get("args", []),
+                env=resolved_env,
+                cwd=workdir,
+            )
+
+            try:
+                await client.connect()
+                self._connected[name] = client
+                # Register tools with the MCP provider
+                if self._mcp_provider:
+                    for tool in await client.list_tools():
+                        self._mcp_provider._tool_map[tool.name] = client
+                    if client not in self._mcp_provider._clients:
+                        self._mcp_provider._clients.append(client)
+                connected.append(name)
+                logger.info("Connected agent-managed MCP server: %s", name)
+            except Exception:
+                logger.exception(
+                    "Failed to connect agent-managed MCP server: %s",
+                    name,
+                )
+
+        return connected
+
+    async def disconnect_server(self, name: str) -> None:
+        """Disconnect a running agent-managed server."""
+        client = self._connected.pop(name, None)
+        if client:
+            # Remove tools from provider
+            if self._mcp_provider:
+                for tool in await client.list_tools():
+                    self._mcp_provider._tool_map.pop(tool.name, None)
+                if client in self._mcp_provider._clients:
+                    self._mcp_provider._clients.remove(client)
+            await client.close()
+            logger.info("Disconnected agent-managed MCP server: %s", name)
+
+    async def disconnect_all(self) -> None:
+        """Disconnect all agent-managed servers."""
+        for name in list(self._connected):
+            await self.disconnect_server(name)
 
     def get_configs(self) -> dict[str, dict[str, Any]]:
         return dict(self._configs)
@@ -350,29 +412,33 @@ class MCPServerManager:
         if cfg.get("deployed"):
             return ToolResult(
                 success=True,
-                output=json.dumps({
-                    "name": name,
-                    "status": "already_deployed",
-                }),
+                output=json.dumps(
+                    {
+                        "name": name,
+                        "status": "already_deployed",
+                    }
+                ),
             )
 
         return ToolResult(
             success=True,
-            output=json.dumps({
-                "requires_approval": True,
-                "name": name,
-                "description": cfg.get("description", ""),
-                "command": cfg.get("command", ""),
-                "args": cfg.get("args", []),
-                "workdir": cfg.get("workdir", ""),
-                "message": (
-                    "Deployment request submitted. "
-                    "The human must approve via "
-                    "POST /mcp-servers/{name}/deploy "
-                    "or the config editor before "
-                    "the server will start."
-                ),
-            }),
+            output=json.dumps(
+                {
+                    "requires_approval": True,
+                    "name": name,
+                    "description": cfg.get("description", ""),
+                    "command": cfg.get("command", ""),
+                    "args": cfg.get("args", []),
+                    "workdir": cfg.get("workdir", ""),
+                    "message": (
+                        "Deployment request submitted. "
+                        "The human must approve via "
+                        "POST /mcp-servers/{name}/deploy "
+                        "or the config editor before "
+                        "the server will start."
+                    ),
+                }
+            ),
         )
 
     def approve_deploy(self, name: str) -> bool:

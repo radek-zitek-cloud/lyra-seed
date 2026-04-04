@@ -207,14 +207,17 @@ async def reload_config():
         logger.exception("Failed to reload skills")
         reloaded.append(f"skills (error: {e})")
 
-    # Reload agent-managed MCP servers
+    # Reload agent-managed MCP servers + connect new
     try:
         mgr = get_mcp_server_manager()
         mgr.reload()
+        connected = await mgr.connect_deployed()
         deployed = sum(1 for c in mgr.get_configs().values() if c.get("deployed"))
-        reloaded.append(
-            f"mcp-servers ({len(mgr.get_configs())} configs, {deployed} deployed)"
-        )
+        msg = f"mcp-servers ({len(mgr.get_configs())} configs, {deployed} deployed"
+        if connected:
+            msg += f", {len(connected)} newly connected"
+        msg += ")"
+        reloaded.append(msg)
     except Exception as e:
         logger.exception("Failed to reload MCP servers")
         reloaded.append(f"mcp-servers (error: {e})")

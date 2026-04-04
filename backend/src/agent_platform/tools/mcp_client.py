@@ -42,6 +42,7 @@ async def _create_subprocess(
     command: str,
     args: list[str],
     env: dict[str, str],
+    cwd: str | None = None,
 ) -> asyncio.subprocess.Process:
     """Create a subprocess cross-platform.
 
@@ -59,6 +60,7 @@ async def _create_subprocess(
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             env=env,
+            cwd=cwd,
         )
     except NotImplementedError:
         if sys.platform != "win32":
@@ -71,6 +73,7 @@ async def _create_subprocess(
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             env=env,
+            cwd=cwd,
         )
         return _PopenWrapper(proc)
 
@@ -141,12 +144,14 @@ class MCPStdioClient:
         args: list[str] | None = None,
         env: dict[str, str] | None = None,
         request_timeout: float = 30.0,
+        cwd: str | None = None,
     ) -> None:
         self._server_name = server_name
         self._command = command
         self._args = args or []
         self._env = env or {}
         self._request_timeout = request_timeout
+        self._cwd = cwd
         self._process: asyncio.subprocess.Process | None = None
         self._request_id = 0
         self._tools: list[Tool] = []
@@ -164,7 +169,12 @@ class MCPStdioClient:
             " ".join(self._args),
         )
 
-        self._process = await _create_subprocess(self._command, self._args, proc_env)
+        self._process = await _create_subprocess(
+            self._command,
+            self._args,
+            proc_env,
+            cwd=self._cwd,
+        )
 
         # Send initialize request
         init_result = await self._send_request(
