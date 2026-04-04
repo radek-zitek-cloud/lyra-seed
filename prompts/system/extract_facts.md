@@ -26,5 +26,12 @@ Rules:
 - Set importance: 0.3 for minor facts, 0.5 for useful info, 0.7 for important details, 0.9+ for critical user identity or preferences
 - If nothing worth extracting, return an empty array `[]`
 
+Do NOT extract:
+- Descriptions of the assistant's own tool list or capabilities ("I have these tools: ...")
+- Test data, example inputs, or sample values used to test a tool
+- Confirmation messages ("Done", "Created successfully") unless they contain unique factual information
+- Rephrased versions of information that was already stated in the same conversation
+- Error messages or invalid input examples from tool validation tests
+
 Respond with ONLY a JSON array (no markdown, no explanation):
 [{"content": "...", "memory_type": "fact|preference|decision|outcome|procedure|tool_knowledge|domain_knowledge", "importance": 0.0-1.0}]

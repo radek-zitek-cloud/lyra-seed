@@ -326,9 +326,16 @@ class CapabilityToolProvider:
 
         # Store as PROCEDURE memory
         if self._memory:
+            structured_content = (
+                f"[REFLECTION]\n"
+                f"Task: {task}\n"
+                f"Outcome: {outcome}\n"
+                f"Tools: {tools_used}\n\n"
+                f"Lessons learned:\n{reflection}"
+            )
             entry = MemoryEntry(
                 agent_id=args.get("agent_id", "system"),
-                content=(f"Reflection on: {task}\n\n{reflection}"),
+                content=structured_content,
                 memory_type=MemoryType.PROCEDURE,
                 importance=0.7,
                 visibility=DEFAULT_VISIBILITY[MemoryType.PROCEDURE],
@@ -439,7 +446,7 @@ class CapabilityToolProvider:
         else:
             subtasks = subtasks_raw
 
-        content = f"Pattern: {task_type}\nStrategy: {strategy}\nSubtasks:\n"
+        content = f"[PATTERN]\nTask type: {task_type}\nStrategy: {strategy}\nSubtasks:\n"
         for i, st in enumerate(subtasks, 1):
             content += f"  {i}. {st}\n"
         if notes:
