@@ -153,15 +153,24 @@ def create_app(
     if platform_config.mcpServers:
         tool_registry.register_provider(mcp_provider)
 
-    # Memory system with real embeddings
+    # Memory system with embeddings
     memory_dir = os.path.join(db_dir, "memory")
     os.makedirs(memory_dir, exist_ok=True)
-    embedding_provider = OpenRouterEmbeddingProvider(
-        api_key=settings.openrouter_api_key.get_secret_value(),
-        model=platform_config.embeddingModel,
-        event_bus=event_bus,
-        timeout=retry_cfg.timeout,
-    )
+    api_key = settings.openrouter_api_key.get_secret_value()
+    if api_key and not api_key.startswith("sk-test"):
+        embedding_provider = OpenRouterEmbeddingProvider(
+            api_key=api_key,
+            model=platform_config.embeddingModel,
+            event_bus=event_bus,
+            timeout=retry_cfg.timeout,
+        )
+    else:
+        from agent_platform.memory.fake_embeddings import (
+            FakeEmbeddingProvider,
+        )
+
+        logger.warning("Using fake embeddings (no valid API key)")
+        embedding_provider = FakeEmbeddingProvider()
     gc_cfg = platform_config.memoryGC
     from agent_platform.memory.decay import TimeDecayStrategy
 
