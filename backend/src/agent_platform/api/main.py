@@ -40,6 +40,7 @@ from agent_platform.observation.in_process_event_bus import InProcessEventBus
 from agent_platform.orchestration.tool_provider import OrchestrationToolProvider
 from agent_platform.tools.agent_spawner import AgentSpawnerProvider
 from agent_platform.tools.mcp_client import MCPClientProvider, MCPStdioClient
+from agent_platform.tools.mcp_server_manager import MCPServerManager
 from agent_platform.tools.registry import ToolRegistry
 from agent_platform.tools.skill_provider import SkillProvider
 from agent_platform.tools.template_provider import TemplateProvider
@@ -138,7 +139,9 @@ def create_app(
     for name, server_cfg in platform_config.mcpServers.items():
         # Resolve env var references: ${VAR_NAME} → os.environ[VAR_NAME]
         resolved_env = {
-            k: os.environ.get(v[2:-1], v) if v.startswith("${") and v.endswith("}") else v
+            k: os.environ.get(v[2:-1], v)
+            if v.startswith("${") and v.endswith("}")
+            else v
             for k, v in server_cfg.env.items()
         }
         client = MCPStdioClient(
@@ -194,12 +197,21 @@ def create_app(
 
     # Template discovery
     template_provider = TemplateProvider(
-        prompts_dir=str(
-            project_root / platform_config.systemPromptsDir
-        ),
+        prompts_dir=str(project_root / platform_config.systemPromptsDir),
         embedding_provider=embedding_provider,
     )
     tool_registry.register_provider(template_provider)
+
+    # MCP Server Manager (agent-managed servers)
+    mcp_servers_dir_cfg = Path(platform_config.mcpServersDir)
+    if not mcp_servers_dir_cfg.is_absolute():
+        mcp_servers_dir_cfg = project_root / mcp_servers_dir_cfg
+    mcp_server_manager = MCPServerManager(
+        mcp_servers_dir=str(mcp_servers_dir_cfg),
+        embedding_provider=embedding_provider,
+        mcp_provider=mcp_provider,
+    )
+    tool_registry.register_provider(mcp_server_manager)
 
     # Load system prompts for summarization and extraction
     summary_prompt = load_system_prompt("summarize", project_root)
@@ -311,6 +323,7 @@ def create_app(
             runtime,
             skill_provider=skill_provider,
             template_provider=template_provider,
+            mcp_server_manager=mcp_server_manager,
             tool_registry=tool_registry,
             system_prompt_resolver=prompt_resolver,
             agent_config_resolver=config_resolver,

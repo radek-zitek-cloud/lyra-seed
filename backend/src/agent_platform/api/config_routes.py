@@ -85,6 +85,7 @@ async def list_config_files():
             if "/" not in f["name"]
         ],
         "skills": _list_files(root / "skills", ".md"),
+        "mcp_servers": _list_files(root / "mcp-servers", ".json"),
     }
 
 
@@ -132,9 +133,12 @@ async def write_config_file(req: FileUpdate):
         ".env",
         "prompts/",
         "skills/",
+        "mcp-servers/",
     )
     if not any(req.path.startswith(p) for p in allowed_prefixes):
-        raise HTTPException(403, "Can only edit config, prompt, and skill files")
+        raise HTTPException(
+            403, "Can only edit config, prompt, skill, and MCP server files"
+        )
 
     file_path.parent.mkdir(parents=True, exist_ok=True)
     file_path.write_text(req.content, encoding="utf-8")
@@ -171,8 +175,9 @@ async def delete_config_file(path: str):
 
 @router.post("/reload")
 async def reload_config():
-    """Reload configuration, skills, and prompts without restarting."""
+    """Reload configuration, skills, MCP servers, and prompts."""
     from agent_platform.api._deps import (
+        get_mcp_server_manager,
         get_skill_provider,
     )
 
@@ -187,15 +192,25 @@ async def reload_config():
         logger.exception("Failed to reload skills")
         reloaded.append(f"skills (error: {e})")
 
+    # Reload agent-managed MCP servers
+    try:
+        mgr = get_mcp_server_manager()
+        mgr.reload()
+        deployed = sum(1 for c in mgr.get_configs().values() if c.get("deployed"))
+        reloaded.append(
+            f"mcp-servers ({len(mgr.get_configs())} configs, {deployed} deployed)"
+        )
+    except Exception as e:
+        logger.exception("Failed to reload MCP servers")
+        reloaded.append(f"mcp-servers (error: {e})")
+
     # Platform config reloads on every agent creation already
     reloaded.append("platform config (reloads per agent creation)")
-    # Prompts reload on every agent creation already
     reloaded.append("agent prompts (reload per agent creation)")
 
     return {
         "status": "reloaded",
         "reloaded": reloaded,
-        "note": "MCP server changes require a full restart.",
     }
 
 

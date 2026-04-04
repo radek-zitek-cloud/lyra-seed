@@ -30,7 +30,9 @@ class FakeEmbedding:
                 results.append(self._vectors[t])
             else:
                 h = hash(t) % 1000
-                results.append([h / 1000, (h * 7 % 1000) / 1000, (h * 13 % 1000) / 1000])
+                results.append(
+                    [h / 1000, (h * 7 % 1000) / 1000, (h * 13 % 1000) / 1000]
+                )
         return results
 
 
@@ -77,13 +79,16 @@ class TestV3Phase2:
 
         mgr = MCPServerManager(mcp_servers_dir=str(tmp_path))
 
-        result = await mgr.call_tool("add_mcp_server", {
-            "name": "firecrawl",
-            "description": "Web scraping via Firecrawl",
-            "command": "npx",
-            "args": json.dumps(["-y", "firecrawl-mcp"]),
-            "env": json.dumps({"FIRECRAWL_API_KEY": "${FIRECRAWL_API_KEY}"}),
-        })
+        result = await mgr.call_tool(
+            "add_mcp_server",
+            {
+                "name": "firecrawl",
+                "description": "Web scraping via Firecrawl",
+                "command": "npx",
+                "args": json.dumps(["-y", "firecrawl-mcp"]),
+                "env": json.dumps({"FIRECRAWL_API_KEY": "${FIRECRAWL_API_KEY}"}),
+            },
+        )
         assert result.success
 
         # Config file written
@@ -94,17 +99,23 @@ class TestV3Phase2:
         assert cfg["deployed"] is True
 
         # Name validation
-        result = await mgr.call_tool("add_mcp_server", {
-            "name": "bad name!",
-            "command": "echo",
-        })
+        result = await mgr.call_tool(
+            "add_mcp_server",
+            {
+                "name": "bad name!",
+                "command": "echo",
+            },
+        )
         assert not result.success
 
         # Duplicate rejected
-        result = await mgr.call_tool("add_mcp_server", {
-            "name": "firecrawl",
-            "command": "echo",
-        })
+        result = await mgr.call_tool(
+            "add_mcp_server",
+            {
+                "name": "firecrawl",
+                "command": "echo",
+            },
+        )
         assert not result.success
 
     @pytest.mark.asyncio
@@ -114,10 +125,13 @@ class TestV3Phase2:
 
         mgr = MCPServerManager(mcp_servers_dir=str(tmp_path))
 
-        result = await mgr.call_tool("create_mcp_server", {
-            "name": "microblog-api",
-            "description": "CRUD for microblog platform",
-        })
+        result = await mgr.call_tool(
+            "create_mcp_server",
+            {
+                "name": "microblog-api",
+                "description": "CRUD for microblog platform",
+            },
+        )
         assert result.success
 
         data = json.loads(result.output)
@@ -140,9 +154,12 @@ class TestV3Phase2:
 
         mgr = MCPServerManager(mcp_servers_dir=str(tmp_path))
 
-        result = await mgr.call_tool("deploy_mcp_server", {
-            "name": "custom-srv",
-        })
+        result = await mgr.call_tool(
+            "deploy_mcp_server",
+            {
+                "name": "custom-srv",
+            },
+        )
 
         # Should indicate HITL required
         assert result.success
@@ -155,10 +172,13 @@ class TestV3Phase2:
         assert cfg["deployed"] is False
 
         # Simulate approval
-        result2 = await mgr.call_tool("deploy_mcp_server", {
-            "name": "custom-srv",
-            "approved": "true",
-        })
+        result2 = await mgr.call_tool(
+            "deploy_mcp_server",
+            {
+                "name": "custom-srv",
+                "approved": "true",
+            },
+        )
         assert result2.success
 
         # Config updated
@@ -171,7 +191,9 @@ class TestV3Phase2:
         from agent_platform.tools.mcp_server_manager import MCPServerManager
 
         _write_server_config(tmp_path, "srv-a", description="Alpha server")
-        _write_server_config(tmp_path, "srv-b", description="Beta server", deployed=False)
+        _write_server_config(
+            tmp_path, "srv-b", description="Beta server", deployed=False
+        )
 
         mgr = MCPServerManager(mcp_servers_dir=str(tmp_path))
 
@@ -195,20 +217,25 @@ class TestV3Phase2:
         _write_server_config(tmp_path, "web-scraper", description="Scrape web pages")
         _write_server_config(tmp_path, "database", description="Query SQL databases")
 
-        embeddings = FakeEmbedding({
-            "Scrape web pages": [1.0, 0.0, 0.0],
-            "Query SQL databases": [0.0, 1.0, 0.0],
-            "crawl websites": [0.95, 0.05, 0.0],
-        })
+        embeddings = FakeEmbedding(
+            {
+                "Scrape web pages": [1.0, 0.0, 0.0],
+                "Query SQL databases": [0.0, 1.0, 0.0],
+                "crawl websites": [0.95, 0.05, 0.0],
+            }
+        )
 
         mgr = MCPServerManager(
             mcp_servers_dir=str(tmp_path),
             embedding_provider=embeddings,
         )
 
-        result = await mgr.call_tool("list_mcp_servers", {
-            "query": "crawl websites",
-        })
+        result = await mgr.call_tool(
+            "list_mcp_servers",
+            {
+                "query": "crawl websites",
+            },
+        )
         assert result.success
         data = json.loads(result.output)
         assert data[0]["name"] == "web-scraper"
@@ -222,15 +249,21 @@ class TestV3Phase2:
 
         mgr = MCPServerManager(mcp_servers_dir=str(tmp_path))
 
-        result = await mgr.call_tool("stop_mcp_server", {
-            "name": "stoppable",
-        })
+        result = await mgr.call_tool(
+            "stop_mcp_server",
+            {
+                "name": "stoppable",
+            },
+        )
         assert result.success
 
         # Cannot stop non-managed (platform) server
-        result = await mgr.call_tool("stop_mcp_server", {
-            "name": "filesystem",
-        })
+        result = await mgr.call_tool(
+            "stop_mcp_server",
+            {
+                "name": "filesystem",
+            },
+        )
         assert not result.success
 
     @pytest.mark.asyncio
@@ -252,23 +285,30 @@ class TestV3Phase2:
         skills_dir = tmp_path / "skills"
         skills_dir.mkdir()
 
-        (tmp_path / "lyra.config.json").write_text(json.dumps({
-            "dataDir": str(tmp_path / "data"),
-            "systemPromptsDir": str(prompts_dir),
-            "skillsDir": str(skills_dir),
-            "mcpServersDir": str(mcp_dir),
-            "defaultModel": "test-model",
-        }))
+        (tmp_path / "lyra.config.json").write_text(
+            json.dumps(
+                {
+                    "dataDir": str(tmp_path / "data"),
+                    "systemPromptsDir": str(prompts_dir),
+                    "skillsDir": str(skills_dir),
+                    "mcpServersDir": str(mcp_dir),
+                    "defaultModel": "test-model",
+                }
+            )
+        )
 
         settings = Settings(openrouter_api_key="sk-test")
         app = create_app(
-            settings, db_dir=str(tmp_path / "data"), project_root=tmp_path,
+            settings,
+            db_dir=str(tmp_path / "data"),
+            project_root=tmp_path,
         )
 
         async with app.router.lifespan_context(app):
             transport = httpx.ASGITransport(app=app)
             async with httpx.AsyncClient(
-                transport=transport, base_url="http://test",
+                transport=transport,
+                base_url="http://test",
             ) as client:
                 resp = await client.get("/config/files")
                 assert resp.status_code == 200
@@ -298,7 +338,8 @@ class TestV3Phase2:
         from agent_platform.tools.mcp_server_manager import MCPServerManager
 
         _write_server_config(
-            tmp_path, "env-test",
+            tmp_path,
+            "env-test",
             env={"API_KEY": "${TEST_SECRET_KEY}"},
         )
 

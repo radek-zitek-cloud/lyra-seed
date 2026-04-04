@@ -15,6 +15,7 @@ from agent_platform.db.sqlite_conversation_repo import (
 from agent_platform.observation.in_process_event_bus import (
     InProcessEventBus,
 )
+from agent_platform.tools.mcp_server_manager import MCPServerManager
 from agent_platform.tools.registry import ToolRegistry
 from agent_platform.tools.skill_provider import SkillProvider
 from agent_platform.tools.template_provider import TemplateProvider
@@ -25,6 +26,7 @@ _event_bus: InProcessEventBus | None = None
 _runtime: AgentRuntime | None = None
 _skill_provider: SkillProvider | None = None
 _template_provider: TemplateProvider | None = None
+_mcp_server_manager: MCPServerManager | None = None
 _tool_registry: ToolRegistry | None = None
 _system_prompt_resolver: Callable[[str], str] | None = None
 _agent_config_resolver: Callable | None = None
@@ -42,6 +44,7 @@ def configure(
     runtime: AgentRuntime,
     skill_provider: SkillProvider | None = None,
     template_provider: TemplateProvider | None = None,
+    mcp_server_manager: MCPServerManager | None = None,
     tool_registry: ToolRegistry | None = None,
     system_prompt_resolver: Callable[[str], str] | None = None,
     agent_config_resolver: Callable | None = None,
@@ -52,7 +55,7 @@ def configure(
     message_repo: Any = None,
 ) -> None:
     global _agent_repo, _conversation_repo, _event_bus, _runtime
-    global _skill_provider, _template_provider, _tool_registry
+    global _skill_provider, _template_provider, _mcp_server_manager, _tool_registry
     global _system_prompt_resolver, _agent_config_resolver
     global _default_model
     global _memory_store, _message_repo
@@ -63,6 +66,7 @@ def configure(
     _runtime = runtime
     _skill_provider = skill_provider
     _template_provider = template_provider
+    _mcp_server_manager = mcp_server_manager
     _tool_registry = tool_registry
     _system_prompt_resolver = system_prompt_resolver
     _agent_config_resolver = agent_config_resolver
@@ -101,6 +105,11 @@ def get_skill_provider() -> SkillProvider:
 def get_template_provider() -> TemplateProvider:
     assert _template_provider is not None, "App not initialized"
     return _template_provider
+
+
+def get_mcp_server_manager() -> MCPServerManager:
+    assert _mcp_server_manager is not None, "App not initialized"
+    return _mcp_server_manager
 
 
 def get_tool_registry() -> ToolRegistry:

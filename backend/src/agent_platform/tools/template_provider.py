@@ -82,9 +82,7 @@ class TemplateProvider:
             md_path = prompts_path / f"{name}.md"
 
             try:
-                config = json.loads(
-                    json_path.read_text(encoding="utf-8")
-                )
+                config = json.loads(json_path.read_text(encoding="utf-8"))
             except Exception:
                 config = {}
 
@@ -104,9 +102,9 @@ class TemplateProvider:
         if not self._embedder:
             return
         missing = [
-            n for n in self._templates
-            if n not in self._embeddings
-            and self._templates[n].description
+            n
+            for n in self._templates
+            if n not in self._embeddings and self._templates[n].description
         ]
         if not missing:
             return
@@ -141,9 +139,7 @@ class TemplateProvider:
                     "properties": {
                         "query": {
                             "type": "string",
-                            "description": (
-                                "Search query (optional)"
-                            ),
+                            "description": ("Search query (optional)"),
                         },
                     },
                 },
@@ -152,10 +148,7 @@ class TemplateProvider:
             ),
             Tool(
                 name="get_template",
-                description=(
-                    "Get details of an agent template "
-                    "including its config."
-                ),
+                description=("Get details of an agent template including its config."),
                 input_schema={
                     "type": "object",
                     "properties": {
@@ -172,18 +165,22 @@ class TemplateProvider:
         ]
 
     async def call_tool(
-        self, name: str, arguments: dict[str, Any],
+        self,
+        name: str,
+        arguments: dict[str, Any],
     ) -> ToolResult:
         if name == "list_templates":
             return await self._list_templates(arguments)
         if name == "get_template":
             return self._get_template(arguments)
         return ToolResult(
-            success=False, error=f"Unknown tool: {name}",
+            success=False,
+            error=f"Unknown tool: {name}",
         )
 
     async def _list_templates(
-        self, arguments: dict[str, Any],
+        self,
+        arguments: dict[str, Any],
     ) -> ToolResult:
         if not self._templates:
             return ToolResult(
@@ -207,7 +204,8 @@ class TemplateProvider:
                         scored.append((sim, t))
                 if scored:
                     scored.sort(
-                        key=lambda x: x[0], reverse=True,
+                        key=lambda x: x[0],
+                        reverse=True,
                     )
                     templates = [t for _, t in scored]
             except Exception:
@@ -228,7 +226,8 @@ class TemplateProvider:
         )
 
     def _get_template(
-        self, arguments: dict[str, Any],
+        self,
+        arguments: dict[str, Any],
     ) -> ToolResult:
         name = arguments.get("name", "")
         tmpl = self._templates.get(name)

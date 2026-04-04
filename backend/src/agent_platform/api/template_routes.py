@@ -31,7 +31,8 @@ async def get_template(name: str):
     tmpl = provider.get_template(name)
     if tmpl is None:
         raise HTTPException(
-            status_code=404, detail="Template not found",
+            status_code=404,
+            detail="Template not found",
         )
     return {
         "name": tmpl.name,
