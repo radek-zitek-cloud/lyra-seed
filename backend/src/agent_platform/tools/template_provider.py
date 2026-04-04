@@ -7,12 +7,12 @@ semantic search.
 
 import json
 import logging
-import math
 from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, Field
 
+from agent_platform.core.utils import cosine_similarity
 from agent_platform.tools.models import Tool, ToolResult, ToolType
 
 logger = logging.getLogger(__name__)
@@ -40,15 +40,6 @@ def _extract_description(md_path: Path) -> str:
         # First non-header, non-empty line is the description
         return stripped[:200]
     return ""
-
-
-def _cosine_similarity(a: list[float], b: list[float]) -> float:
-    dot = sum(x * y for x, y in zip(a, b))
-    na = math.sqrt(sum(x * x for x in a))
-    nb = math.sqrt(sum(x * x for x in b))
-    if na == 0 or nb == 0:
-        return 0.0
-    return dot / (na * nb)
 
 
 class TemplateProvider:
@@ -143,7 +134,7 @@ class TemplateProvider:
                         },
                     },
                 },
-                tool_type=ToolType.PROMPT_MACRO,
+                tool_type=ToolType.INTERNAL,
                 source="template",
             ),
             Tool(
@@ -159,7 +150,7 @@ class TemplateProvider:
                     },
                     "required": ["name"],
                 },
-                tool_type=ToolType.PROMPT_MACRO,
+                tool_type=ToolType.INTERNAL,
                 source="template",
             ),
         ]
@@ -200,7 +191,7 @@ class TemplateProvider:
                 for t in templates:
                     vec = self._embeddings.get(t.name)
                     if vec:
-                        sim = _cosine_similarity(query_vec, vec)
+                        sim = cosine_similarity(query_vec, vec)
                         scored.append((sim, t))
                 if scored:
                     scored.sort(

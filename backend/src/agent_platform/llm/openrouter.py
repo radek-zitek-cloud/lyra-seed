@@ -33,6 +33,7 @@ class OpenRouterProvider:
         event_bus: InProcessEventBus | None = None,
         agent_id: str = "system",
         timeout: float = 60.0,
+        default_model: str = "openai/gpt-4.1-mini",
     ) -> None:
         self._api_key = api_key
         self._client = http_client or httpx.AsyncClient(
@@ -40,6 +41,7 @@ class OpenRouterProvider:
         )
         self._event_bus = event_bus
         self._agent_id = agent_id
+        self._default_model = default_model
         self._current_agent_id: str | None = None
         self._current_retry: dict | None = None  # per-agent override
 
@@ -50,6 +52,8 @@ class OpenRouterProvider:
         config: LLMConfig | None = None,
     ) -> LLMResponse:
         config = config or LLMConfig()
+        if config.model is None:
+            config.model = self._default_model
         agent_id = self._current_agent_id or self._agent_id
 
         # Build request

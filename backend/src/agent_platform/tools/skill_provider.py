@@ -19,7 +19,6 @@ Summarize into 3-5 bullet points:
 
 import json
 import logging
-import math
 import os
 import re
 import time
@@ -29,6 +28,7 @@ from typing import Any
 import yaml
 from pydantic import BaseModel, Field
 
+from agent_platform.core.utils import cosine_similarity
 from agent_platform.llm.models import (
     LLMConfig,
     Message,
@@ -130,16 +130,6 @@ def _params_to_json_schema(params: dict[str, Any]) -> dict[str, Any]:
     if required:
         schema["required"] = required
     return schema
-
-
-def _cosine_similarity(a: list[float], b: list[float]) -> float:
-    """Compute cosine similarity between two vectors."""
-    dot = sum(x * y for x, y in zip(a, b))
-    na = math.sqrt(sum(x * x for x in a))
-    nb = math.sqrt(sum(x * x for x in b))
-    if na == 0 or nb == 0:
-        return 0.0
-    return dot / (na * nb)
 
 
 def _build_skill_file(
@@ -250,7 +240,7 @@ class SkillProvider:
                 name=s.name,
                 description=s.description,
                 input_schema=_params_to_json_schema(s.parameters),
-                tool_type=ToolType.PROMPT_MACRO,
+                tool_type=ToolType.INTERNAL,
                 source="skill",
             )
             for s in self._skills.values()
@@ -328,7 +318,7 @@ class SkillProvider:
                     name=name,
                     description=desc,
                     input_schema=schema,
-                    tool_type=ToolType.PROMPT_MACRO,
+                    tool_type=ToolType.INTERNAL,
                     source="skill",
                 )
             )
@@ -376,7 +366,7 @@ class SkillProvider:
                 for s in skills_list:
                     vec = self._embeddings.get(s.name)
                     if vec:
-                        sim = _cosine_similarity(query_vec, vec)
+                        sim = cosine_similarity(query_vec, vec)
                         scored.append((sim, s))
                 if scored:
                     scored.sort(key=lambda x: x[0], reverse=True)
@@ -590,7 +580,7 @@ class SkillProvider:
             try:
                 new_vec = (await self._embedder.embed([description]))[0]
                 for sname, vec in self._embeddings.items():
-                    sim = _cosine_similarity(new_vec, vec)
+                    sim = cosine_similarity(new_vec, vec)
                     if sim >= self._dedup_threshold:
                         return ToolResult(
                             success=False,
