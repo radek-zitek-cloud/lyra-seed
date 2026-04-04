@@ -49,6 +49,7 @@ class CapabilityToolProvider:
         embedding_provider: Any | None = None,
         reflect_prompt: str | None = None,
         agent_repo: Any | None = None,
+        knowledge_store: Any | None = None,
     ) -> None:
         self._llm = llm_provider
         self._skills = skill_provider
@@ -59,6 +60,7 @@ class CapabilityToolProvider:
         self._embedder = embedding_provider
         self._reflect_prompt = reflect_prompt or _REFLECT_DEFAULT
         self._agent_repo = agent_repo
+        self._knowledge = knowledge_store
 
     async def _resolve_model(
         self,
@@ -203,6 +205,7 @@ class CapabilityToolProvider:
             "templates": [],
             "mcp_servers": [],
             "relevant_memories": [],
+            "relevant_knowledge": [],
         }
 
         # Search skills
@@ -265,6 +268,21 @@ class CapabilityToolProvider:
                 ]
             except Exception:
                 logger.exception("Memory search failed")
+
+        # Search knowledge base
+        if self._knowledge:
+            try:
+                chunks = self._knowledge.search(task, top_k=5)
+                available["relevant_knowledge"] = [
+                    {
+                        "content": c.content[:200],
+                        "source": c.source,
+                        "heading": c.heading_path,
+                    }
+                    for c in chunks
+                ]
+            except Exception:
+                logger.exception("Knowledge search failed")
 
         # LLM assessment
         assessment = ""

@@ -91,6 +91,7 @@ class PlatformConfig(BaseModel):
     maxSpawnDepth: int = 3
     skillsDir: str = "./skills"
     mcpServersDir: str = "./mcp-servers"
+    knowledgeDir: str = "./knowledge"
 
 
 def load_platform_config(project_root: Path) -> PlatformConfig:

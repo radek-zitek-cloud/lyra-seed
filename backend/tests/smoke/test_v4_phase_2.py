@@ -199,23 +199,30 @@ class TestV4Phase2:
         kb_dir = tmp_path / "knowledge"
         kb_dir.mkdir()
 
-        (tmp_path / "lyra.config.json").write_text(json.dumps({
-            "dataDir": str(tmp_path / "data"),
-            "systemPromptsDir": str(prompts_dir),
-            "skillsDir": str(skills_dir),
-            "knowledgeDir": str(kb_dir),
-            "defaultModel": "test-model",
-        }))
+        (tmp_path / "lyra.config.json").write_text(
+            json.dumps(
+                {
+                    "dataDir": str(tmp_path / "data"),
+                    "systemPromptsDir": str(prompts_dir),
+                    "skillsDir": str(skills_dir),
+                    "knowledgeDir": str(kb_dir),
+                    "defaultModel": "test-model",
+                }
+            )
+        )
 
         settings = Settings(openrouter_api_key="sk-test")
         app = create_app(
-            settings, db_dir=str(tmp_path / "data"), project_root=tmp_path,
+            settings,
+            db_dir=str(tmp_path / "data"),
+            project_root=tmp_path,
         )
 
         async with app.router.lifespan_context(app):
             transport = httpx.ASGITransport(app=app)
             async with httpx.AsyncClient(
-                transport=transport, base_url="http://test",
+                transport=transport,
+                base_url="http://test",
             ) as client:
                 resp = await client.get("/tools")
                 names = [t["name"] for t in resp.json()]
@@ -235,7 +242,8 @@ class TestV4Phase2:
 
         mock_llm = AsyncMock()
         mock_llm.complete.return_value = LLMResponse(
-            content="Knowledge base has memory system docs.", usage={},
+            content="Knowledge base has memory system docs.",
+            usage={},
         )
 
         provider = CapabilityToolProvider(
