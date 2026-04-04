@@ -90,6 +90,7 @@ class PlatformConfig(BaseModel):
     mcpRequestTimeout: float = 30.0
     maxSpawnDepth: int = 3
     skillsDir: str = "./skills"
+    mcpServersDir: str = "./mcp-servers"
 
 
 def load_platform_config(project_root: Path) -> PlatformConfig:

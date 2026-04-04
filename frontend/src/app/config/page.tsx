@@ -148,6 +148,7 @@ interface FileTree {
   agent_prompts: FileEntry[];
   system_prompts: FileEntry[];
   skills: FileEntry[];
+  mcp_servers: FileEntry[];
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -156,6 +157,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   agent_prompts: "Agent Prompts",
   system_prompts: "System Prompts",
   skills: "Skills",
+  mcp_servers: "MCP Servers",
 };
 
 export default function ConfigPage() {
