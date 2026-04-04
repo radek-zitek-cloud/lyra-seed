@@ -277,6 +277,25 @@ def create_app(
     tool_registry.register_provider(orchestration_provider)
 
     # Capability tools (analyze, reflect, analytics, patterns)
+    # Knowledge base
+    from agent_platform.knowledge.store import KnowledgeStore
+    from agent_platform.knowledge.tools import KnowledgeToolProvider
+
+    kb_dir_cfg = Path(platform_config.knowledgeDir)
+    if not kb_dir_cfg.is_absolute():
+        kb_dir_cfg = project_root / kb_dir_cfg
+    knowledge_store = KnowledgeStore(
+        persist_dir=os.path.join(db_dir, "knowledge_index"),
+        embedding_fn=embedding_provider,
+    )
+    if kb_dir_cfg.exists():
+        knowledge_store.ingest_directory(kb_dir_cfg)
+    knowledge_provider = KnowledgeToolProvider(
+        knowledge_store=knowledge_store,
+    )
+    tool_registry.register_provider(knowledge_provider)
+
+    # Capability tools
     from agent_platform.tools.capability_tools import (
         CapabilityToolProvider,
     )
@@ -292,6 +311,7 @@ def create_app(
         embedding_provider=embedding_provider,
         reflect_prompt=reflect_prompt,
         agent_repo=agent_repo,
+        knowledge_store=knowledge_store,
     )
     tool_registry.register_provider(capability_provider)
 
