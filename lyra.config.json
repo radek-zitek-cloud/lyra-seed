@@ -16,6 +16,13 @@
       "env": {
         "ALLOW_COMMANDS": "ls,cat,pwd,grep,wc,touch,find,git,docker,python,pip,uv,uvx,npm,node,pnpm,npx,curl"
       }
+    },
+    "firecrawl": {
+      "command": "npx",
+      "args": ["-y", "firecrawl-mcp"],
+      "env": {
+        "FIRECRAWL_API_KEY": "${FIRECRAWL_API_KEY}"
+      }
     }
   },
 

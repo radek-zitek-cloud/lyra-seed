@@ -81,6 +81,20 @@ def create_app(
     if project_root is None:
         project_root = _PROJECT_ROOT
 
+    # Load .env into os.environ (for MCP server env var resolution)
+    env_file = project_root / ".env"
+    if env_file.exists():
+        for line in env_file.read_text().splitlines():
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            if "=" in line:
+                key, _, value = line.partition("=")
+                key = key.strip()
+                value = value.strip().strip('"').strip("'")
+                if key not in os.environ:
+                    os.environ[key] = value
+
     # Load platform config (lyra.config.json)
     platform_config = load_platform_config(project_root)
 
@@ -122,11 +136,16 @@ def create_app(
     # MCP servers from config
     mcp_provider = MCPClientProvider()
     for name, server_cfg in platform_config.mcpServers.items():
+        # Resolve env var references: ${VAR_NAME} → os.environ[VAR_NAME]
+        resolved_env = {
+            k: os.environ.get(v[2:-1], v) if v.startswith("${") and v.endswith("}") else v
+            for k, v in server_cfg.env.items()
+        }
         client = MCPStdioClient(
             server_name=name,
             command=server_cfg.command,
             args=server_cfg.args,
-            env=server_cfg.env,
+            env=resolved_env,
             request_timeout=platform_config.mcpRequestTimeout,
         )
         mcp_provider.add_client(client)
