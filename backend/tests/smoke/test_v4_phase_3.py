@@ -43,14 +43,17 @@ class TestV4Phase3:
         _write_skill(skills_dir, "summarize", "Summarize text", "Sum: {{text}}")
 
         skill_provider = SkillProvider(
-            skills_dir=str(skills_dir), llm_provider=AsyncMock(),
+            skills_dir=str(skills_dir),
+            llm_provider=AsyncMock(),
         )
 
         # Set up knowledge
         kb_dir = tmp_path / "kb"
         kb_dir.mkdir()
         kb = KnowledgeStore(persist_dir=str(tmp_path / "kb_index"))
-        _write_doc(kb_dir, "guide.md", "# Summarization\n\nHow to summarize text effectively.")
+        _write_doc(
+            kb_dir, "guide.md", "# Summarization\n\nHow to summarize text effectively."
+        )
         kb.ingest(kb_dir / "guide.md")
 
         provider = DiscoveryProvider(
@@ -84,7 +87,8 @@ class TestV4Phase3:
 
         provider = DiscoveryProvider(
             skill_provider=SkillProvider(
-                skills_dir=str(skills_dir), llm_provider=AsyncMock(),
+                skills_dir=str(skills_dir),
+                llm_provider=AsyncMock(),
             ),
             knowledge_store=kb,
         )
@@ -105,7 +109,8 @@ class TestV4Phase3:
 
         provider = DiscoveryProvider()
         result = await provider.call_tool(
-            "discover", {"query": "something completely unrelated xyz"},
+            "discover",
+            {"query": "something completely unrelated xyz"},
         )
         assert result.success
         data = json.loads(result.output)
@@ -123,7 +128,8 @@ class TestV4Phase3:
 
         provider = DiscoveryProvider(
             skill_provider=SkillProvider(
-                skills_dir=str(skills_dir), llm_provider=AsyncMock(),
+                skills_dir=str(skills_dir),
+                llm_provider=AsyncMock(),
             ),
         )
 
@@ -150,11 +156,13 @@ class TestV4Phase3:
 
         mock_llm = AsyncMock()
         mock_llm.complete.return_value = LLMResponse(
-            content="Assessment done.", usage={},
+            content="Assessment done.",
+            usage={},
         )
 
         skill_provider = SkillProvider(
-            skills_dir=str(skills_dir), llm_provider=mock_llm,
+            skills_dir=str(skills_dir),
+            llm_provider=mock_llm,
         )
         discovery = DiscoveryProvider(skill_provider=skill_provider)
 
@@ -164,7 +172,8 @@ class TestV4Phase3:
         )
 
         result = await provider.call_tool(
-            "analyze_capabilities", {"task": "review code quality"},
+            "analyze_capabilities",
+            {"task": "review code quality"},
         )
         assert result.success
         data = json.loads(result.output)
@@ -185,23 +194,30 @@ class TestV4Phase3:
         (tmp_path / "skills").mkdir()
         (tmp_path / "knowledge").mkdir()
 
-        (tmp_path / "lyra.config.json").write_text(json.dumps({
-            "dataDir": str(tmp_path / "data"),
-            "systemPromptsDir": str(prompts_dir),
-            "skillsDir": str(tmp_path / "skills"),
-            "knowledgeDir": str(tmp_path / "knowledge"),
-            "defaultModel": "test-model",
-        }))
+        (tmp_path / "lyra.config.json").write_text(
+            json.dumps(
+                {
+                    "dataDir": str(tmp_path / "data"),
+                    "systemPromptsDir": str(prompts_dir),
+                    "skillsDir": str(tmp_path / "skills"),
+                    "knowledgeDir": str(tmp_path / "knowledge"),
+                    "defaultModel": "test-model",
+                }
+            )
+        )
 
         settings = Settings(openrouter_api_key="sk-test")
         app = create_app(
-            settings, db_dir=str(tmp_path / "data"), project_root=tmp_path,
+            settings,
+            db_dir=str(tmp_path / "data"),
+            project_root=tmp_path,
         )
 
         async with app.router.lifespan_context(app):
             transport = httpx.ASGITransport(app=app)
             async with httpx.AsyncClient(
-                transport=transport, base_url="http://test",
+                transport=transport,
+                base_url="http://test",
             ) as client:
                 resp = await client.get("/tools")
                 names = [t["name"] for t in resp.json()]

@@ -115,8 +115,8 @@ class TestV3Phase4:
 
         assert result.success
         data = json.loads(result.output)
-        assert "available" in data
-        assert "skills" in data["available"]
+        assert "discovered" in data
+        assert isinstance(data["discovered"], list)
         assert "assessment" in data
 
     @pytest.mark.asyncio

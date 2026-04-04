@@ -50,6 +50,7 @@ class CapabilityToolProvider:
         reflect_prompt: str | None = None,
         agent_repo: Any | None = None,
         knowledge_store: Any | None = None,
+        discovery_provider: Any | None = None,
     ) -> None:
         self._llm = llm_provider
         self._skills = skill_provider
@@ -61,6 +62,7 @@ class CapabilityToolProvider:
         self._reflect_prompt = reflect_prompt or _REFLECT_DEFAULT
         self._agent_repo = agent_repo
         self._knowledge = knowledge_store
+        self._discovery = discovery_provider
 
     async def _resolve_model(
         self,
@@ -200,99 +202,29 @@ class CapabilityToolProvider:
         args: dict[str, Any],
     ) -> ToolResult:
         task = args.get("task", "")
-        available: dict[str, list] = {
-            "skills": [],
-            "templates": [],
-            "mcp_servers": [],
-            "relevant_memories": [],
-            "relevant_knowledge": [],
-        }
 
-        # Search skills
-        if self._skills:
+        # Use discover if available, else empty
+        discovered: list[dict] = []
+        if self._discovery:
             try:
-                r = await self._skills.call_tool(
-                    "list_skills",
-                    {"query": task},
+                r = await self._discovery.call_tool(
+                    "discover",
+                    {"query": task, "top_k": 15},
                 )
                 if r.success and r.output:
-                    try:
-                        available["skills"] = json.loads(r.output)
-                    except (json.JSONDecodeError, TypeError):
-                        pass
+                    discovered = json.loads(r.output)
             except Exception:
-                logger.exception("Skill search failed")
-
-        # Search templates
-        if self._templates:
-            try:
-                r = await self._templates.call_tool(
-                    "list_templates",
-                    {"query": task},
-                )
-                if r.success and r.output:
-                    try:
-                        available["templates"] = json.loads(r.output)
-                    except (json.JSONDecodeError, TypeError):
-                        pass
-            except Exception:
-                logger.exception("Template search failed")
-
-        # Search MCP servers
-        if self._mcp_mgr:
-            try:
-                r = await self._mcp_mgr.call_tool(
-                    "list_mcp_servers",
-                    {"query": task},
-                )
-                if r.success and r.output:
-                    try:
-                        available["mcp_servers"] = json.loads(r.output)
-                    except (json.JSONDecodeError, TypeError):
-                        pass
-            except Exception:
-                logger.exception("MCP server search failed")
-
-        # Search memories
-        if self._memory:
-            try:
-                results = await self._memory.search(
-                    task,
-                    top_k=5,
-                )
-                available["relevant_memories"] = [
-                    {"content": m.content, "type": m.memory_type}
-                    if hasattr(m, "content")
-                    else str(m)
-                    for m in results
-                ]
-            except Exception:
-                logger.exception("Memory search failed")
-
-        # Search knowledge base
-        if self._knowledge:
-            try:
-                chunks = self._knowledge.search(task, top_k=5)
-                available["relevant_knowledge"] = [
-                    {
-                        "content": c.content[:200],
-                        "source": c.source,
-                        "heading": c.heading_path,
-                    }
-                    for c in chunks
-                ]
-            except Exception:
-                logger.exception("Knowledge search failed")
+                logger.exception("Discovery failed")
 
         # LLM assessment
         assessment = ""
         try:
             prompt = (
                 f"Task: {task}\n\n"
-                f"Available capabilities:\n"
-                f"{json.dumps(available, indent=2, default=str)}\n\n"
+                f"Discovered capabilities:\n"
+                f"{json.dumps(discovered, indent=2, default=str)}\n\n"
                 f"Analyze:\n"
-                f"1. Which available capabilities are useful?\n"
+                f"1. Which discovered capabilities are useful?\n"
                 f"2. What capabilities are missing?\n"
                 f"3. How should the gaps be filled?\n"
                 f"Be concise and actionable."
@@ -318,7 +250,7 @@ class CapabilityToolProvider:
             output=json.dumps(
                 {
                     "task": task,
-                    "available": available,
+                    "discovered": discovered,
                     "assessment": assessment,
                 }
             ),
