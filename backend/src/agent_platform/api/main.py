@@ -288,8 +288,6 @@ def create_app(
         persist_dir=os.path.join(db_dir, "knowledge_index"),
         embedding_fn=embedding_provider,
     )
-    if kb_dir_cfg.exists():
-        knowledge_store.ingest_directory(kb_dir_cfg)
     knowledge_provider = KnowledgeToolProvider(
         knowledge_store=knowledge_store,
     )
@@ -333,6 +331,14 @@ def create_app(
         await agent_repo.initialize()
         await conv_repo.initialize()
         await message_repo.initialize()
+
+        # Ingest knowledge base (after event bus is ready)
+        if kb_dir_cfg.exists():
+            knowledge_store.ingest_directory(kb_dir_cfg)
+            logger.info(
+                "Knowledge base: %d sources indexed",
+                len(knowledge_store.get_sources()),
+            )
 
         # Connect MCP servers
         if platform_config.mcpServers:
