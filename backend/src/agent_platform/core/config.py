@@ -17,6 +17,7 @@ class Settings(BaseSettings):
         "env_prefix": "LYRA_",
         "env_file": str(_ENV_FILE) if _ENV_FILE.exists() else None,
         "env_file_encoding": "utf-8",
+        "extra": "ignore",
     }
 
     openrouter_api_key: SecretStr = SecretStr("")
