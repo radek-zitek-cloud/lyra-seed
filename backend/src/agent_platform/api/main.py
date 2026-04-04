@@ -279,6 +279,24 @@ def create_app(
     )
     tool_registry.register_provider(orchestration_provider)
 
+    # Capability tools (analyze, reflect, analytics, patterns)
+    from agent_platform.tools.capability_tools import (
+        CapabilityToolProvider,
+    )
+
+    reflect_prompt = load_system_prompt("reflect", project_root)
+    capability_provider = CapabilityToolProvider(
+        llm_provider=llm_provider,
+        skill_provider=skill_provider,
+        template_provider=template_provider,
+        mcp_server_manager=mcp_server_manager,
+        memory_store=memory_store,
+        event_bus=event_bus,
+        embedding_provider=embedding_provider,
+        reflect_prompt=reflect_prompt,
+    )
+    tool_registry.register_provider(capability_provider)
+
     runtime = AgentRuntime(
         agent_repo=agent_repo,
         conversation_repo=conv_repo,
