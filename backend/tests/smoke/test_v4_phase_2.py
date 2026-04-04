@@ -246,9 +246,12 @@ class TestV4Phase2:
             usage={},
         )
 
+        from agent_platform.tools.discovery_provider import DiscoveryProvider
+
+        discovery = DiscoveryProvider(knowledge_store=store)
         provider = CapabilityToolProvider(
             llm_provider=mock_llm,
-            knowledge_store=store,
+            discovery_provider=discovery,
         )
 
         result = await provider.call_tool(
@@ -258,6 +261,6 @@ class TestV4Phase2:
 
         assert result.success
         data = json.loads(result.output)
-        assert "available" in data
-        assert "relevant_knowledge" in data["available"]
-        assert len(data["available"]["relevant_knowledge"]) >= 1
+        assert "discovered" in data
+        assert isinstance(data["discovered"], list)
+        assert len(data["discovered"]) >= 1

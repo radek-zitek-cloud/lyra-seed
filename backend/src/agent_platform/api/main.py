@@ -293,6 +293,19 @@ def create_app(
     )
     tool_registry.register_provider(knowledge_provider)
 
+    # Unified discovery
+    from agent_platform.tools.discovery_provider import DiscoveryProvider
+
+    discovery_provider = DiscoveryProvider(
+        skill_provider=skill_provider,
+        template_provider=template_provider,
+        mcp_server_manager=mcp_server_manager,
+        knowledge_store=knowledge_store,
+        memory_store=memory_store,
+        embedding_provider=embedding_provider,
+    )
+    tool_registry.register_provider(discovery_provider)
+
     # Capability tools
     from agent_platform.tools.capability_tools import (
         CapabilityToolProvider,
@@ -301,15 +314,10 @@ def create_app(
     reflect_prompt = load_system_prompt("reflect", project_root)
     capability_provider = CapabilityToolProvider(
         llm_provider=llm_provider,
-        skill_provider=skill_provider,
-        template_provider=template_provider,
-        mcp_server_manager=mcp_server_manager,
-        memory_store=memory_store,
         event_bus=event_bus,
-        embedding_provider=embedding_provider,
         reflect_prompt=reflect_prompt,
         agent_repo=agent_repo,
-        knowledge_store=knowledge_store,
+        discovery_provider=discovery_provider,
     )
     tool_registry.register_provider(capability_provider)
 
