@@ -401,4 +401,6 @@ class MCPClientProvider:
         client = self._tool_map.get(name)
         if client is None:
             return ToolResult(success=False, error=f"Unknown MCP tool: {name}")
-        return await client.call_tool(name, arguments)
+        # Strip agent_id — injected by runtime, not expected by MCP servers
+        clean_args = {k: v for k, v in arguments.items() if k != "agent_id"}
+        return await client.call_tool(name, clean_args)
