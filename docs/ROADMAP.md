@@ -776,9 +776,9 @@ V2P1 proved that sub-agents can spawn and execute with full tool access. However
 
 ---
 
-### V3 Phase 3: Capability Acquisition Loop — MOSTLY COMPLETE
+### V3 Phase 3: Capability Acquisition Loop — COMPLETE
 
-**Status:** The core infrastructure was delivered across V2P7, V3P1, and V3P2. Agents can already discover, create, test, and deploy skills and MCP servers. The remaining gaps (formal capability analysis tool, acquisition agent template, and end-to-end model case test) are folded into V3P4.
+**Status:** Core infrastructure delivered across V2P7, V3P1, and V3P2. Remaining gaps (formal capability analysis tool, acquisition agent template) delivered in V3P4. End-to-end demonstrated in UC-012 (agent searched web for GitHub MCP server, added it) and microblog MCP server build.
 
 **What was delivered:**
 - Skill lifecycle: list_skills (semantic search), test_skill (with LLM evaluation), create_skill (with dedup), update_skill (with versioning)

@@ -29,7 +29,8 @@ Platform-wide settings loaded once at startup from the project root. Changes req
 | `dataDir` | string | `"./data"` | Directory for SQLite databases and memory storage |
 | `systemPromptsDir` | string | `"./prompts"` | Directory containing agent prompt and config files |
 | `skillsDir` | string | `"./skills"` | Directory containing skill `.md` files |
-| `defaultModel` | string | `"openai/gpt-4.1-mini"` | Default LLM model for agent reasoning |
+| `mcpServersDir` | string | `"./mcp-servers"` | Directory for agent-managed MCP server configs |
+| `defaultModel` | string | `"openai/gpt-4.1-mini"` | Default LLM model for agent reasoning (also used as fallback when LLMConfig.model is None) |
 | `embeddingModel` | string | `"openai/text-embedding-3-large"` | Model for memory embeddings |
 
 ### Auxiliary Models

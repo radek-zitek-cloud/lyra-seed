@@ -168,9 +168,22 @@ This section documents what was delivered, what deviated from the original requi
 - **Simplified agent_id Injection:** Runtime now injects `agent_id` into all tool calls (not a hardcoded whitelist), supporting dynamic skill names.
 - **Config Editor UI:** Web-based configuration editor at `/config` with sidebar file browser (Platform Config, Agent Configs, Agent Prompts, System Prompts, Skills), inline text editor with save/cancel, delete with inline confirmation (protected for platform config and system prompts), and cursor-aware context help bar showing descriptions for config keys.
 
+### Post-V3 Addendum
+
+- **Skill Lifecycle (V3P1):** `test_skill` dry-runs with two-call LLM evaluation (execute + assess PASS/FAIL). `update_skill` versions old files as `{name}.v{n}.md`. Name validation rejects invalid characters and reserved tool names. Semantic skill search via `list_skills(query="...")`. Deduplication rejects semantically similar descriptions (threshold 0.85).
+- **MCP Server Management (V3P2):** `add_mcp_server` adds pre-built servers (npm/pip). `create_mcp_server` scaffolds custom server directories. `deploy_mcp_server` HITL-gated (human-only API, LLM cannot bypass). `list_mcp_servers` with semantic search. `stop_mcp_server` for agent-managed servers. Configs in `mcp-servers/*.json`. Hot-reload via `/config/reload`. Demonstrated end-to-end: agent built microblog MCP server from API docs.
+- **Capability Analysis (V3P4):** `analyze_capabilities` searches skills, templates, MCP servers, and memories for a task, returns structured gap assessment. `reflect` generates post-task retrospective stored as PROCEDURE memory. `tool_analytics` aggregates success rates and latency from event data. `store_pattern` and `find_pattern` for reusable orchestration patterns. `capability-acquirer` agent template with search-first workflow.
+- **Template Discovery:** `list_templates(query="...")` and `get_template` tools for semantic search over agent templates.
+- **Multi-Agent Graph UI (V2P5):** React Flow graph visualization of agent hierarchy, orchestration subtasks, and message flows.
+- **Mixed Subtask Execution (V2P6):** Orchestration subtasks can route to tools or sub-agents via `assigned_to` field.
+
+### Post-V4P1 Addendum
+
+- **Technical Cleanup (V4P1):** `LLMConfig` default model changed from `minimax/minimax-m2.7` to `None` (resolves from platform config). `ToolType.PROMPT_MACRO` renamed to `ToolType.INTERNAL`. Shared utilities extracted (`cosine_similarity`, `resolve_env_vars`). `capability_tools` resolves model from agent config.
+
 ### Not yet delivered
 
-- **Multi-Agent UI (V2P5):** Agent topology graph, communication flow visualization
-- **Orchestration Subtask Dispatch (V2P6):** Subtasks routed to tools or sub-agents via `assigned_to` field
-- **Self-Evolution (V3):** Skill validation, versioning, MCP server scaffolding
-- **Model Case (V3):** Full end-to-end capability acquisition loop
+- **RAG Knowledge Base:** Document ingestion, chunking, and semantic search over `.md` knowledge base files
+- **Unified Discovery (BL-008):** Single `discover(query)` tool searching across all capability sources
+- **Content Pipeline:** End-to-end technical content pipeline (coordinator → researcher → writer → editor → critic)
+- **Production Hardening:** Cost caps, error recovery, session persistence

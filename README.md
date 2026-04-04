@@ -216,15 +216,20 @@ lyra-seed/
 
 - **V1 Complete:** 8 phases (skeleton, events, runtime, tools, memory, UI, HITL, hardening)
 - **V2 Complete:** 7 phases (spawning, messaging, orchestration, tool scoping, graph UI, subtask dispatch, skills)
-- **V3P1 Complete:** Skill creation with test/validate, versioning, semantic search, dedup, template discovery
-- **152 smoke tests** all passing
-- **Next:** V3P2 (MCP Server Creation), BL-008 (Unified RAG Discovery)
+- **V3 Complete:** 4 phases (skill lifecycle, MCP server creation, capability acquisition, learning & reflection)
+- **V4P1 Complete:** Technical alignment (LLMConfig fix, ToolType rename, shared utilities)
+- **177 smoke tests** all passing
+- **Next:** V4P2 (RAG Knowledge Base), V4P4 (Content Pipeline)
 
 ## Documentation
 
 - [Roadmap](docs/ROADMAP.md) — Full version/phase plan
+- [Post-V3 Roadmap](docs/POST_V3_ROADMAP.md) — V4 proposals and technical debt
 - [Requirements](docs/REQUIREMENTS.md) — Feature specifications with delivery status
 - [Configuration Guide](docs/CONFIGURATION_GUIDE.md) — All configuration surfaces with examples
 - [Agent Templates](prompts/README.md) — Template descriptions and composition patterns
+- [Project Assessment](docs/PROJECT_ASSESSMENT.md) — What's standard vs cutting-edge
+- [Content Pipeline Use Case](docs/USE_CASE_CONTENT_PIPELINE.md) — Technical content pipeline proposal
+- [Property Acquisition Use Case](docs/USE_CASE_PROPERTY_ACQUISITION.md) — Real estate analysis use case
 - [Development Methodology](docs/DEVELOPMENT_METHODOLOGY.md) — Phase-driven smoke-test workflow
 - [Backlog](docs/BACKLOG.md) — Future work items

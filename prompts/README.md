@@ -84,9 +84,14 @@ Generic worker running fully autonomous. Same as hitl-worker but all tool calls 
 - **HITL:** never
 - **MCP servers:** all
 
-### worker
+### capability-acquirer
 
-Legacy generic worker template. Equivalent to non-hitl-worker. Retained for backwards compatibility.
+Specialized sub-agent for finding or building missing capabilities. Follows a search-first workflow: check existing skills → templates → MCP servers → web search → build if nothing found.
+
+- **Use case:** `spawn_agent` with `template: "capability-acquirer"` when the parent identifies a capability gap
+- **Temperature:** 0.3
+- **HITL:** never
+- **MCP servers:** none (uses platform tools: list_skills, list_templates, list_mcp_servers, create_skill, add_mcp_server)
 
 ---
 
