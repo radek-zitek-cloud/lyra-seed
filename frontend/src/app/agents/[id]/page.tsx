@@ -101,9 +101,11 @@ export default function AgentPage() {
     }
 
     // Refresh conversation when agent completes a turn
+    // Skip mid-turn refreshes while prompt is in flight to prevent
+    // the optimistic human message from disappearing
     if (
       eventType === "agent_complete" ||
-      eventType === "llm_response"
+      (eventType === "llm_response" && !promptInFlight.current)
     ) {
       fetchAgentConversations(agentId)
         .then((convos: { messages: { role: string; content: string }[] }[]) => {
