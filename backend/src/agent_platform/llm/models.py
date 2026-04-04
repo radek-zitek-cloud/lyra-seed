@@ -45,6 +45,6 @@ class LLMResponse(BaseModel):
 class LLMConfig(BaseModel):
     """Configuration for an LLM call."""
 
-    model: str = "minimax/minimax-m2.7"
+    model: str | None = None
     temperature: float = 0.7
     max_tokens: int | None = None

@@ -129,6 +129,7 @@ def create_app(
         api_key=settings.openrouter_api_key.get_secret_value(),
         event_bus=event_bus,
         timeout=retry_cfg.timeout,
+        default_model=platform_config.defaultModel,
     )
 
     # Tool system
@@ -137,13 +138,9 @@ def create_app(
     # MCP servers from config
     mcp_provider = MCPClientProvider()
     for name, server_cfg in platform_config.mcpServers.items():
-        # Resolve env var references: ${VAR_NAME} → os.environ[VAR_NAME]
-        resolved_env = {
-            k: os.environ.get(v[2:-1], v)
-            if v.startswith("${") and v.endswith("}")
-            else v
-            for k, v in server_cfg.env.items()
-        }
+        from agent_platform.core.utils import resolve_env_vars
+
+        resolved_env = resolve_env_vars(server_cfg.env)
         client = MCPStdioClient(
             server_name=name,
             command=server_cfg.command,
@@ -294,6 +291,7 @@ def create_app(
         event_bus=event_bus,
         embedding_provider=embedding_provider,
         reflect_prompt=reflect_prompt,
+        agent_repo=agent_repo,
     )
     tool_registry.register_provider(capability_provider)
 

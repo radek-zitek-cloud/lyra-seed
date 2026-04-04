@@ -80,7 +80,7 @@ class AgentSpawnerProvider:
                     },
                     "required": ["name", "task"],
                 },
-                tool_type=ToolType.PROMPT_MACRO,
+                tool_type=ToolType.INTERNAL,
                 source="agent_spawner",
             ),
             Tool(
@@ -95,7 +95,7 @@ class AgentSpawnerProvider:
                     },
                     "required": ["child_agent_id"],
                 },
-                tool_type=ToolType.PROMPT_MACRO,
+                tool_type=ToolType.INTERNAL,
                 source="agent_spawner",
             ),
             Tool(
@@ -109,7 +109,7 @@ class AgentSpawnerProvider:
                     },
                     "required": ["child_agent_id"],
                 },
-                tool_type=ToolType.PROMPT_MACRO,
+                tool_type=ToolType.INTERNAL,
                 source="agent_spawner",
             ),
             Tool(
@@ -123,7 +123,7 @@ class AgentSpawnerProvider:
                     },
                     "required": ["child_agent_id"],
                 },
-                tool_type=ToolType.PROMPT_MACRO,
+                tool_type=ToolType.INTERNAL,
                 source="agent_spawner",
             ),
             Tool(
@@ -137,7 +137,7 @@ class AgentSpawnerProvider:
                     },
                     "required": ["child_agent_id"],
                 },
-                tool_type=ToolType.PROMPT_MACRO,
+                tool_type=ToolType.INTERNAL,
                 source="agent_spawner",
             ),
             Tool(
@@ -150,7 +150,7 @@ class AgentSpawnerProvider:
                     },
                     "required": [],
                 },
-                tool_type=ToolType.PROMPT_MACRO,
+                tool_type=ToolType.INTERNAL,
                 source="agent_spawner",
             ),
             Tool(
@@ -174,7 +174,7 @@ class AgentSpawnerProvider:
                         "message_type",
                     ],
                 },
-                tool_type=ToolType.PROMPT_MACRO,
+                tool_type=ToolType.INTERNAL,
                 source="agent_spawner",
             ),
             Tool(
@@ -189,7 +189,7 @@ class AgentSpawnerProvider:
                     },
                     "required": [],
                 },
-                tool_type=ToolType.PROMPT_MACRO,
+                tool_type=ToolType.INTERNAL,
                 source="agent_spawner",
             ),
             Tool(
@@ -203,7 +203,7 @@ class AgentSpawnerProvider:
                     },
                     "required": ["child_agent_id"],
                 },
-                tool_type=ToolType.PROMPT_MACRO,
+                tool_type=ToolType.INTERNAL,
                 source="agent_spawner",
             ),
         ]

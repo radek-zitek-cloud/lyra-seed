@@ -29,7 +29,7 @@ class TestV1Phase3:
 
         # ToolType enum
         assert ToolType.MCP is not None
-        assert ToolType.PROMPT_MACRO is not None
+        assert ToolType.INTERNAL is not None
 
         # Tool model
         tool = Tool(
@@ -92,7 +92,7 @@ class TestV1Phase3:
                     "type": "object",
                     "properties": {"expr": {"type": "string"}},
                 },
-                tool_type=ToolType.PROMPT_MACRO,
+                tool_type=ToolType.INTERNAL,
                 source="macro-1",
             ),
         ]

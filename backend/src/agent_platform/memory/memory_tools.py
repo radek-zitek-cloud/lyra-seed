@@ -55,7 +55,7 @@ class MemoryToolProvider:
                     },
                     "required": ["content", "agent_id"],
                 },
-                tool_type=ToolType.PROMPT_MACRO,
+                tool_type=ToolType.INTERNAL,
                 source="memory",
             ),
             Tool(
@@ -83,7 +83,7 @@ class MemoryToolProvider:
                     },
                     "required": ["query", "agent_id"],
                 },
-                tool_type=ToolType.PROMPT_MACRO,
+                tool_type=ToolType.INTERNAL,
                 source="memory",
             ),
             Tool(
@@ -99,7 +99,7 @@ class MemoryToolProvider:
                     },
                     "required": ["memory_id"],
                 },
-                tool_type=ToolType.PROMPT_MACRO,
+                tool_type=ToolType.INTERNAL,
                 source="memory",
             ),
         ]

@@ -7,27 +7,17 @@ deploying with HITL gates, and hot-reload.
 
 import json
 import logging
-import math
-import os
 import re
 from pathlib import Path
 from typing import Any
 
+from agent_platform.core.utils import cosine_similarity
 from agent_platform.tools.mcp_client import MCPStdioClient
 from agent_platform.tools.models import Tool, ToolResult, ToolType
 
 logger = logging.getLogger(__name__)
 
 _NAME_RE = re.compile(r"^[a-zA-Z0-9_-]+$")
-
-
-def _cosine_similarity(a: list[float], b: list[float]) -> float:
-    dot = sum(x * y for x, y in zip(a, b))
-    na = math.sqrt(sum(x * x for x in a))
-    nb = math.sqrt(sum(x * x for x in b))
-    if na == 0 or nb == 0:
-        return 0.0
-    return dot / (na * nb)
 
 
 class MCPServerManager:
@@ -129,12 +119,9 @@ class MCPServerManager:
 
     @staticmethod
     def resolve_env(env: dict[str, str]) -> dict[str, str]:
-        return {
-            k: os.environ.get(v[2:-1], v)
-            if v.startswith("${") and v.endswith("}")
-            else v
-            for k, v in env.items()
-        }
+        from agent_platform.core.utils import resolve_env_vars
+
+        return resolve_env_vars(env)
 
     async def _ensure_embeddings(self) -> None:
         if not self._embedder:
@@ -178,7 +165,7 @@ class MCPServerManager:
                     },
                     "required": ["name", "command"],
                 },
-                tool_type=ToolType.PROMPT_MACRO,
+                tool_type=ToolType.INTERNAL,
                 source="mcp_manager",
             ),
             Tool(
@@ -203,7 +190,7 @@ class MCPServerManager:
                     },
                     "required": ["name"],
                 },
-                tool_type=ToolType.PROMPT_MACRO,
+                tool_type=ToolType.INTERNAL,
                 source="mcp_manager",
             ),
             Tool(
@@ -221,7 +208,7 @@ class MCPServerManager:
                     },
                     "required": ["name"],
                 },
-                tool_type=ToolType.PROMPT_MACRO,
+                tool_type=ToolType.INTERNAL,
                 source="mcp_manager",
             ),
             Tool(
@@ -233,7 +220,7 @@ class MCPServerManager:
                         "query": {"type": "string"},
                     },
                 },
-                tool_type=ToolType.PROMPT_MACRO,
+                tool_type=ToolType.INTERNAL,
                 source="mcp_manager",
             ),
             Tool(
@@ -246,7 +233,7 @@ class MCPServerManager:
                     },
                     "required": ["name"],
                 },
-                tool_type=ToolType.PROMPT_MACRO,
+                tool_type=ToolType.INTERNAL,
                 source="mcp_manager",
             ),
         ]
@@ -472,7 +459,7 @@ class MCPServerManager:
                 for s in servers:
                     vec = self._embeddings.get(s["name"])
                     if vec:
-                        sim = _cosine_similarity(query_vec, vec)
+                        sim = cosine_similarity(query_vec, vec)
                         scored.append((sim, s))
                 if scored:
                     scored.sort(key=lambda x: x[0], reverse=True)

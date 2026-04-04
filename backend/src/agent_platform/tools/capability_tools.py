@@ -48,6 +48,7 @@ class CapabilityToolProvider:
         event_bus: Any | None = None,
         embedding_provider: Any | None = None,
         reflect_prompt: str | None = None,
+        agent_repo: Any | None = None,
     ) -> None:
         self._llm = llm_provider
         self._skills = skill_provider
@@ -57,6 +58,19 @@ class CapabilityToolProvider:
         self._event_bus = event_bus
         self._embedder = embedding_provider
         self._reflect_prompt = reflect_prompt or _REFLECT_DEFAULT
+        self._agent_repo = agent_repo
+
+    async def _resolve_model(
+        self,
+        args: dict[str, Any],
+    ) -> str | None:
+        """Resolve model from agent config."""
+        agent_id = args.get("agent_id")
+        if agent_id and self._agent_repo:
+            agent = await self._agent_repo.get(agent_id)
+            if agent:
+                return agent.config.model
+        return None
 
     async def list_tools(self) -> list[Tool]:
         return [
@@ -76,7 +90,7 @@ class CapabilityToolProvider:
                     },
                     "required": ["task"],
                 },
-                tool_type=ToolType.PROMPT_MACRO,
+                tool_type=ToolType.INTERNAL,
                 source="capability",
             ),
             Tool(
@@ -93,7 +107,7 @@ class CapabilityToolProvider:
                     },
                     "required": ["task", "outcome"],
                 },
-                tool_type=ToolType.PROMPT_MACRO,
+                tool_type=ToolType.INTERNAL,
                 source="capability",
             ),
             Tool(
@@ -115,7 +129,7 @@ class CapabilityToolProvider:
                         },
                     },
                 },
-                tool_type=ToolType.PROMPT_MACRO,
+                tool_type=ToolType.INTERNAL,
                 source="capability",
             ),
             Tool(
@@ -136,7 +150,7 @@ class CapabilityToolProvider:
                     },
                     "required": ["task_type", "strategy"],
                 },
-                tool_type=ToolType.PROMPT_MACRO,
+                tool_type=ToolType.INTERNAL,
                 source="capability",
             ),
             Tool(
@@ -152,7 +166,7 @@ class CapabilityToolProvider:
                     },
                     "required": ["task_description"],
                 },
-                tool_type=ToolType.PROMPT_MACRO,
+                tool_type=ToolType.INTERNAL,
                 source="capability",
             ),
         ]
@@ -265,6 +279,8 @@ class CapabilityToolProvider:
                 f"3. How should the gaps be filled?\n"
                 f"Be concise and actionable."
             )
+            config = LLMConfig(temperature=0.3)
+            config.model = await self._resolve_model(args)
             resp = await self._llm.complete(
                 [
                     Message(
@@ -272,7 +288,7 @@ class CapabilityToolProvider:
                         content=prompt,
                     )
                 ],
-                config=LLMConfig(temperature=0.3),
+                config=config,
             )
             assessment = resp.content or ""
         except Exception:
@@ -308,6 +324,8 @@ class CapabilityToolProvider:
         )
 
         try:
+            config = LLMConfig(temperature=0.3)
+            config.model = await self._resolve_model(args)
             resp = await self._llm.complete(
                 [
                     Message(
@@ -315,7 +333,7 @@ class CapabilityToolProvider:
                         content=prompt,
                     )
                 ],
-                config=LLMConfig(temperature=0.3),
+                config=config,
             )
             reflection = resp.content or ""
         except Exception as e:
@@ -446,7 +464,9 @@ class CapabilityToolProvider:
         else:
             subtasks = subtasks_raw
 
-        content = f"[PATTERN]\nTask type: {task_type}\nStrategy: {strategy}\nSubtasks:\n"
+        content = (
+            f"[PATTERN]\nTask type: {task_type}\nStrategy: {strategy}\nSubtasks:\n"
+        )
         for i, st in enumerate(subtasks, 1):
             content += f"  {i}. {st}\n"
         if notes:

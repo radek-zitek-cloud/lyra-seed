@@ -110,7 +110,7 @@ class TestV2Phase7:
         assert "create_skill" in names
         assert "list_skills" in names
         for t in tools:
-            assert t.tool_type.value == "prompt_macro"
+            assert t.tool_type.value == "internal"
             assert t.source == "skill"
 
     @pytest.mark.asyncio

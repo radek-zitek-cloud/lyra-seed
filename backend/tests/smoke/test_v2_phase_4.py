@@ -50,7 +50,7 @@ def _core_tool(name: str) -> Tool:
         name=name,
         description=f"{name} tool",
         input_schema={"type": "object", "properties": {}},
-        tool_type=ToolType.PROMPT_MACRO,
+        tool_type=ToolType.INTERNAL,
         source="core",
     )
 

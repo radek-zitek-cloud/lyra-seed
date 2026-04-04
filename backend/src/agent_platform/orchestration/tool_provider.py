@@ -78,7 +78,7 @@ class OrchestrationToolProvider:
                     },
                     "required": ["task"],
                 },
-                tool_type=ToolType.PROMPT_MACRO,
+                tool_type=ToolType.INTERNAL,
                 source="orchestration",
             ),
             Tool(
@@ -102,7 +102,7 @@ class OrchestrationToolProvider:
                     },
                     "required": ["task"],
                 },
-                tool_type=ToolType.PROMPT_MACRO,
+                tool_type=ToolType.INTERNAL,
                 source="orchestration",
             ),
         ]

@@ -10,7 +10,7 @@ class ToolType(StrEnum):
     """Type of tool."""
 
     MCP = "mcp"
-    PROMPT_MACRO = "prompt_macro"
+    INTERNAL = "internal"
 
 
 class Tool(BaseModel):
