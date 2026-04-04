@@ -147,16 +147,15 @@ class MCPServerManager:
             Tool(
                 name="deploy_mcp_server",
                 description=(
-                    "Deploy a scaffolded MCP server. Requires human approval."
+                    "Request deployment of a scaffolded MCP server. "
+                    "Returns server details for human review. "
+                    "The human must approve via the API before "
+                    "the server is actually deployed."
                 ),
                 input_schema={
                     "type": "object",
                     "properties": {
                         "name": {"type": "string"},
-                        "approved": {
-                            "type": "string",
-                            "description": "Set to 'true' after HITL approval",
-                        },
                     },
                     "required": ["name"],
                 },
@@ -328,6 +327,11 @@ class MCPServerManager:
     # ── deploy_mcp_server ─────────────────────────────
 
     async def _deploy_server(self, args: dict[str, Any]) -> ToolResult:
+        """Request deployment — always returns pending.
+
+        Actual deployment is done by the human via
+        approve_deploy(name) or POST /mcp-servers/{name}/deploy.
+        """
         name = args.get("name", "")
         cfg = self._configs.get(name)
 
@@ -343,49 +347,43 @@ class MCPServerManager:
                 error="Cannot deploy platform-managed servers.",
             )
 
-        approved = args.get("approved", "").lower() == "true"
-
-        if not approved:
-            # Return HITL request — agent must get approval
+        if cfg.get("deployed"):
             return ToolResult(
                 success=True,
-                output=json.dumps(
-                    {
-                        "requires_hitl": True,
-                        "name": name,
-                        "description": cfg.get("description", ""),
-                        "command": cfg.get("command", ""),
-                        "args": cfg.get("args", []),
-                        "workdir": cfg.get("workdir", ""),
-                        "message": (
-                            "This server requires human approval "
-                            "before deployment. Call deploy_mcp_server "
-                            "again with approved='true' after "
-                            "receiving approval."
-                        ),
-                    }
-                ),
+                output=json.dumps({
+                    "name": name,
+                    "status": "already_deployed",
+                }),
             )
-
-        # Approved — mark as deployed
-        cfg["deployed"] = True
-        self._write_config(name, cfg)
-        self._configs[name] = cfg
 
         return ToolResult(
             success=True,
-            output=json.dumps(
-                {
-                    "name": name,
-                    "status": "deployed",
-                    "message": (
-                        "Server marked as deployed. "
-                        "Use /config/reload or restart "
-                        "to connect it."
-                    ),
-                }
-            ),
+            output=json.dumps({
+                "requires_approval": True,
+                "name": name,
+                "description": cfg.get("description", ""),
+                "command": cfg.get("command", ""),
+                "args": cfg.get("args", []),
+                "workdir": cfg.get("workdir", ""),
+                "message": (
+                    "Deployment request submitted. "
+                    "The human must approve via "
+                    "POST /mcp-servers/{name}/deploy "
+                    "or the config editor before "
+                    "the server will start."
+                ),
+            }),
         )
+
+    def approve_deploy(self, name: str) -> bool:
+        """Approve deployment — called by human via API only."""
+        cfg = self._configs.get(name)
+        if not cfg or not cfg.get("managed"):
+            return False
+        cfg["deployed"] = True
+        self._write_config(name, cfg)
+        self._configs[name] = cfg
+        return True
 
     # ── list_mcp_servers ──────────────────────────────
 

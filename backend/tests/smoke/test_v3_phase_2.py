@@ -154,36 +154,33 @@ class TestV3Phase2:
 
         mgr = MCPServerManager(mcp_servers_dir=str(tmp_path))
 
+        # Tool always returns pending — never deploys
         result = await mgr.call_tool(
             "deploy_mcp_server",
-            {
-                "name": "custom-srv",
-            },
+            {"name": "custom-srv"},
         )
-
-        # Should indicate HITL required
         assert result.success
         data = json.loads(result.output)
-        assert data.get("requires_hitl") is True
-        assert "description" in data
+        assert data.get("requires_approval") is True
 
         # Config still not deployed
         cfg = json.loads((tmp_path / "custom-srv.json").read_text())
         assert cfg["deployed"] is False
 
-        # Simulate approval
+        # Even if agent passes extra args, still not deployed
         result2 = await mgr.call_tool(
             "deploy_mcp_server",
-            {
-                "name": "custom-srv",
-                "approved": "true",
-            },
+            {"name": "custom-srv", "approved": "true"},
         )
-        assert result2.success
-
-        # Config updated
+        data2 = json.loads(result2.output)
+        assert data2.get("requires_approval") is True
         cfg2 = json.loads((tmp_path / "custom-srv.json").read_text())
-        assert cfg2["deployed"] is True
+        assert cfg2["deployed"] is False
+
+        # Only approve_deploy (human API) deploys
+        assert mgr.approve_deploy("custom-srv") is True
+        cfg3 = json.loads((tmp_path / "custom-srv.json").read_text())
+        assert cfg3["deployed"] is True
 
     @pytest.mark.asyncio
     async def test_st_v3_2_5_list_mcp_servers(self, tmp_path):

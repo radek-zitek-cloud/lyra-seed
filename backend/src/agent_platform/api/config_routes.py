@@ -173,6 +173,21 @@ async def delete_config_file(path: str):
     return {"status": "deleted", "path": path}
 
 
+@router.post("/mcp-servers/{name}/deploy")
+async def approve_mcp_deploy(name: str):
+    """Approve deployment of an agent-managed MCP server.
+
+    This is a human-only action — agents cannot call this endpoint.
+    They use deploy_mcp_server which returns a pending status.
+    """
+    from agent_platform.api._deps import get_mcp_server_manager
+
+    mgr = get_mcp_server_manager()
+    if mgr.approve_deploy(name):
+        return {"status": "deployed", "name": name}
+    raise HTTPException(404, f"Server '{name}' not found or not managed")
+
+
 @router.post("/reload")
 async def reload_config():
     """Reload configuration, skills, MCP servers, and prompts."""

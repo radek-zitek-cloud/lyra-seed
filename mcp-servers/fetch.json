@@ -1,0 +1,11 @@
+{
+  "name": "fetch",
+  "description": "Fetch web pages and convert to markdown.",
+  "command": "uvx",
+  "args": [
+    "mcp-fetch"
+  ],
+  "env": {},
+  "managed": true,
+  "deployed": false
+}

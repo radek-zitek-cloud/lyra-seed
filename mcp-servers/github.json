@@ -1,0 +1,12 @@
+{
+  "name": "github",
+  "description": "GitHub MCP server for interacting with repositories, issues, and pull requests.",
+  "command": "npx",
+  "args": [
+    "-y",
+    "@modelcontextprotocol/server-github"
+  ],
+  "env": {},
+  "managed": true,
+  "deployed": true
+}

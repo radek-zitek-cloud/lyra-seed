@@ -1,0 +1,12 @@
+{
+  "name": "example-api",
+  "description": "CRUD operations for the Example API.",
+  "command": "python",
+  "args": [
+    "server.py"
+  ],
+  "workdir": "/home/radek/Code/lyra-seed/mcp-servers/example-api",
+  "env": {},
+  "managed": true,
+  "deployed": true
+}

@@ -1,0 +1,1 @@
+{"name":"manual-test","description":"Manually added for testing","command":"echo","args":["test"],"managed":true,"deployed":true}
