@@ -776,50 +776,57 @@ V2P1 proved that sub-agents can spawn and execute with full tool access. However
 
 ---
 
-### V3 Phase 3: Capability Acquisition Loop
+### V3 Phase 3: Capability Acquisition Loop — MOSTLY COMPLETE
 
-**Deliverables:**
+**Status:** The core infrastructure was delivered across V2P7, V3P1, and V3P2. Agents can already discover, create, test, and deploy skills and MCP servers. The remaining gaps (formal capability analysis tool, acquisition agent template, and end-to-end model case test) are folded into V3P4.
 
-- Capability gap analysis:
-  - Agent receives task → checks available tools → identifies what's missing
-  - `analyze_capabilities(task_description) -> CapabilityReport` tool
-  - Report lists: available tools, missing capabilities, acquisition plan
-- Acquisition sub-agent:
-  - Specialized agent for building or finding new tools
-  - Can search for existing MCP servers (registry/marketplace — if exists)
-  - Can create prompt macros or MCP servers to fill gaps
-  - Reports back to parent with new tool availability
-- End-to-end "model case" flow:
-  1. Human prompts with complex task
-  2. Main agent decomposes task
-  3. Identifies capability gaps
-  4. Spawns acquisition sub-agent(s) for gaps
-  5. Spawns execution sub-agent(s) for known subtasks
-  6. Acquisition agents build/find tools → register them
-  7. Main agent re-plans with new tools available
-  8. Executes remaining subtasks
-  9. Synthesizes final result
+**What was delivered:**
+- Skill lifecycle: list_skills (semantic search), test_skill (with LLM evaluation), create_skill (with dedup), update_skill (with versioning)
+- MCP server lifecycle: add_mcp_server, create_mcp_server, deploy_mcp_server (HITL-gated), list_mcp_servers (semantic search), stop_mcp_server
+- Template discovery: list_templates (semantic search), get_template
+- Demonstrated end-to-end: agent searched web for GitHub MCP server, added it; agent built microblog MCP server from API docs
 
 ---
 
-### V3 Phase 4: Learning & Knowledge Accumulation
+### V3 Phase 4: Learning, Reflection & Capability Formalization
+
+**Objective:** Add explicit guardrails and structure to the capability acquisition loop. Formalize gap analysis, create a dedicated acquisition agent template, add post-task reflection, tool analytics, and pattern storage. Test the full model case end-to-end.
 
 **Deliverables:**
+
+- `analyze_capabilities` tool:
+  - Agent describes a task → tool checks available tools, skills, templates, and MCP servers via semantic search
+  - Returns a structured report: what's available, what's missing, suggested acquisition plan
+  - Uses the unified discovery pattern (skills + templates + tools + memories)
+  - Helps the agent decide: use existing tools, create a skill, add an MCP server, or build a custom one
+
+- `capability-acquirer` agent template:
+  - Specialized sub-agent for finding or building missing capabilities
+  - System prompt guides the search-first approach: list_skills → list_templates → list_mcp_servers → web search → create skill or add/build MCP server
+  - Reports back to parent with what was acquired
 
 - Post-task reflection:
   - After completing a complex task, agent generates a retrospective
   - What worked, what failed, what tools were useful, what was missing
   - Stored in long-term memory as PROCEDURE knowledge
+  - `reflect` tool or automatic trigger after orchestration completes
+
 - Tool usage analytics:
-  - Track which tools are used, success rates, average latency
-  - Agent can query analytics to choose tools: "which tool works best for this?"
+  - Track tool calls with success/failure rates and latency from event bus
+  - `tool_analytics(tool_name?)` tool — agent can query: "which tools work best for web scraping?"
+  - Aggregated from existing event data (no new storage needed)
+
 - Pattern library:
-  - Successful task decomposition patterns stored as reusable templates
-  - Agent can match new tasks against known patterns
-- Memory management UI (roadmap from V1 discussion):
-  - Human can browse all memories (cross-context and long-term)
-  - Edit, delete, or boost importance of specific memories
-  - Search memories semantically
+  - Successful orchestration plans (task → subtasks → strategy) stored as reusable patterns
+  - `store_pattern` and `find_pattern(query)` tools
+  - When a new complex task arrives, agent checks patterns before decomposing from scratch
+  - Stored as skill-like `.md` files or in memory
+
+- End-to-end model case test:
+  - UC that exercises the full 9-step loop: complex task → gap analysis → capability acquisition → execution → synthesis
+  - Documented as an agent-drive use case with execution report
+
+**Exit Criteria:** Agent can analyze its own capability gaps, delegate acquisition to a specialized sub-agent, reflect on completed tasks, query tool analytics, and reuse decomposition patterns. Full model case demonstrated end-to-end in an agent-drive UC.
 
 ---
 
