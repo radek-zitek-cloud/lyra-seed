@@ -29,7 +29,9 @@ class FakeEmbedding:
                 results.append(self._vectors[t])
             else:
                 h = hash(t) % 1000
-                results.append([h / 1000, (h * 7 % 1000) / 1000, (h * 13 % 1000) / 1000])
+                results.append(
+                    [h / 1000, (h * 7 % 1000) / 1000, (h * 13 % 1000) / 1000]
+                )
         return results
 
 
@@ -87,10 +89,12 @@ class TestV3Phase4:
             usage={},
         )
 
-        embeddings = FakeEmbedding({
-            "Summarize text": [1.0, 0.0, 0.0],
-            "summarize web content": [0.9, 0.1, 0.0],
-        })
+        embeddings = FakeEmbedding(
+            {
+                "Summarize text": [1.0, 0.0, 0.0],
+                "summarize web content": [0.9, 0.1, 0.0],
+            }
+        )
 
         skill_provider = SkillProvider(
             skills_dir=str(skills_dir),
@@ -275,7 +279,8 @@ class TestV3Phase4:
 
         # All tools
         result = await provider.call_tool(
-            "tool_analytics", {},
+            "tool_analytics",
+            {},
         )
         assert result.success
         data = json.loads(result.output)
@@ -317,11 +322,13 @@ class TestV3Phase4:
             {
                 "task_type": "competitive analysis",
                 "strategy": "parallel",
-                "subtasks": json.dumps([
-                    "Research company A",
-                    "Research company B",
-                    "Research company C",
-                ]),
+                "subtasks": json.dumps(
+                    [
+                        "Research company A",
+                        "Research company B",
+                        "Research company C",
+                    ]
+                ),
                 "notes": "Each company researched independently",
             },
         )
@@ -389,12 +396,14 @@ class TestV3Phase4:
         skills_dir.mkdir()
 
         (tmp_path / "lyra.config.json").write_text(
-            json.dumps({
-                "dataDir": str(tmp_path / "data"),
-                "systemPromptsDir": str(prompts_dir),
-                "skillsDir": str(skills_dir),
-                "defaultModel": "test-model",
-            }),
+            json.dumps(
+                {
+                    "dataDir": str(tmp_path / "data"),
+                    "systemPromptsDir": str(prompts_dir),
+                    "skillsDir": str(skills_dir),
+                    "defaultModel": "test-model",
+                }
+            ),
         )
 
         settings = Settings(openrouter_api_key="sk-test")
@@ -407,7 +416,8 @@ class TestV3Phase4:
         async with app.router.lifespan_context(app):
             transport = httpx.ASGITransport(app=app)
             async with httpx.AsyncClient(
-                transport=transport, base_url="http://test",
+                transport=transport,
+                base_url="http://test",
             ) as client:
                 resp = await client.get("/tools")
                 assert resp.status_code == 200

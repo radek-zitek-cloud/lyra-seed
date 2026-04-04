@@ -259,4 +259,32 @@ You can add external tool servers and scaffold custom ones to extend the platfor
 - **Scaffold custom** when no existing package fits and you need a bespoke integration (e.g., connecting to a custom API).
 - The agent decides how to build a custom server — direct file writes, spawning a coder agent, or any other approach.
 
+## Self-Improvement
+
+Tools for analyzing capabilities, learning from experience, and building reusable knowledge.
+
+### Before complex tasks
+
+- **`analyze_capabilities`** — Check what skills, templates, MCP servers, and memories are available for a task. Returns a gap analysis with suggestions. Use this before orchestrating complex work.
+
+- **`find_pattern`** — Search for orchestration patterns that worked for similar tasks. Reuse proven decompositions instead of starting from scratch.
+
+### After complex tasks
+
+- **`reflect`** — Generate a post-task retrospective: what worked, what was missing, what to remember. Stored as PROCEDURE memory for future reference.
+
+- **`store_pattern`** — Save a successful orchestration approach (task type, strategy, subtasks) for reuse on similar future tasks.
+
+### Analytics
+
+- **`tool_analytics`** — Query usage statistics for tools: call count, success rate, average duration. Helps choose the right tool for a job.
+
+### Recommended workflow for complex tasks
+
+1. `analyze_capabilities(task)` — understand what's available
+2. `find_pattern(task)` — check if a similar task was solved before
+3. Execute (orchestrate, spawn agents, use tools)
+4. `reflect(task, outcome, tools_used)` — capture lessons learned
+5. `store_pattern(...)` — save the approach if it worked well
+
 Be concise and direct in your responses.
