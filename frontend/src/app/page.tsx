@@ -20,6 +20,8 @@ export default function HomePage() {
   >([]);
   const [agentCosts, setAgentCosts] = useState<Record<string, number>>({});
   const [newName, setNewName] = useState("");
+  const [newTemplate, setNewTemplate] = useState("");
+  const [templates, setTemplates] = useState<{ name: string; description: string }[]>([]);
   const { connectionState, connect, disconnect } = useEventStream();
 
   const refreshAll = async () => {
@@ -42,13 +44,18 @@ export default function HomePage() {
 
   useEffect(() => {
     refreshAll().catch(() => {});
+    fetch(`${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"}/templates`)
+      .then((r) => r.json())
+      .then(setTemplates)
+      .catch(() => {});
   }, []);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newName.trim()) return;
-    await createAgent(newName.trim());
+    await createAgent(newName.trim(), newTemplate || undefined);
     setNewName("");
+    setNewTemplate("");
     await refreshAll();
   };
 
@@ -112,6 +119,27 @@ export default function HomePage() {
           onFocus={(e) => (e.currentTarget.style.borderColor = "#00ff41")}
           onBlur={(e) => (e.currentTarget.style.borderColor = "#222")}
         />
+        <select
+          value={newTemplate}
+          onChange={(e) => setNewTemplate(e.target.value)}
+          style={{
+            padding: "8px 10px",
+            background: "#0a0a0a",
+            border: "1px solid #222",
+            borderRadius: "2px",
+            color: newTemplate ? "#e0e0e0" : "#555",
+            fontFamily: "inherit",
+            fontSize: "12px",
+          }}
+          title="Template — leave as default to match by agent name"
+        >
+          <option value="">template: auto</option>
+          {templates.map((t) => (
+            <option key={t.name} value={t.name}>
+              {t.name}
+            </option>
+          ))}
+        </select>
         <button
           type="submit"
           disabled={!newName.trim()}

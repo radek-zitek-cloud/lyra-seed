@@ -18,7 +18,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 logger = logging.getLogger(__name__)
 
@@ -128,6 +128,9 @@ def load_system_prompt(name: str, project_root: Path) -> str | None:
 class AgentFileConfig(BaseModel):
     """Agent configuration loaded from {name}.json in prompts dir.
 
+    Accepts both snake_case and camelCase field names, e.g.
+    "summary_model" or "summaryModel" both work.
+
     Example {prompts_dir}/my-agent.json:
     {
       "model": "anthropic/claude-sonnet-4",
@@ -137,22 +140,44 @@ class AgentFileConfig(BaseModel):
     }
     """
 
+    model_config = ConfigDict(populate_by_name=True)
+
     model: str | None = None
-    hitl_policy: str | None = None
+    hitl_policy: str | None = Field(
+        None, alias="hitlPolicy"
+    )
     temperature: float | None = None
-    max_iterations: int | None = None
+    max_iterations: int | None = Field(
+        None, alias="maxIterations"
+    )
     retry: RetryConfig | None = None
     hitl: HITLConfig | None = None
     memoryGC: MemoryGCConfig | None = None
     context: ContextConfig | None = None
-    summary_model: str | None = None
-    extraction_model: str | None = None
-    orchestration_model: str | None = None
-    max_subtasks: int | None = None
-    auto_extract: bool | None = None
-    memory_sharing: dict[str, str] | None = None
-    allowed_mcp_servers: list[str] | None = None
-    allowed_tools: list[str] | None = None
+    summary_model: str | None = Field(
+        None, alias="summaryModel"
+    )
+    extraction_model: str | None = Field(
+        None, alias="extractionModel"
+    )
+    orchestration_model: str | None = Field(
+        None, alias="orchestrationModel"
+    )
+    max_subtasks: int | None = Field(
+        None, alias="maxSubtasks"
+    )
+    auto_extract: bool | None = Field(
+        None, alias="autoExtract"
+    )
+    memory_sharing: dict[str, str] | None = Field(
+        None, alias="memorySharing"
+    )
+    allowed_mcp_servers: list[str] | None = Field(
+        None, alias="allowedMcpServers"
+    )
+    allowed_tools: list[str] | None = Field(
+        None, alias="allowedTools"
+    )
 
 
 def _sanitize_name(agent_name: str) -> str:
@@ -218,16 +243,22 @@ def resolve_agent_config(
     name_path = base / f"{safe_name}.json"
     if name_path.exists():
         logger.info("Loading agent config from %s", name_path)
-        with open(name_path) as f:
-            data = json.load(f)
-        return AgentFileConfig.model_validate(data)
+        try:
+            with open(name_path) as f:
+                data = json.load(f)
+            return AgentFileConfig.model_validate(data)
+        except (json.JSONDecodeError, Exception) as e:
+            logger.error("Bad agent config %s: %s", name_path, e)
 
     # Try default config
     default_path = base / "default.json"
     if default_path.exists():
         logger.info("Loading default agent config from %s", default_path)
-        with open(default_path) as f:
-            data = json.load(f)
-        return AgentFileConfig.model_validate(data)
+        try:
+            with open(default_path) as f:
+                data = json.load(f)
+            return AgentFileConfig.model_validate(data)
+        except (json.JSONDecodeError, Exception) as e:
+            logger.error("Bad default config %s: %s", default_path, e)
 
     return AgentFileConfig()

@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from agent_platform.api import _deps
 from agent_platform.api.config_routes import router as config_router
+from agent_platform.api.knowledge_routes import router as knowledge_router
 from agent_platform.api.memory_routes import router as memory_router
 from agent_platform.api.message_routes import router as message_router
 from agent_platform.api.observation_routes import router as observation_router
@@ -398,6 +399,7 @@ def create_app(
             project_root=project_root,
             memory_store=memory_store,
             message_repo=message_repo,
+            knowledge_store=knowledge_store,
         )
         yield
         # Shutdown — disconnect agent-managed MCP servers
@@ -445,6 +447,7 @@ def create_app(
     app.include_router(config_router)
     app.include_router(observation_router)
     app.include_router(memory_router)
+    app.include_router(knowledge_router)
     app.include_router(message_router)
     app.include_router(ws_router)
 

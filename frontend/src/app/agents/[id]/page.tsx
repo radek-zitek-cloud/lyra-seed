@@ -16,6 +16,7 @@ import {
   fetchAgentCost,
   fetchAgentEvents,
   fetchAgentMessages,
+  resetAgent,
   respondHITL,
   sendAgentMessage,
   sendPrompt,
@@ -43,6 +44,7 @@ export default function AgentPage() {
   const [children, setChildren] = useState<{ id: string; name: string; status: string }[]>([]);
   const [agentMessages, setAgentMessages] = useState<Record<string, unknown>[]>([]);
   const [sending, setSending] = useState(false);
+  const [showConfig, setShowConfig] = useState(false);
   const { events: liveEvents, connectionState, connect, disconnect } = useEventStream(agentId);
   const promptInFlight = useRef(false);
 
@@ -209,6 +211,27 @@ export default function AgentPage() {
         >
           {agentStatus}
         </span>
+        {(agentStatus === "failed" || agentStatus === "completed") && (
+          <button
+            onClick={() => {
+              resetAgent(agentId).then(() => refreshAll()).catch(() => {});
+            }}
+            style={{
+              fontSize: "10px",
+              fontWeight: 700,
+              padding: "1px 8px",
+              borderRadius: "2px",
+              letterSpacing: "1px",
+              color: "#e8a",
+              background: "rgba(255,200,100,0.08)",
+              border: "1px solid rgba(255,200,100,0.2)",
+              cursor: "pointer",
+              fontFamily: "inherit",
+            }}
+          >
+            RESET
+          </button>
+        )}
         {sending && (
           <>
             <span
@@ -229,6 +252,88 @@ export default function AgentPage() {
           <ConnectionStatus state={connectionState} onConnect={connect} onDisconnect={disconnect} />
         </span>
       </div>
+
+      {/* Config panel (collapsible) */}
+      {agentConfig && (
+        <div style={{ flexShrink: 0, marginBottom: showConfig ? "6px" : 0 }}>
+          <button
+            onClick={() => setShowConfig((v) => !v)}
+            style={{
+              fontSize: "11px",
+              fontWeight: 700,
+              color: "#555",
+              letterSpacing: "1px",
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              padding: "2px 0",
+              fontFamily: "inherit",
+            }}
+          >
+            {showConfig ? "\u25BC" : "\u25B6"} CONFIG
+          </button>
+          {showConfig && (
+            <div style={{
+              background: "#111",
+              border: "1px solid #1a1a1a",
+              borderRadius: "3px",
+              padding: "6px",
+              marginTop: "2px",
+              display: "flex",
+              flexDirection: "column",
+              gap: "6px",
+            }}>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "12px", fontSize: "11px" }}>
+                {!!agentConfig.model && (
+                  <span><span style={{ color: "#555" }}>model </span><span style={{ color: "#e0e0e0" }}>{String(agentConfig.model)}</span></span>
+                )}
+                {agentConfig.temperature != null && (
+                  <span><span style={{ color: "#555" }}>temp </span><span style={{ color: "#e0e0e0" }}>{String(agentConfig.temperature)}</span></span>
+                )}
+                {agentConfig.max_iterations != null && (
+                  <span><span style={{ color: "#555" }}>max_iter </span><span style={{ color: "#e0e0e0" }}>{String(agentConfig.max_iterations)}</span></span>
+                )}
+                {!!agentConfig.hitl_policy && (
+                  <span><span style={{ color: "#555" }}>hitl </span><span style={{ color: "#e0e0e0" }}>{String(agentConfig.hitl_policy)}</span></span>
+                )}
+                {agentConfig.max_context_tokens != null && (
+                  <span><span style={{ color: "#555" }}>ctx_tokens </span><span style={{ color: "#e0e0e0" }}>{String(agentConfig.max_context_tokens)}</span></span>
+                )}
+                {agentConfig.memory_top_k != null && (
+                  <span><span style={{ color: "#555" }}>mem_k </span><span style={{ color: "#e0e0e0" }}>{String(agentConfig.memory_top_k)}</span></span>
+                )}
+              </div>
+              {Array.isArray(agentConfig.allowed_tools) && (agentConfig.allowed_tools as string[]).length > 0 && (
+                <div style={{ fontSize: "11px" }}>
+                  <span style={{ color: "#555" }}>tools </span>
+                  <span style={{ color: "#aa66ff" }}>
+                    {(agentConfig.allowed_tools as string[]).join(", ")}
+                  </span>
+                </div>
+              )}
+              {!!agentConfig.system_prompt && (
+                <div style={{ fontSize: "11px" }}>
+                  <div style={{ color: "#555", marginBottom: "2px" }}>system prompt</div>
+                  <pre style={{
+                    color: "#b0b0b0",
+                    background: "#0a0a0a",
+                    border: "1px solid #1a1a1a",
+                    borderRadius: "2px",
+                    padding: "4px",
+                    fontSize: "10px",
+                    whiteSpace: "pre-wrap",
+                    maxHeight: "200px",
+                    overflowY: "auto",
+                    margin: 0,
+                  }}>
+                    {String(agentConfig.system_prompt)}
+                  </pre>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Child agents */}
       {children.length > 0 && (

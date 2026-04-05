@@ -1,5 +1,6 @@
 """Knowledge store — ChromaDB-backed document chunk storage."""
 
+import hashlib
 import logging
 from pathlib import Path
 from typing import Any
@@ -35,39 +36,67 @@ class KnowledgeStore:
 
         self._collection = self._client.get_or_create_collection(**kwargs)
         self._sources: set[str] = set()
+        self._source_hashes: dict[str, str] = {}
         self._load_sources()
 
     def _load_sources(self) -> None:
-        """Load known source files from existing collection."""
+        """Load known source files and content hashes."""
         try:
             result = self._collection.get(include=["metadatas"])
             if result and result["metadatas"]:
                 for meta in result["metadatas"]:
                     if meta and "source" in meta:
-                        self._sources.add(meta["source"])
+                        source = meta["source"]
+                        self._sources.add(source)
+                        if "content_hash" in meta:
+                            self._source_hashes[source] = (
+                                meta["content_hash"]
+                            )
         except Exception:
             pass
 
-    def ingest(self, path: Path) -> int:
+    def ingest(self, path: Path, force: bool = False) -> int:
         """Ingest a markdown file — chunks, embeds, stores.
 
-        Re-ingesting replaces existing chunks from the same source.
-        Returns the number of chunks stored.
+        Skips re-embedding if the file content hasn't changed
+        (based on SHA-256 hash). Use force=True to re-embed anyway.
+        Returns the number of chunks stored (0 if skipped).
         """
+        file_content = path.read_text(encoding="utf-8")
+        content_hash = hashlib.sha256(
+            file_content.encode()
+        ).hexdigest()[:16]
+        source = path.name
+
+        # Skip if content unchanged
+        if (
+            not force
+            and source in self._source_hashes
+            and self._source_hashes[source] == content_hash
+        ):
+            logger.debug("Skipping %s (unchanged)", source)
+            return 0
+
         chunks = chunk_markdown(path)
         if not chunks:
             return 0
 
-        source = path.name
+        directory = str(path.parent)
 
         # Remove existing chunks from this source
         self._remove_source(source)
 
-        # Add new chunks
+        # Add new chunks with content hash
         ids = [f"{source}:{i}" for i in range(len(chunks))]
         documents = [c.content for c in chunks]
         metadatas = [
-            {"source": c.source, "heading_path": c.heading_path} for c in chunks
+            {
+                "source": c.source,
+                "heading_path": c.heading_path,
+                "directory": directory,
+                "content_hash": content_hash,
+            }
+            for c in chunks
         ]
 
         self._collection.add(
@@ -76,6 +105,7 @@ class KnowledgeStore:
             metadatas=metadatas,
         )
         self._sources.add(source)
+        self._source_hashes[source] = content_hash
 
         logger.info("Ingested %s: %d chunks", source, len(chunks))
         return len(chunks)
@@ -114,24 +144,61 @@ class KnowledgeStore:
                         content=doc,
                         source=meta.get("source", ""),
                         heading_path=meta.get("heading_path", ""),
+                        directory=meta.get("directory", ""),
                     )
                 )
 
         return chunks
 
     def ingest_directory(self, dir_path: Path) -> int:
-        """Ingest all .md files from a directory."""
+        """Ingest all .md files from a directory.
+
+        Only re-embeds files whose content has changed.
+        Returns total number of newly embedded chunks.
+        """
         if not dir_path.exists():
             return 0
 
         total = 0
+        skipped = 0
         for path in sorted(dir_path.glob("*.md")):
             if path.name.startswith("README"):
                 continue
-            total += self.ingest(path)
+            count = self.ingest(path)
+            if count:
+                total += count
+            else:
+                skipped += 1
 
+        if skipped:
+            logger.info(
+                "Knowledge: %d files unchanged (skipped)",
+                skipped,
+            )
         return total
 
     def get_sources(self) -> list[str]:
         """Return list of ingested document names."""
         return sorted(self._sources)
+
+    def get_chunks(self, source: str | None = None) -> list[DocumentChunk]:
+        """Return stored chunks, optionally filtered by source."""
+        kwargs: dict = {"include": ["documents", "metadatas"]}
+        if source:
+            kwargs["where"] = {"source": source}
+        try:
+            result = self._collection.get(**kwargs)
+        except Exception:
+            return []
+        chunks: list[DocumentChunk] = []
+        if result and result["documents"]:
+            for doc, meta in zip(result["documents"], result["metadatas"]):
+                chunks.append(
+                    DocumentChunk(
+                        content=doc,
+                        source=meta.get("source", ""),
+                        heading_path=meta.get("heading_path", ""),
+                        directory=meta.get("directory", ""),
+                    )
+                )
+        return chunks

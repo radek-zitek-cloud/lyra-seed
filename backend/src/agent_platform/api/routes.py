@@ -10,6 +10,7 @@ router = APIRouter()
 
 class CreateAgentRequest(BaseModel):
     name: str
+    template: str | None = None  # config/prompt resolution name
     config: AgentConfig | None = None
 
 
@@ -44,7 +45,8 @@ async def create_agent(req: CreateAgentRequest):
     resolve_config = get_agent_config_resolver()
 
     config = req.config or AgentConfig()
-    file_config = resolve_config(req.name)
+    template_name = req.template or req.name
+    file_config = resolve_config(template_name)
 
     # Apply file-based config overrides (name.json > default.json)
     if file_config.model:
@@ -124,9 +126,9 @@ async def create_agent(req: CreateAgentRequest):
             if file_config.max_subtasks is None:
                 config.max_subtasks = pc.maxSubtasks
 
-    # Apply system prompt from name.md
+    # Apply system prompt from template.md
     if config.system_prompt == AgentConfig().system_prompt:
-        config.system_prompt = resolve_prompt(req.name)
+        config.system_prompt = resolve_prompt(template_name)
 
     agent = Agent(name=req.name, config=config)
     await repo.create(agent)
@@ -188,6 +190,22 @@ async def prompt_agent(agent_id: str, req: PromptRequest):
     runtime = get_runtime()
     response = await runtime.run(agent_id, req.message)
     return response.model_dump(mode="json")
+
+
+@router.post("/agents/{agent_id}/reset")
+async def reset_agent(agent_id: str):
+    """Reset a failed/completed agent back to idle."""
+    from agent_platform.api._deps import get_agent_repo
+
+    repo = get_agent_repo()
+    agent = await repo.get(agent_id)
+    if agent is None:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    if agent.status == AgentStatus.IDLE:
+        return agent.model_dump(mode="json")
+    agent.status = AgentStatus.IDLE
+    await repo.update(agent.id, agent)
+    return agent.model_dump(mode="json")
 
 
 @router.post("/agents/{agent_id}/hitl-respond")

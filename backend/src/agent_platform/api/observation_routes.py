@@ -17,6 +17,27 @@ async def list_agents():
     return [a.model_dump(mode="json") for a in agents]
 
 
+@router.get("/events")
+async def get_global_events(
+    event_type: str | None = Query(None),
+    module: str | None = Query(None),
+    limit: int = Query(200, ge=1, le=1000),
+):
+    """Query all events across all agents."""
+    from agent_platform.api._deps import get_event_bus
+
+    event_bus = get_event_bus()
+    filters = EventFilter()
+    if event_type:
+        filters.event_types = [EventType(event_type)]
+    if module:
+        filters.module = module
+
+    events = await event_bus.query(filters)
+    # Return most recent events (tail)
+    return [e.model_dump(mode="json") for e in events[-limit:]]
+
+
 @router.get("/agents/{agent_id}/events")
 async def get_agent_events(
     agent_id: str,

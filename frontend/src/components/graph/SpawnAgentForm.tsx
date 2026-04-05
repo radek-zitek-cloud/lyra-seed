@@ -20,7 +20,7 @@ export function SpawnAgentForm({ onCreated }: SpawnAgentFormProps) {
     try {
       const config: Record<string, unknown> = {};
       if (model.trim()) config.model = model.trim();
-      await createAgent(name.trim(), config);
+      await createAgent(name.trim(), undefined, config);
       setName("");
       setModel("");
       onCreated();

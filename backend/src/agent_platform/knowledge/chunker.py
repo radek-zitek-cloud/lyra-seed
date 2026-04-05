@@ -5,6 +5,9 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
+# ~8K tokens ≈ ~32K chars is a safe limit for embedding APIs.
+DEFAULT_MAX_CHUNK_CHARS = 30_000
+
 
 class DocumentChunk(BaseModel):
     """A chunk of a document with metadata."""
@@ -12,16 +15,71 @@ class DocumentChunk(BaseModel):
     content: str
     source: str  # filename
     heading_path: str  # e.g., "Memory System > Context Memory"
+    directory: str = ""  # parent directory path
 
 
 _HEADING_RE = re.compile(r"^(#{1,6})\s+(.+)$", re.MULTILINE)
 
 
-def chunk_markdown(path: Path) -> list[DocumentChunk]:
+def _split_large_chunk(
+    content: str,
+    source: str,
+    heading_path: str,
+    max_chars: int,
+) -> list[DocumentChunk]:
+    """Split an oversized chunk on paragraph boundaries."""
+    if len(content) <= max_chars:
+        return [
+            DocumentChunk(
+                content=content,
+                source=source,
+                heading_path=heading_path,
+            )
+        ]
+
+    chunks: list[DocumentChunk] = []
+    paragraphs = re.split(r"\n\n+", content)
+    current = ""
+    part = 1
+
+    for para in paragraphs:
+        if current and len(current) + len(para) + 2 > max_chars:
+            chunks.append(
+                DocumentChunk(
+                    content=current.strip(),
+                    source=source,
+                    heading_path=f"{heading_path} [{part}]",
+                )
+            )
+            part += 1
+            current = ""
+        current += ("\n\n" if current else "") + para
+
+    if current.strip():
+        label = (
+            f"{heading_path} [{part}]" if part > 1 else heading_path
+        )
+        chunks.append(
+            DocumentChunk(
+                content=current.strip(),
+                source=source,
+                heading_path=label,
+            )
+        )
+
+    return chunks
+
+
+def chunk_markdown(
+    path: Path,
+    max_chunk_chars: int = DEFAULT_MAX_CHUNK_CHARS,
+) -> list[DocumentChunk]:
     """Split a markdown file into chunks by headings.
 
     Each heading starts a new chunk. Nested headings create
     hierarchical heading paths (e.g., "Parent > Child").
+    Chunks exceeding max_chunk_chars are further split on
+    paragraph boundaries.
     """
     text = path.read_text(encoding="utf-8")
     source = path.name
@@ -34,16 +92,12 @@ def chunk_markdown(path: Path) -> list[DocumentChunk]:
         headings.append((m.start(), level, title))
 
     if not headings:
-        # No headings — return the whole document as one chunk
+        # No headings — return the whole document, split if needed
         content = text.strip()
         if content:
-            return [
-                DocumentChunk(
-                    content=content,
-                    source=source,
-                    heading_path=path.stem,
-                )
-            ]
+            return _split_large_chunk(
+                content, source, path.stem, max_chunk_chars
+            )
         return []
 
     chunks: list[DocumentChunk] = []
@@ -51,11 +105,9 @@ def chunk_markdown(path: Path) -> list[DocumentChunk]:
     # Content before first heading (if any)
     intro = text[: headings[0][0]].strip()
     if intro:
-        chunks.append(
-            DocumentChunk(
-                content=intro,
-                source=source,
-                heading_path=path.stem,
+        chunks.extend(
+            _split_large_chunk(
+                intro, source, path.stem, max_chunk_chars
             )
         )
 
@@ -86,11 +138,9 @@ def chunk_markdown(path: Path) -> list[DocumentChunk]:
 
         # Include both heading and body as content
         if body:
-            chunks.append(
-                DocumentChunk(
-                    content=body,
-                    source=source,
-                    heading_path=heading_path,
+            chunks.extend(
+                _split_large_chunk(
+                    body, source, heading_path, max_chunk_chars
                 )
             )
 

@@ -134,6 +134,42 @@ function getLineAt(text: string, pos: number): string {
   return text.substring(start, end);
 }
 
+// ── JSON syntax highlighting ─────────────────────────────
+
+function highlightJson(text: string): React.ReactNode[] {
+  // Tokenize JSON for syntax coloring
+  const tokens: React.ReactNode[] = [];
+  const re =
+    /("(?:[^"\\]|\\.)*")\s*(:)|("(?:[^"\\]|\\.)*")|(true|false|null)|(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)|([{}[\],:])|(\s+)|(.)/g;
+  let m: RegExpExecArray | null;
+  let i = 0;
+  while ((m = re.exec(text)) !== null) {
+    if (m[1] !== undefined) {
+      // Key
+      tokens.push(
+        <span key={i++} style={{ color: "#6a8" }}>{m[1]}</span>,
+        <span key={i++} style={{ color: "#888" }}>{m[2] ? ":" : ""}</span>,
+      );
+    } else if (m[3] !== undefined) {
+      // String value
+      tokens.push(<span key={i++} style={{ color: "#e8a" }}>{m[3]}</span>);
+    } else if (m[4] !== undefined) {
+      // Boolean / null
+      tokens.push(<span key={i++} style={{ color: "#aa66ff" }}>{m[4]}</span>);
+    } else if (m[5] !== undefined) {
+      // Number
+      tokens.push(<span key={i++} style={{ color: "#6688ff" }}>{m[5]}</span>);
+    } else if (m[6] !== undefined) {
+      // Punctuation
+      tokens.push(<span key={i++} style={{ color: "#555" }}>{m[6]}</span>);
+    } else {
+      // Whitespace or other
+      tokens.push(<span key={i++}>{m[0]}</span>);
+    }
+  }
+  return tokens;
+}
+
 // ── Component ────────────────────────────────────────────
 
 interface FileEntry {
@@ -160,6 +196,54 @@ const CATEGORY_LABELS: Record<string, string> = {
   mcp_servers: "MCP Servers",
 };
 
+const CREATABLE: Record<string, { dir: string; ext: string; template: string }> = {
+  agent_configs: {
+    dir: "prompts",
+    ext: ".json",
+    template: `{
+  "model": null,
+  "hitl_policy": "never",
+  "temperature": 0.7,
+  "max_iterations": 10
+}
+`,
+  },
+  agent_prompts: {
+    dir: "prompts",
+    ext: ".md",
+    template: `# Agent Name
+
+You are a helpful assistant.
+
+## Capabilities
+
+- Describe what this agent does
+
+## Constraints
+
+- Describe any constraints
+`,
+  },
+  skills: {
+    dir: "skills",
+    ext: ".md",
+    template: `---
+name: skill-name
+description: What this skill does
+parameters:
+  - name: input
+    type: string
+    required: true
+    description: The input to process
+---
+
+Process the following input:
+
+{{ input }}
+`,
+  },
+};
+
 export default function ConfigPage() {
   const [tree, setTree] = useState<FileTree | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
@@ -173,6 +257,8 @@ export default function ConfigPage() {
   const [confirmRestart, setConfirmRestart] = useState(false);
   const [serverAction, setServerAction] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [newFileCategory, setNewFileCategory] = useState<string | null>(null);
+  const [newFileName, setNewFileName] = useState("");
 
   // Load file tree
   useEffect(() => {
@@ -197,6 +283,53 @@ export default function ConfigPage() {
       })
       .catch(() => setStatus("Failed to load file"));
   }, []);
+
+  const createFile = useCallback(
+    async (category: string, name: string) => {
+      const spec = CREATABLE[category];
+      if (!spec || !name.trim()) return;
+      const cleanName = name.trim().replace(/[^a-zA-Z0-9_-]/g, "");
+      if (!cleanName) return;
+      const path = `${spec.dir}/${cleanName}${spec.ext}`;
+      try {
+        const res = await fetch(`${API}/config/file`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ path, content: spec.template }),
+        });
+        if (res.ok) {
+          setNewFileCategory(null);
+          setNewFileName("");
+          // Refresh tree then open the new file
+          const treeRes = await fetch(`${API}/config/files`);
+          const newTree = await treeRes.json();
+          setTree(newTree);
+          loadFile(path);
+        } else {
+          const err = await res.json();
+          setStatus(`Error: ${err.detail}`);
+        }
+      } catch {
+        setStatus("Failed to create file");
+      }
+    },
+    [loadFile],
+  );
+
+  // Guard file switch when there are unsaved changes
+  const [pendingFile, setPendingFile] = useState<string | null>(null);
+
+  const selectFile = useCallback(
+    (path: string) => {
+      if (path === selected) return;
+      if (content !== original) {
+        setPendingFile(path);
+        return;
+      }
+      loadFile(path);
+    },
+    [selected, content, original, loadFile],
+  );
 
   // Save file
   const save = useCallback(async () => {
@@ -319,6 +452,36 @@ export default function ConfigPage() {
   }, []);
 
   const dirty = content !== original;
+  const [jsonError, setJsonError] = useState<string | null>(null);
+
+  // Validate JSON on content change
+  useEffect(() => {
+    if (!selected?.endsWith(".json")) {
+      setJsonError(null);
+      return;
+    }
+    if (!content.trim()) {
+      setJsonError(null);
+      return;
+    }
+    try {
+      JSON.parse(content);
+      setJsonError(null);
+    } catch (e) {
+      setJsonError(e instanceof Error ? e.message : "Invalid JSON");
+    }
+  }, [content, selected]);
+
+  // Warn on browser navigation / tab close with unsaved changes
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (dirty) {
+        e.preventDefault();
+      }
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [dirty]);
 
   return (
     <div style={{ display: "flex", height: "100%", gap: 0 }}>
@@ -347,7 +510,7 @@ export default function ConfigPage() {
         {tree &&
           Object.entries(CATEGORY_LABELS).map(([key, label]) => {
             const files = tree[key as keyof FileTree] || [];
-            if (files.length === 0) return null;
+            if (files.length === 0 && !CREATABLE[key]) return null;
             return (
               <div key={key} style={{ marginBottom: 8 }}>
                 <div
@@ -357,14 +520,84 @@ export default function ConfigPage() {
                     color: "#555",
                     letterSpacing: 1,
                     textTransform: "uppercase",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
                   }}
                 >
                   {label}
+                  {CREATABLE[key] && (
+                    <button
+                      onClick={() => {
+                        setNewFileCategory(newFileCategory === key ? null : key);
+                        setNewFileName("");
+                      }}
+                      style={{
+                        fontSize: 12,
+                        background: "none",
+                        border: "none",
+                        color: newFileCategory === key ? "#e8a" : "#555",
+                        cursor: "pointer",
+                        padding: "0 2px",
+                        fontFamily: "inherit",
+                        lineHeight: 1,
+                      }}
+                    >
+                      +
+                    </button>
+                  )}
                 </div>
+                {newFileCategory === key && (
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      createFile(key, newFileName);
+                    }}
+                    style={{
+                      padding: "2px 12px 4px 20px",
+                      display: "flex",
+                      gap: 4,
+                    }}
+                  >
+                    <input
+                      autoFocus
+                      value={newFileName}
+                      onChange={(e) => setNewFileName(e.target.value)}
+                      placeholder="name"
+                      style={{
+                        flex: 1,
+                        fontSize: 11,
+                        background: "#0a0a0a",
+                        color: "#e0e0e0",
+                        border: "1px solid #333",
+                        borderRadius: 2,
+                        padding: "2px 6px",
+                        fontFamily: "inherit",
+                        minWidth: 0,
+                      }}
+                    />
+                    <button
+                      type="submit"
+                      disabled={!newFileName.trim()}
+                      style={{
+                        fontSize: 10,
+                        padding: "2px 8px",
+                        border: "1px solid #333",
+                        borderRadius: 2,
+                        background: newFileName.trim() ? "#2a4a2a" : "#1a1a1a",
+                        color: newFileName.trim() ? "#8e8" : "#555",
+                        cursor: newFileName.trim() ? "pointer" : "default",
+                        fontFamily: "inherit",
+                      }}
+                    >
+                      CREATE
+                    </button>
+                  </form>
+                )}
                 {files.map((f) => (
                   <div
                     key={f.path}
-                    onClick={() => loadFile(f.path)}
+                    onClick={() => selectFile(f.path)}
                     style={{
                       padding: "3px 12px 3px 20px",
                       fontSize: 12,
@@ -631,35 +864,78 @@ export default function ConfigPage() {
           )}
         </div>
 
-        {/* Text area */}
+        {/* Editor */}
         {selected ? (
-          <textarea
-            ref={textareaRef}
-            value={content}
-            onChange={(e) => {
-              setContent(e.target.value);
-              setTimeout(updateHelp, 0);
-            }}
-            onClick={updateHelp}
-            onKeyUp={updateHelp}
-            spellCheck={false}
-            style={{
-              flex: 1,
-              width: "100%",
-              padding: 12,
-              margin: 0,
-              border: "none",
-              outline: "none",
-              resize: "none",
-              fontFamily:
-                "'JetBrains Mono', 'Fira Code', monospace",
-              fontSize: 12,
-              lineHeight: 1.5,
-              color: "#d0d0d0",
-              background: "#0a0a0a",
-              tabSize: 2,
-            }}
-          />
+          <div style={{ flex: 1, position: "relative", minHeight: 0, overflow: "hidden" }}>
+            {/* Syntax highlight layer (behind textarea) */}
+            {selected.endsWith(".json") && (
+              <pre
+                aria-hidden
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  padding: 12,
+                  margin: 0,
+                  fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+                  fontSize: 12,
+                  lineHeight: 1.5,
+                  tabSize: 2,
+                  background: "#0a0a0a",
+                  border: "none",
+                  overflowY: "auto",
+                  overflowX: "auto",
+                  whiteSpace: "pre-wrap",
+                  wordWrap: "break-word",
+                  pointerEvents: "none",
+                }}
+              >
+                {highlightJson(content)}
+                {/* Extra line so scrolling matches textarea */}
+                {"\n"}
+              </pre>
+            )}
+            <textarea
+              ref={textareaRef}
+              value={content}
+              onChange={(e) => {
+                setContent(e.target.value);
+                setTimeout(updateHelp, 0);
+              }}
+              onClick={updateHelp}
+              onKeyUp={updateHelp}
+              spellCheck={false}
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                width: "100%",
+                height: "100%",
+                padding: 12,
+                margin: 0,
+                border: "none",
+                outline: "none",
+                resize: "none",
+                fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+                fontSize: 12,
+                lineHeight: 1.5,
+                color: selected.endsWith(".json") ? "transparent" : "#d0d0d0",
+                caretColor: "#d0d0d0",
+                background: selected.endsWith(".json") ? "transparent" : "#0a0a0a",
+                tabSize: 2,
+              }}
+              onScroll={(e) => {
+                // Sync highlight layer scroll
+                const pre = e.currentTarget.previousElementSibling as HTMLElement | null;
+                if (pre) {
+                  pre.scrollTop = e.currentTarget.scrollTop;
+                  pre.scrollLeft = e.currentTarget.scrollLeft;
+                }
+              }}
+            />
+          </div>
         ) : (
           <div
             style={{
@@ -672,6 +948,26 @@ export default function ConfigPage() {
             }}
           >
             Select a file from the sidebar to view and edit
+          </div>
+        )}
+
+        {/* JSON error bar */}
+        {jsonError && selected?.endsWith(".json") && (
+          <div
+            style={{
+              padding: "4px 12px",
+              borderTop: "1px solid #422",
+              fontSize: 11,
+              color: "#e66",
+              background: "#1a0a0a",
+              flexShrink: 0,
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+            }}
+          >
+            <span style={{ fontWeight: 700 }}>JSON</span>
+            {jsonError}
           </div>
         )}
 
@@ -708,6 +1004,100 @@ export default function ConfigPage() {
           </div>
         )}
       </div>
+
+      {/* Unsaved changes dialog */}
+      {pendingFile && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.6)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+          }}
+          onClick={() => setPendingFile(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "#111",
+              border: "1px solid #333",
+              borderRadius: 3,
+              padding: "16px 20px",
+              minWidth: 320,
+              display: "flex",
+              flexDirection: "column",
+              gap: 12,
+            }}
+          >
+            <div style={{ fontSize: 13, color: "#e0e0e0", fontWeight: 700 }}>
+              Unsaved changes
+            </div>
+            <div style={{ fontSize: 12, color: "#888" }}>
+              You have unsaved changes to{" "}
+              <span style={{ color: "#e8a" }}>{selected?.split("/").pop()}</span>.
+              What would you like to do?
+            </div>
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <button
+                onClick={() => {
+                  save().then(() => {
+                    setPendingFile(null);
+                    loadFile(pendingFile);
+                  });
+                }}
+                style={{
+                  fontSize: 11,
+                  padding: "5px 14px",
+                  border: "1px solid #333",
+                  borderRadius: 2,
+                  background: "#2a4a2a",
+                  color: "#8e8",
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                }}
+              >
+                SAVE
+              </button>
+              <button
+                onClick={() => {
+                  setPendingFile(null);
+                  loadFile(pendingFile);
+                }}
+                style={{
+                  fontSize: 11,
+                  padding: "5px 14px",
+                  border: "1px solid #422",
+                  borderRadius: 2,
+                  background: "#2a1a1a",
+                  color: "#e88",
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                }}
+              >
+                DISCARD
+              </button>
+              <button
+                onClick={() => setPendingFile(null)}
+                style={{
+                  fontSize: 11,
+                  padding: "5px 14px",
+                  border: "1px solid #333",
+                  borderRadius: 2,
+                  background: "#1a1a1a",
+                  color: "#888",
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                }}
+              >
+                CANCEL
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

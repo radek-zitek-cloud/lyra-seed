@@ -12,6 +12,18 @@ export async function fetchAgent(id: string) {
   return res.json();
 }
 
+export async function fetchGlobalEvents(
+  params?: { event_type?: string; module?: string; limit?: number },
+) {
+  const url = new URL(`${API_BASE}/events`);
+  if (params?.event_type) url.searchParams.set("event_type", params.event_type);
+  if (params?.module) url.searchParams.set("module", params.module);
+  if (params?.limit) url.searchParams.set("limit", String(params.limit));
+  const res = await fetch(url.toString());
+  if (!res.ok) throw new Error("Failed to fetch events");
+  return res.json();
+}
+
 export async function fetchAgentEvents(
   id: string,
   params?: { event_type?: string; module?: string },
@@ -30,13 +42,22 @@ export async function fetchAgentConversations(id: string) {
   return res.json();
 }
 
-export async function createAgent(name: string, config?: Record<string, unknown>) {
+export async function createAgent(name: string, template?: string, config?: Record<string, unknown>) {
+  const body: Record<string, unknown> = { name };
+  if (template) body.template = template;
+  if (config && Object.keys(config).length > 0) body.config = config;
   const res = await fetch(`${API_BASE}/agents`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name, config: config ?? {} }),
+    body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error("Failed to create agent");
+  return res.json();
+}
+
+export async function resetAgent(id: string) {
+  const res = await fetch(`${API_BASE}/agents/${id}/reset`, { method: "POST" });
+  if (!res.ok) throw new Error("Failed to reset agent");
   return res.json();
 }
 
@@ -133,5 +154,28 @@ export async function updateMemory(id: string, patch: { importance?: number; arc
     body: JSON.stringify(patch),
   });
   if (!res.ok) throw new Error("Failed to update memory");
+  return res.json();
+}
+
+export async function fetchKnowledgeSources() {
+  const res = await fetch(`${API_BASE}/knowledge/sources`);
+  if (!res.ok) throw new Error("Failed to fetch knowledge sources");
+  return res.json();
+}
+
+export async function fetchKnowledgeChunks(source?: string) {
+  const url = new URL(`${API_BASE}/knowledge/chunks`);
+  if (source) url.searchParams.set("source", source);
+  const res = await fetch(url.toString());
+  if (!res.ok) throw new Error("Failed to fetch knowledge chunks");
+  return res.json();
+}
+
+export async function searchKnowledge(q: string, topK: number = 10) {
+  const url = new URL(`${API_BASE}/knowledge/search`);
+  url.searchParams.set("q", q);
+  url.searchParams.set("top_k", String(topK));
+  const res = await fetch(url.toString());
+  if (!res.ok) throw new Error("Failed to search knowledge");
   return res.json();
 }

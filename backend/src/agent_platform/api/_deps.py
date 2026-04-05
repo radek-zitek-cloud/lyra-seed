@@ -35,6 +35,7 @@ _platform_config: Any = None
 _project_root: Any = None
 _memory_store: Any = None
 _message_repo: Any = None
+_knowledge_store: Any = None
 
 
 def configure(
@@ -53,6 +54,7 @@ def configure(
     project_root: Any = None,
     memory_store: Any = None,
     message_repo: Any = None,
+    knowledge_store: Any = None,
 ) -> None:
     global _agent_repo, _conversation_repo, _event_bus, _runtime
     global _skill_provider, _template_provider, _mcp_server_manager, _tool_registry
@@ -60,6 +62,7 @@ def configure(
     global _default_model
     global _memory_store, _message_repo
     global _platform_config, _project_root
+    global _knowledge_store
     _agent_repo = agent_repo
     _conversation_repo = conversation_repo
     _event_bus = event_bus
@@ -75,6 +78,7 @@ def configure(
     _project_root = project_root
     _memory_store = memory_store
     _message_repo = message_repo
+    _knowledge_store = knowledge_store
 
 
 def get_agent_repo() -> SqliteAgentRepo:
@@ -149,3 +153,8 @@ def get_memory_store():
 
 def get_message_repo():
     return _message_repo
+
+
+def get_knowledge_store():
+    assert _knowledge_store is not None, "App not initialized"
+    return _knowledge_store

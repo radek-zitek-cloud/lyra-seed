@@ -6,11 +6,11 @@ Self-evolving multi-agent platform. Experimental hobby project by Radek Zítek (
 
 ## Key Documents
 
-Before doing any implementation work, read these files from the project root:
+Before doing any implementation work, read these files from `docs/`:
 
-- `REQUIREMENTS.md` — High-level requirements and use cases
-- `ROADMAP.md` — Detailed version/phase roadmap with deliverables and exit criteria
-- `METHODOLOGY.md` — Development workflow (phase-driven smoke-test loop)
+- `docs/REQUIREMENTS.md` — High-level requirements and use cases
+- `docs/ROADMAP.md` — Detailed version/phase roadmap with deliverables and exit criteria
+- `docs/DEVELOPMENT_METHODOLOGY.md` — Development workflow (phase-driven smoke-test loop)
 
 ## Development Methodology
 
@@ -25,6 +25,8 @@ Phase plans and status are stored in `docs/phases/{version}-phase-{number}/`.
 - **Task runner:** justfile (must work on both Linux bash and Windows PowerShell)
 - **LLM:** OpenRouter (behind abstract provider interface)
 - **Embeddings:** openai/text-embedding-3-large via OpenRouter
+- **Vector store:** ChromaDB (memory and knowledge search)
+- **Config:** `lyra.config.json` (platform config), `LYRA_OPENROUTER_API_KEY` env var
 
 ## Conventions
 
@@ -33,7 +35,7 @@ Phase plans and status are stored in `docs/phases/{version}-phase-{number}/`.
 - All services injected via FastAPI `Depends` (testable, mockable)
 - Pydantic models for all data contracts
 - Async-first throughout the backend
-- Smoke tests use pytest markers: `@pytest.mark.smoke`, `@pytest.mark.phase("v1-phase-0")`
+- Smoke tests use pytest markers: `@pytest.mark.smoke`, `@pytest.mark.phase("v4-phase-1")`
 - LLM and external API calls are always mocked in smoke tests
 - Every significant action emits an event via the EventBus
 
@@ -47,5 +49,6 @@ just test             # Run all tests
 just lint             # Run linter
 just format           # Format code
 just smoke-test       # Run all smoke tests
-just smoke-test-phase v1-phase-0  # Run smoke tests for a specific phase
+just smoke-test-phase v4-phase-1  # Run smoke tests for a specific phase
+just smoke-test-id pattern        # Run a single smoke test by ID pattern
 ```

@@ -61,6 +61,30 @@ export default function RootLayout({
               MEMORIES
             </a>
             <a
+              href="/knowledge"
+              style={{
+                color: "#555",
+                textDecoration: "none",
+                border: "1px solid #222",
+                borderRadius: "2px",
+                padding: "3px 10px",
+              }}
+            >
+              KNOWLEDGE
+            </a>
+            <a
+              href="/events"
+              style={{
+                color: "#555",
+                textDecoration: "none",
+                border: "1px solid #222",
+                borderRadius: "2px",
+                padding: "3px 10px",
+              }}
+            >
+              EVENTS
+            </a>
+            <a
               href="/graph"
               style={{
                 color: "#555",

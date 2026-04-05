@@ -1,0 +1,9 @@
+{
+  "model": "anthropic/claude-opus-4.6",
+  "hitl_policy": "never",
+  "temperature": 0.7,
+  "max_iterations": 10,
+  "summary_model": "anthropic/claude-haiku-4.5",
+  "extraction_model": "anthropic/claude-haiku-4.5",
+  "orchestration_model": "anthropic/claude-haiku-4.5"
+}

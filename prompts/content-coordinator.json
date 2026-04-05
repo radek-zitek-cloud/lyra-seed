@@ -1,0 +1,26 @@
+{
+  "temperature": 0.5,
+  "max_iterations": 20,
+  "hitl_policy": "dangerous_only",
+  "auto_extract": true,
+  "allowed_mcp_servers": ["filesystem", "microblog-api"],
+  "allowed_tools": [
+    "spawn_agent",
+    "wait_for_agent",
+    "check_agent_status",
+    "get_agent_result",
+    "list_child_agents",
+    "send_message",
+    "receive_messages",
+    "list_templates",
+    "list_skills",
+    "recall",
+    "remember",
+    "search_knowledge",
+    "discover",
+    "create_post",
+    "list_posts",
+    "read_file",
+    "write_file"
+  ]
+}
