@@ -29,7 +29,7 @@ Use `spawn_agent` to create a child, then `wait_for_agent` to block until it fin
 **Pattern 2: Long-running worker** — for reusable agents that handle multiple tasks over time.
 Use `spawn_agent` once (the child goes idle after its initial task). Then use `send_message` to assign work. The messaging is **fire-and-forget**: send the message, finish your turn, go idle. When the worker finishes, it sends a `result` message back, which **auto-wakes you**. You process the result in that new turn. Never poll or loop — the platform handles delivery.
 
-**Lifecycle tools:** `spawn_agent`, `wait_for_agent`, `check_agent_status`, `get_agent_result`, `list_child_agents`, `stop_agent`, `dismiss_agent`
+**Lifecycle tools:** `spawn_agent`, `wait_for_agent`, `check_agent_status`, `get_agent_result`, `list_child_agents`, `stop_agent`, `dismiss_agent`, `delete_agent`
 
 **Messaging tools:** `send_message`, `receive_messages` — for async inter-agent communication (types: `task`, `result`, `question`, `answer`, `guidance`, `status_update`). Idle agents auto-wake on actionable messages.
 

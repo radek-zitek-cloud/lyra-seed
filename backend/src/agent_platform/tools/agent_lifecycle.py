@@ -1,4 +1,4 @@
-"""Agent lifecycle operations — spawn, wait, stop, dismiss, check, list, get result."""
+"""Agent lifecycle operations — spawn, wait, stop, dismiss, delete, check, list, get result."""
 
 from __future__ import annotations
 
@@ -258,6 +258,65 @@ async def dismiss_agent(
         success=True,
         output=f"Agent {child_id} dismissed",
         duration_ms=int((time.monotonic() - start) * 1000),
+    )
+
+
+async def delete_agent(
+    provider: AgentSpawnerProvider, args: dict[str, Any], start: float
+) -> ToolResult:
+    """Delete a child agent and clean up all associated data."""
+    parent_id = args.get("agent_id")
+    child_id = args["child_agent_id"]
+    child = await provider._agent_repo.get(child_id)
+    if child is None:
+        return ToolResult(
+            success=False,
+            error=f"Agent {child_id} not found",
+            duration_ms=int((time.monotonic() - start) * 1000),
+        )
+
+    # Only allow deleting own children
+    if child.parent_agent_id != parent_id:
+        return ToolResult(
+            success=False,
+            error=f"Agent {child_id} is not your child",
+            duration_ms=int((time.monotonic() - start) * 1000),
+        )
+
+    # Cancel if running
+    task = provider._running_tasks.pop(child_id, None)
+    if task:
+        task.cancel()
+    provider._completion_events.pop(child_id, None)
+
+    # Clean up conversations
+    convos = await provider._conv_repo.list(filters={"agent_id": child_id})
+    for conv in convos:
+        await provider._conv_repo.delete(conv.id)
+
+    # Clean up messages
+    if provider._message_repo:
+        msgs = await provider._message_repo.list_for_agent(
+            child_id, direction="all"
+        )
+        for msg in msgs:
+            await provider._message_repo.delete(msg.id)
+
+    # Clean up events
+    await provider._event_bus.delete_agent_events(child_id)
+
+    # Delete the agent record
+    await provider._agent_repo.delete(child_id)
+
+    duration = int((time.monotonic() - start) * 1000)
+    logger.info("Deleted child agent %s (parent %s)", child_id, parent_id)
+    return ToolResult(
+        success=True,
+        output=json.dumps({
+            "deleted": child_id,
+            "name": child.name,
+        }),
+        duration_ms=duration,
     )
 
 

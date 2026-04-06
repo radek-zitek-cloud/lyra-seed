@@ -13,6 +13,7 @@ from agent_platform.db.sqlite_message_repo import SqliteMessageRepo
 from agent_platform.observation.in_process_event_bus import InProcessEventBus
 from agent_platform.tools.agent_lifecycle import (
     check_agent_status,
+    delete_agent,
     dismiss_agent,
     get_agent_result,
     list_child_agents,
@@ -312,6 +313,29 @@ class AgentSpawnerProvider:
                 tool_type=ToolType.INTERNAL,
                 source="agent_spawner",
             ),
+            Tool(
+                name="delete_agent",
+                description=(
+                    "Permanently delete a child agent and all its data "
+                    "(conversations, messages, events). Cannot be undone."
+                ),
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "child_agent_id": {
+                            "type": "string",
+                            "description": "ID of the child agent to delete.",
+                        },
+                        "agent_id": {
+                            "type": "string",
+                            "description": "Auto-injected. Do not set.",
+                        },
+                    },
+                    "required": ["child_agent_id"],
+                },
+                tool_type=ToolType.INTERNAL,
+                source="agent_spawner",
+            ),
         ]
 
     async def call_tool(self, name: str, arguments: dict[str, Any]) -> ToolResult:
@@ -326,6 +350,7 @@ class AgentSpawnerProvider:
             "send_message": send_message,
             "receive_messages": receive_messages,
             "dismiss_agent": dismiss_agent,
+            "delete_agent": delete_agent,
         }
         handler = handlers.get(name)
         if handler is None:

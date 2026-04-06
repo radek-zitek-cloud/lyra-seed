@@ -108,6 +108,15 @@ class SqliteEventStore:
                 rows.append(self._row_to_event(row))
         return rows
 
+    async def delete_by_agent(self, agent_id: str) -> int:
+        """Delete all events for an agent. Returns count deleted."""
+        assert self._db is not None
+        cursor = await self._db.execute(
+            "DELETE FROM events WHERE agent_id = ?", (agent_id,)
+        )
+        await self._db.commit()
+        return cursor.rowcount
+
     async def close(self) -> None:
         """Close the database connection."""
         if self._db:

@@ -91,6 +91,12 @@ class InProcessEventBus:
         if self._store:
             await self._store.close()
 
+    async def delete_agent_events(self, agent_id: str) -> int:
+        """Delete all persisted events for an agent."""
+        if self._store:
+            return await self._store.delete_by_agent(agent_id)
+        return 0
+
     async def _iter_subscription(self, sub: _Subscription) -> AsyncIterator[Event]:
         """Async iterator that yields events from a subscription queue."""
         try:
