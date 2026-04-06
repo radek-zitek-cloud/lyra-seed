@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 function fmtTime(ts?: string | null): string {
   if (!ts) return "";
@@ -198,8 +198,54 @@ export function ConversationPanel({ messages, streamingContent }: { messages: Me
 
 /* ── Event Timeline ──────────────────────────────────── */
 
+function FilterChip({ label, active, color, onClick }: {
+  label: string; active: boolean; color: string; onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        fontSize: "9px",
+        fontWeight: 700,
+        padding: "1px 5px",
+        borderRadius: "2px",
+        border: `1px solid ${active ? color : "#333"}`,
+        background: active ? `${color}18` : "transparent",
+        color: active ? color : "#555",
+        cursor: "pointer",
+        fontFamily: "inherit",
+        letterSpacing: "0.3px",
+        lineHeight: "14px",
+      }}
+    >
+      {label}
+    </button>
+  );
+}
+
+const STORAGE_KEY_TYPES = "lyra-event-filter-types";
+const STORAGE_KEY_MODULES = "lyra-event-filter-modules";
+const STORAGE_KEY_OPEN = "lyra-event-filter-open";
+
+function loadSet(key: string): Set<string> {
+  try {
+    const raw = localStorage.getItem(key);
+    if (raw) return new Set(JSON.parse(raw));
+  } catch { /* ignore */ }
+  return new Set();
+}
+
+function saveSet(key: string, s: Set<string>) {
+  try { localStorage.setItem(key, JSON.stringify([...s])); } catch { /* ignore */ }
+}
+
 export function EventTimeline({ events }: { events: EventItem[] }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [hiddenTypes, setHiddenTypes] = useState<Set<string>>(() => loadSet(STORAGE_KEY_TYPES));
+  const [hiddenModules, setHiddenModules] = useState<Set<string>>(() => loadSet(STORAGE_KEY_MODULES));
+  const [showFilters, setShowFilters] = useState(() => {
+    try { return localStorage.getItem(STORAGE_KEY_OPEN) === "1"; } catch { return false; }
+  });
   const scrollRef = useRef<HTMLDivElement>(null);
   const wasAtBottom = useRef(true);
 
@@ -217,18 +263,109 @@ export function EventTimeline({ events }: { events: EventItem[] }) {
     });
   };
 
+  const toggleType = (t: string) => {
+    setHiddenTypes((prev) => {
+      const next = new Set(prev);
+      if (next.has(t)) next.delete(t); else next.add(t);
+      saveSet(STORAGE_KEY_TYPES, next);
+      return next;
+    });
+  };
+
+  const toggleModule = (m: string) => {
+    setHiddenModules((prev) => {
+      const next = new Set(prev);
+      if (next.has(m)) next.delete(m); else next.add(m);
+      saveSet(STORAGE_KEY_MODULES, next);
+      return next;
+    });
+  };
+
+  // Collect unique types and modules from events
+  const eventTypes = useMemo(() => {
+    const s = new Set<string>();
+    for (const e of events) s.add(e.event_type);
+    return Array.from(s).sort();
+  }, [events]);
+
+  const modules = useMemo(() => {
+    const s = new Set<string>();
+    for (const e of events) if (e.module) s.add(e.module);
+    return Array.from(s).sort();
+  }, [events]);
+
+  const filtered = useMemo(
+    () => events.filter(
+      (e) => !hiddenTypes.has(e.event_type) && !hiddenModules.has(e.module),
+    ),
+    [events, hiddenTypes, hiddenModules],
+  );
+
   useEffect(() => {
     const el = scrollRef.current;
     if (el && wasAtBottom.current) el.scrollTop = el.scrollHeight;
-  }, [events]);
+  }, [filtered]);
 
   return (
     <div style={{ background: "#111", border: "1px solid #1a1a1a", borderRadius: "3px", padding: "6px", minHeight: 0, display: "flex", flexDirection: "column" }}>
-      <h2 style={{ fontSize: "11px", fontWeight: 700, color: "#888", letterSpacing: "1px", marginBottom: "4px", flexShrink: 0 }}>
-        EVENTS
-      </h2>
+      <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "4px", flexShrink: 0 }}>
+        <h2 style={{ fontSize: "11px", fontWeight: 700, color: "#888", letterSpacing: "1px", margin: 0 }}>
+          EVENTS
+        </h2>
+        <span style={{ fontSize: "10px", color: "#555" }}>
+          {filtered.length}/{events.length}
+        </span>
+        <button
+          onClick={() => setShowFilters((v) => {
+            const next = !v;
+            try { localStorage.setItem(STORAGE_KEY_OPEN, next ? "1" : "0"); } catch { /* ignore */ }
+            return next;
+          })}
+          style={{
+            fontSize: "9px",
+            fontWeight: 700,
+            color: (hiddenTypes.size > 0 || hiddenModules.size > 0) ? "#ffaa00" : "#555",
+            background: "none",
+            border: "none",
+            cursor: "pointer",
+            fontFamily: "inherit",
+            padding: 0,
+            marginLeft: "auto",
+          }}
+        >
+          {showFilters ? "\u25BC" : "\u25B6"} FILTER
+        </button>
+      </div>
+      {showFilters && (
+        <div style={{ flexShrink: 0, marginBottom: "4px", display: "flex", flexDirection: "column", gap: "4px" }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "3px" }}>
+            {eventTypes.map((t) => (
+              <FilterChip
+                key={t}
+                label={t}
+                active={!hiddenTypes.has(t)}
+                color={EVENT_COLORS[t] ?? "#888"}
+                onClick={() => toggleType(t)}
+              />
+            ))}
+          </div>
+          {modules.length > 1 && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "3px" }}>
+              {modules.map((m) => (
+                <FilterChip
+                  key={m}
+                  label={m}
+                  active={!hiddenModules.has(m)}
+                  color="#8a8"
+                  onClick={() => toggleModule(m)}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
       <div ref={scrollRef} onScroll={handleScroll} style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
-        {events.map((evt) => {
+        {filtered.map((evt) => {
           const color = EVENT_COLORS[evt.event_type] ?? "#555";
           return (
             <div key={evt.id} style={{ borderLeft: `2px solid ${color}`, marginBottom: "1px" }}>
@@ -293,9 +430,9 @@ export function EventTimeline({ events }: { events: EventItem[] }) {
             </div>
           );
         })}
-        {events.length === 0 && (
+        {filtered.length === 0 && (
           <div style={{ color: "#333", textAlign: "center", padding: "8px", fontSize: "11px" }}>
-            No events yet.
+            {events.length === 0 ? "No events yet." : "All events filtered."}
           </div>
         )}
       </div>

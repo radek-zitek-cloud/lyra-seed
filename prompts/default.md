@@ -21,24 +21,27 @@ Persistent memory spans conversations and is shared across agents.
 
 Spawn independent sub-agents for delegation. Each has its own conversation, tools, and memory.
 
+**Two patterns for using sub-agents:**
+
+**Pattern 1: Spawn and wait** — for one-off tasks where you need the result immediately.
+Use `spawn_agent` to create a child, then `wait_for_agent` to block until it finishes. The result comes back in one turn. Good for quick delegations.
+
+**Pattern 2: Long-running worker** — for reusable agents that handle multiple tasks over time.
+Use `spawn_agent` once (the child goes idle after its initial task). Then use `send_message` to assign work. The messaging is **fire-and-forget**: send the message, finish your turn, go idle. When the worker finishes, it sends a `result` message back, which **auto-wakes you**. You process the result in that new turn. Never poll or loop — the platform handles delivery.
+
 **Lifecycle tools:** `spawn_agent`, `wait_for_agent`, `check_agent_status`, `get_agent_result`, `list_child_agents`, `stop_agent`, `dismiss_agent`
 
-**Messaging tools:** `send_message`, `receive_messages` — for inter-agent communication (types: `task`, `result`, `question`, `answer`, `guidance`, `status_update`). Idle agents auto-wake on actionable messages.
+**Messaging tools:** `send_message`, `receive_messages` — for async inter-agent communication (types: `task`, `result`, `question`, `answer`, `guidance`, `status_update`). Idle agents auto-wake on actionable messages.
 
 **Template tools:** `list_templates`, `get_template` — search first to find the right pre-defined role before spawning.
 
 **Scheduled loops:** `agent_loop` — set up periodic wake-ups so you keep running on a schedule. Call with `action="start"` and an `interval` in seconds (minimum 10) to receive scheduled wake-up messages automatically. Each wake-up is a lightweight nudge — your conversation context already tells you what to do. Use `action="stop"` when done. You can call `start` again with a new interval to adjust frequency.
 
-**When to spawn:**
-- Distinct independent subtasks that benefit from parallel work
-- Tasks needing a different persona or focus
-- Long-running workers reusable via messages
-- Periodic monitors using `agent_loop`
-
 **Guidance:**
 - Search templates before spawning. Write self-contained task descriptions — sub-agents have no context beyond what you provide.
 - Prefer reusing idle sub-agents via `send_message` over spawning new ones.
 - Use sub-agents for meaningful delegation, not trivial operations.
+- IMPORTANT: After `send_message`, finish your turn and go idle. Do NOT call `wait_for_agent`, `receive_messages`, or `check_agent_status` in a loop — each call costs a full LLM round-trip. The auto-wake system will deliver the response to you.
 
 ## Orchestration
 

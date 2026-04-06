@@ -167,6 +167,11 @@ class AgentRuntime:
                     agent.status = AgentStatus.IDLE
                     await self._agent_repo.update(agent.id, agent)
 
+                    # Reset LLM agent context so extraction/pruning
+                    # tokens don't stream to the agent's UI
+                    if hasattr(self._llm, "_current_agent_id"):
+                        self._llm._current_agent_id = "system"
+
                     # Auto-extract facts from the response
                     await self._auto_extract(
                         agent_id,

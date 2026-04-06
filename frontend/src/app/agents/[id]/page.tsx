@@ -23,6 +23,8 @@ import {
   sendPrompt,
 } from "@/lib/api";
 
+/* ── Status badge styles ──────────────────────────── */
+
 const STATUS_STYLES: Record<string, { color: string; bg: string; border: string }> = {
   idle: { color: "#555", bg: "rgba(85,85,85,0.08)", border: "rgba(85,85,85,0.2)" },
   running: { color: "#00ff41", bg: "rgba(0,255,65,0.08)", border: "rgba(0,255,65,0.2)" },
@@ -32,9 +34,13 @@ const STATUS_STYLES: Record<string, { color: string; bg: string; border: string 
 };
 const DEFAULT_STATUS = { color: "#555", bg: "transparent", border: "#222" };
 
+/* ── Page component ───────────────────────────────── */
+
 export default function AgentPage() {
   const params = useParams();
   const agentId = params.id as string;
+
+  /* ── State ──────────────────────────────────────── */
 
   const [agent, setAgent] = useState<Record<string, unknown> | null>(null);
   const [messages, setMessages] = useState<
@@ -47,10 +53,14 @@ export default function AgentPage() {
   const [sending, setSending] = useState(false);
   const [showConfig, setShowConfig] = useState(false);
   const [streamingContent, setStreamingContent] = useState("");
-  const { events: liveEvents, connectionState, connect, disconnect } = useEventStream(agentId);
-  const promptInFlight = useRef(false);
+
+  // Subscribe to global event stream — we need events from children too
+  const { events: liveEvents, connectionState, connect, disconnect } = useEventStream();
   const streamingRef = useRef("");
   const processedCount = useRef(0);
+  const childIdsRef = useRef<Set<string>>(new Set());
+
+  /* ── Data fetching ──────────────────────────────── */
 
   const refreshAll = async () => {
     const [a, evts, convos, c, ch, msgs] = await Promise.all([
@@ -65,122 +75,154 @@ export default function AgentPage() {
     setEvents(evts);
     setCost(c);
     setChildren(ch);
+    childIdsRef.current = new Set(ch.map((c: { id: string }) => c.id));
     setAgentMessages(msgs);
     if (convos.length > 0) setMessages(convos[0].messages);
   };
+
+  const refreshConversation = () =>
+    fetchAgentConversations(agentId)
+      .then((convos: { messages: { role: string; content: string }[] }[]) => {
+        if (convos.length > 0) setMessages(convos[0].messages);
+      })
+      .catch(() => {});
 
   useEffect(() => {
     refreshAll().catch(() => {});
   }, [agentId]);
 
+  /* ── SSE event processing (global stream) ────────── */
+
   useEffect(() => {
     if (liveEvents.length === 0) return;
 
-    // Process all events since last render (handles batched SSE arrivals)
     const unprocessed = liveEvents.slice(processedCount.current);
     processedCount.current = liveEvents.length;
     if (unprocessed.length === 0) return;
 
-    // Separate token events from control events
-    const tokenEvents: typeof unprocessed = [];
-    const controlEvents: typeof unprocessed = [];
+    // Separate this agent's events from other agents' events
+    const myTokens: typeof unprocessed = [];
+    const myControl: typeof unprocessed = [];
+    let childActivity = false;
+
     for (const evt of unprocessed) {
-      if (evt.event_type === "llm_token") {
-        tokenEvents.push(evt);
-      } else {
-        controlEvents.push(evt);
+      const evtAgent = evt.agent_id as string;
+      const isMe = evtAgent === agentId;
+      const isChild = childIdsRef.current.has(evtAgent);
+
+      if (isMe) {
+        if (evt.event_type === "llm_token") {
+          const token = (evt.payload as Record<string, unknown>)?.token;
+          if (typeof token === "string") {
+            streamingRef.current += token;
+          }
+        } else {
+          myControl.push(evt);
+        }
+      } else if (isChild) {
+        childActivity = true;
       }
     }
 
-    // Accumulate streaming tokens
-    if (tokenEvents.length > 0) {
-      for (const evt of tokenEvents) {
-        const token = (evt.payload as Record<string, unknown>)?.token;
-        if (typeof token === "string") {
-          streamingRef.current += token;
-        }
-      }
+    // Flush tokens
+    if (streamingRef.current) {
       setStreamingContent(streamingRef.current);
     }
 
-    if (controlEvents.length === 0) return;
-
-    // Add non-token events to timeline
-    setEvents((prev) => {
-      const ids = new Set(prev.map((e) => (e as Record<string, unknown>).id));
-      const newEvents = controlEvents.filter(
-        (e) => !ids.has(e.id),
-      ) as unknown as Record<string, unknown>[];
-      return newEvents.length > 0 ? [...prev, ...newEvents] : prev;
-    });
-
-    // Process side effects for each control event
-    let shouldRefreshAgent = false;
-    let shouldRefreshMessages = false;
-    let shouldRefreshChildren = false;
-    let shouldRefreshConversation = false;
-    let shouldClearStreaming = false;
-
-    for (const evt of controlEvents) {
-      const et = evt.event_type as string;
-
-      if (et === "llm_request" || et === "llm_response") {
-        shouldClearStreaming = true;
-      }
-
-      if (et === "hitl_request" || et === "hitl_response" || et === "error" || et === "agent_complete") {
-        shouldRefreshAgent = true;
-      }
-
-      if (et === "message_sent" || et === "message_received") {
-        shouldRefreshMessages = true;
-        shouldRefreshChildren = true;
-      }
-
-      if (et === "agent_spawn" || et === "agent_complete") {
-        shouldRefreshChildren = true;
-      }
-
-      if (et === "agent_complete" || (et === "llm_response" && !promptInFlight.current)) {
-        shouldRefreshConversation = true;
-      }
-    }
-
-    if (shouldClearStreaming) {
-      streamingRef.current = "";
-      setStreamingContent("");
-    }
-
-    if (shouldRefreshAgent) {
-      fetchAgent(agentId).then(setAgent).catch(() => {});
-    }
-    if (shouldRefreshMessages) {
-      fetchAgentMessages(agentId).then(setAgentMessages).catch(() => {});
-    }
-    if (shouldRefreshChildren) {
-      fetchAgentChildren(agentId).then(setChildren).catch(() => {});
-    }
-    if (shouldRefreshConversation) {
-      fetchAgentConversations(agentId)
-        .then((convos: { messages: { role: string; content: string }[] }[]) => {
-          if (convos.length > 0) setMessages(convos[0].messages);
+    // Refresh children on any child activity
+    if (childActivity) {
+      fetchAgentChildren(agentId)
+        .then((ch) => {
+          setChildren(ch);
+          childIdsRef.current = new Set(ch.map((c: { id: string }) => c.id));
         })
         .catch(() => {});
     }
+
+    if (myControl.length === 0) return;
+
+    // Add this agent's control events to timeline
+    setEvents((prev) => {
+      const ids = new Set(prev.map((e) => (e as Record<string, unknown>).id));
+      const fresh = myControl.filter(
+        (e) => !ids.has(e.id),
+      ) as unknown as Record<string, unknown>[];
+      return fresh.length > 0 ? [...prev, ...fresh] : prev;
+    });
+
+    // Collect side-effect flags
+    let needAgent = false;
+    let needMessages = false;
+    let needChildren = false;
+    let needConversation = false;
+
+    for (const evt of myControl) {
+      const et = evt.event_type as string;
+
+      if (et === "llm_request") {
+        streamingRef.current = "";
+        setStreamingContent("");
+      }
+
+      // Refresh agent status on any state-changing event
+      if (et === "llm_request" || et === "llm_response" || et === "hitl_request" || et === "hitl_response" || et === "error" || et === "agent_complete") {
+        needAgent = true;
+      }
+      if (et === "message_sent" || et === "message_received") {
+        needMessages = true;
+        needChildren = true;
+      }
+      if (et === "agent_spawn" || et === "agent_complete") {
+        needChildren = true;
+      }
+      if (et === "llm_response" || et === "agent_complete") {
+        needConversation = true;
+      }
+    }
+
+    if (needAgent) fetchAgent(agentId).then(setAgent).catch(() => {});
+    if (needMessages) fetchAgentMessages(agentId).then(setAgentMessages).catch(() => {});
+    if (needChildren) {
+      fetchAgentChildren(agentId)
+        .then((ch) => {
+          setChildren(ch);
+          childIdsRef.current = new Set(ch.map((c: { id: string }) => c.id));
+        })
+        .catch(() => {});
+    }
+    if (needConversation) refreshConversation();
   }, [liveEvents, agentId]);
+
+  /* ── Clear streaming when messages arrive ────────── */
+
+  useEffect(() => {
+    // Once the conversation has the assistant's response,
+    // the streaming bubble is redundant — clear it.
+    if (!streamingRef.current) return;
+    const visible = messages.filter(
+      (m) => m.role === "assistant" && m.content,
+    );
+    if (visible.length > 0) {
+      streamingRef.current = "";
+      setStreamingContent("");
+    }
+  }, [messages]);
+
+  /* ── User actions ───────────────────────────────── */
 
   const handlePrompt = async (message: string) => {
     setSending(true);
-    promptInFlight.current = true;
+    // Optimistic: show human message immediately
     setMessages((prev) => [...prev, { role: "human", content: message }]);
 
-    sendPrompt(agentId, message)
-      .then(() => refreshAll())
-      .catch(() => {})
-      .finally(() => {
-        setSending(false);
-        promptInFlight.current = false;
-      });
+    try {
+      await sendPrompt(agentId, message);
+      await refreshAll();
+    } catch {
+      // ignore
+    } finally {
+      setSending(false);
+    }
   };
 
   const handleSendMessage = async (content: string, messageType: string) => {
@@ -197,6 +239,8 @@ export default function AgentPage() {
     await respondHITL(id, approved, message);
     fetchAgent(agentId).then(setAgent).catch(() => {});
   };
+
+  /* ── Derived state ──────────────────────────────── */
 
   if (!agent) {
     return <p style={{ color: "#333", fontSize: "12px" }}>Loading...</p>;
@@ -217,6 +261,8 @@ export default function AgentPage() {
   const agentConfig = (agent as Record<string, unknown>).config as Record<string, any> | undefined;
   const agentModel = String(agentConfig?.model ?? "default");
   const parentId = (agent as Record<string, unknown>).parent_agent_id as string | null;
+
+  /* ── Render ─────────────────────────────────────── */
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>

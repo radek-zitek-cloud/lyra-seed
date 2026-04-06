@@ -50,10 +50,16 @@ class ChromaMemoryStore:
         """
         if self._dedup_threshold < 1.0:
             try:
+                # Check own memories AND public memories from all agents
                 result = self._collection.query(
                     query_texts=[entry.content],
                     n_results=1,
-                    where={"agent_id": entry.agent_id},
+                    where={
+                        "$or": [
+                            {"agent_id": entry.agent_id},
+                            {"visibility": "public"},
+                        ]
+                    },
                     include=["distances", "documents"],
                 )
                 if result["ids"] and result["ids"][0]:

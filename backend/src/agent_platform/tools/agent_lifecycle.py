@@ -384,6 +384,13 @@ async def resolve_child_config(
         child_config.allowed_mcp_servers = parent.config.allowed_mcp_servers
         child_config.allowed_tools = parent.config.allowed_tools
 
+    # Resolve system prompt from default.md if not set by template or override
+    if (
+        child_config.system_prompt == AgentConfig().system_prompt
+        and provider._resolve_prompt
+    ):
+        child_config.system_prompt = provider._resolve_prompt("default")
+
     # Explicit overrides
     if args.get("system_prompt"):
         child_config.system_prompt = args["system_prompt"]
