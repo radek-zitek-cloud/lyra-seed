@@ -91,10 +91,7 @@ async def update_memory(memory_id: str, patch: MemoryPatch):
     if patch.archived is not None:
         entry.archived = patch.archived
 
-    store._collection.update(
-        ids=[memory_id],
-        metadatas=[store._entry_to_metadata(entry)],
-    )
+    await store.update_entry(entry)
     return _entry_to_dict(entry)
 
 

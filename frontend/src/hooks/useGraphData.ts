@@ -23,6 +23,7 @@ export function useGraphData() {
   const [messages, setMessages] = useState<GraphMessage[]>([]);
   const [orchestrations, setOrchestrations] = useState<GraphOrchestration[]>([]);
   const [connectionState, setConnectionState] = useState<ConnectionState>("disconnected");
+  const [tick, setTick] = useState(0);
 
   const sourceRef = useRef<EventSource | null>(null);
   const manualDisconnect = useRef(false);
@@ -168,9 +169,7 @@ export function useGraphData() {
 
       if (evt.module?.startsWith("orchestration.")) {
         // Re-fetch orchestration data for this agent
-        loadAgents().then(() => {
-          fetchAgents().then((data) => loadOrchestrations(data));
-        });
+        refresh();
       }
     };
 
@@ -208,7 +207,7 @@ export function useGraphData() {
 
     // Re-render periodically so short time range filters stay current
     const refreshInterval = setInterval(() => {
-      setMessages((prev) => [...prev]);
+      setTick((t) => t + 1);
     }, 5_000);
 
     return () => {

@@ -1,6 +1,9 @@
 """Agent runtime engine — core agent loop."""
 
 import asyncio
+import json
+import logging
+from datetime import UTC, datetime
 
 from agent_platform.core.models import (
     Agent,
@@ -15,6 +18,8 @@ from agent_platform.llm.models import LLMConfig, LLMResponse, Message, MessageRo
 from agent_platform.observation.events import Event, EventType
 from agent_platform.observation.in_process_event_bus import InProcessEventBus
 from agent_platform.tools.registry import ToolRegistry
+
+logger = logging.getLogger(__name__)
 
 
 class AgentRuntime:
@@ -62,8 +67,6 @@ class AgentRuntime:
 
         # Add system prompt if conversation is empty
         if not conversation.messages:
-            from datetime import UTC, datetime
-
             now = datetime.now(UTC)
             time_context = (
                 f"\n\nCurrent date and time: "
@@ -78,8 +81,6 @@ class AgentRuntime:
             )
 
         # Add human message
-        from datetime import UTC, datetime
-
         conversation.messages.append(
             Message(
                 role=MessageRole.HUMAN,
@@ -259,8 +260,6 @@ class AgentRuntime:
                         result.output if result.success else f"Error: {result.error}"
                     )
                     if isinstance(tool_result, dict):
-                        import json
-
                         tool_result = json.dumps(tool_result)
 
                     # Emit TOOL_RESULT event
@@ -452,7 +451,9 @@ class AgentRuntime:
                 # Delete after injection so it's not re-injected
                 await self._message_repo.delete(msg.id)
         except Exception:
-            pass  # Never break the runtime loop
+            logger.warning(
+                "Failed to inject guidance messages for %s", agent_id, exc_info=True
+            )
 
     async def _auto_extract(
         self,
@@ -475,7 +476,7 @@ class AgentRuntime:
                 extraction_model=getattr(config, "extraction_model", None),
             )
         except Exception:
-            pass  # Extraction failure never breaks the run
+            logger.warning("Fact extraction failed for %s", agent_id, exc_info=True)
 
     async def _prune_memories(
         self, agent_id: str, agent_config: object | None = None
@@ -505,7 +506,7 @@ class AgentRuntime:
                     )
                 )
         except Exception:
-            pass  # GC failure should not break the run
+            logger.warning("Memory GC failed for %s", agent_id, exc_info=True)
 
     async def cleanup_stuck_agents(self) -> int:
         """Reset agents stuck in RUNNING/WAITING_HITL to IDLE.
@@ -523,7 +524,5 @@ class AgentRuntime:
                 await self._agent_repo.update(agent.id, agent)
                 count += 1
         if count:
-            import logging
-
-            logging.getLogger(__name__).info("Cleaned up %d stuck agents", count)
+            logger.info("Cleaned up %d stuck agents", count)
         return count

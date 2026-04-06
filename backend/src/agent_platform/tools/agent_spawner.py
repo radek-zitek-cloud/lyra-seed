@@ -6,7 +6,6 @@ import time
 from collections.abc import Callable
 from typing import Any
 
-from agent_platform.core.models import MessageType
 from agent_platform.db.sqlite_agent_repo import SqliteAgentRepo
 from agent_platform.db.sqlite_conversation_repo import SqliteConversationRepo
 from agent_platform.db.sqlite_message_repo import SqliteMessageRepo

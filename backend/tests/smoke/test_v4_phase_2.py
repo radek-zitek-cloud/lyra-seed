@@ -96,7 +96,6 @@ class TestV4Phase2:
         _write_doc(tmp_path, "doc.md", "# New\n\nBrand new content.")
         store.ingest(path)
 
-        old = store.search("Old content", top_k=1)
         new = store.search("Brand new content", top_k=1)
         # New content should be findable
         assert any("Brand new" in r.content for r in new)

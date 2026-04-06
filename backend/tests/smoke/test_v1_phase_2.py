@@ -253,7 +253,6 @@ class TestV1Phase2:
             SqliteConversationRepo,
         )
         from agent_platform.llm.models import LLMResponse
-        from agent_platform.observation.events import EventFilter, EventType
         from agent_platform.observation.in_process_event_bus import (
             InProcessEventBus,
         )

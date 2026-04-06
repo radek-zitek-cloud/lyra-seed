@@ -5,8 +5,7 @@ All LLM calls are mocked — no real API calls.
 """
 
 import asyncio
-import json
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -346,7 +345,7 @@ class TestV2Phase6:
             agent_spawner=deps["spawner"],
         )
 
-        result = await strategy.execute(plan)
+        await strategy.execute(plan)
 
         for st in plan.subtasks:
             assert st.status == SubTaskStatus.COMPLETED

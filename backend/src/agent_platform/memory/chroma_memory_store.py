@@ -210,6 +210,13 @@ class ChromaMemoryStore:
         except Exception:
             return False
 
+    async def update_entry(self, entry: MemoryEntry) -> None:
+        """Persist updated metadata for an existing memory entry."""
+        self._collection.update(
+            ids=[entry.id],
+            metadatas=[self._entry_to_metadata(entry)],
+        )
+
     async def update_access(self, id: str) -> None:
         """Update last_accessed_at, increment access_count, recompute decay."""
         entry = await self.get(id)
