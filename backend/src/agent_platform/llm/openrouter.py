@@ -167,7 +167,6 @@ class OpenRouterProvider:
         }
 
         from agent_platform.llm.retry import (
-            RETRYABLE_STATUS_CODES,
             _backoff_delay,
         )
 
@@ -190,7 +189,7 @@ class OpenRouterProvider:
                     start, content_parts, tool_calls_acc, usage,
                 )
                 return result
-            except (httpx.ReadTimeout, httpx.ConnectTimeout, httpx.TimeoutException) as exc:
+            except (httpx.ReadTimeout, httpx.ConnectTimeout, httpx.TimeoutException):
                 if attempt < max_retries:
                     delay = _backoff_delay(attempt, base_delay, max_delay)
                     logger.warning(

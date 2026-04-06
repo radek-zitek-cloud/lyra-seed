@@ -3,7 +3,6 @@ Smoke tests for V4 Phase 3 — Unified Capability Discovery.
 """
 
 import json
-from pathlib import Path
 from unittest.mock import AsyncMock
 
 import pytest

@@ -1,9 +1,9 @@
 """Date/time tool — lets agents check the current date and time."""
 
 import time
-from datetime import UTC, datetime, timezone, timedelta
+from datetime import datetime
 from typing import Any
-from zoneinfo import ZoneInfo, available_timezones
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from agent_platform.tools.models import Tool, ToolResult, ToolType
 
@@ -49,7 +49,7 @@ class DateTimeToolProvider:
         tz_name = arguments.get("timezone", "UTC")
         try:
             tz = ZoneInfo(tz_name)
-        except (KeyError, Exception):
+        except (ZoneInfoNotFoundError, KeyError):
             duration = int((time.monotonic() - start) * 1000)
             return ToolResult(
                 success=False,

@@ -44,7 +44,10 @@ export function useEventStream(agentId?: string) {
 
     source.onmessage = (msg) => {
       const event: EventItem = JSON.parse(msg.data);
-      setEvents((prev) => [...prev, event]);
+      setEvents((prev) => {
+        const next = [...prev, event];
+        return next.length > 500 ? next.slice(next.length - 500) : next;
+      });
     };
 
     source.onerror = () => {
