@@ -28,6 +28,7 @@ interface EventItem {
 
 const EVENT_COLORS: Record<string, string> = {
   llm_request: "#6688ff",
+  llm_token: "#5577cc",
   llm_response: "#4466dd",
   tool_call: "#aa66ff",
   tool_result: "#8844cc",
@@ -98,7 +99,7 @@ function isNearBottom(el: HTMLElement, threshold = 30): boolean {
 
 /* ── Conversation Panel ─────────────────────────────── */
 
-export function ConversationPanel({ messages }: { messages: Message[] }) {
+export function ConversationPanel({ messages, streamingContent }: { messages: Message[]; streamingContent?: string }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const wasAtBottom = useRef(true);
 
@@ -110,7 +111,7 @@ export function ConversationPanel({ messages }: { messages: Message[] }) {
   useEffect(() => {
     const el = scrollRef.current;
     if (el && wasAtBottom.current) el.scrollTop = el.scrollHeight;
-  }, [messages]);
+  }, [messages, streamingContent]);
 
   return (
     <div style={{ background: "#111", border: "1px solid #1a1a1a", borderRadius: "3px", padding: "6px", flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
@@ -161,7 +162,27 @@ export function ConversationPanel({ messages }: { messages: Message[] }) {
             </div>
           );
         })}
-        {messages.filter((m) => {
+        {streamingContent && (
+          <div
+            style={{
+              padding: "2px 4px",
+              marginBottom: "1px",
+              borderLeft: "2px solid #00ff41",
+              background: "#0a0a0a",
+              fontSize: "12px",
+              lineHeight: "1.4",
+            }}
+          >
+            <span style={{ color: "#00ff41", fontWeight: 700, fontSize: "10px", letterSpacing: "0.5px", textTransform: "uppercase", marginRight: "6px" }}>
+              ASSISTANT:
+            </span>
+            <span style={{ color: "#d0d0d0", whiteSpace: "pre-wrap" }}>
+              {streamingContent}
+            </span>
+            <span style={{ display: "inline-block", width: "6px", height: "12px", background: "#00ff41", marginLeft: "2px", animation: "blink 1s step-end infinite", verticalAlign: "text-bottom" }} />
+          </div>
+        )}
+        {!streamingContent && messages.filter((m) => {
           if (m.role === "tool_result" || m.role === "system") return false;
           if (m.role === "assistant" && m.tool_calls && !m.content) return false;
           return true;

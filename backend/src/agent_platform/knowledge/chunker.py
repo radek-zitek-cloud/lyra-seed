@@ -73,6 +73,7 @@ def _split_large_chunk(
 def chunk_markdown(
     path: Path,
     max_chunk_chars: int = DEFAULT_MAX_CHUNK_CHARS,
+    source_name: str | None = None,
 ) -> list[DocumentChunk]:
     """Split a markdown file into chunks by headings.
 
@@ -82,7 +83,7 @@ def chunk_markdown(
     paragraph boundaries.
     """
     text = path.read_text(encoding="utf-8")
-    source = path.name
+    source = source_name or path.name
 
     # Find all heading positions
     headings: list[tuple[int, int, str]] = []  # (pos, level, title)

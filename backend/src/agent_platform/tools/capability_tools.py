@@ -81,15 +81,15 @@ class CapabilityToolProvider:
             Tool(
                 name="analyze_capabilities",
                 description=(
-                    "Analyze what capabilities are available "
-                    "for a task and identify gaps."
+                    "Analyze what skills, templates, MCP tools, and memories "
+                    "are available for a task. Returns a gap analysis with suggestions."
                 ),
                 input_schema={
                     "type": "object",
                     "properties": {
                         "task": {
                             "type": "string",
-                            "description": "Task description",
+                            "description": "Description of the task to analyze.",
                         },
                     },
                     "required": ["task"],
@@ -100,14 +100,24 @@ class CapabilityToolProvider:
             Tool(
                 name="reflect",
                 description=(
-                    "Generate a post-task retrospective and store as PROCEDURE memory."
+                    "Generate a post-task retrospective. "
+                    "Captures lessons learned and stores as a PROCEDURE memory."
                 ),
                 input_schema={
                     "type": "object",
                     "properties": {
-                        "task": {"type": "string"},
-                        "outcome": {"type": "string"},
-                        "tools_used": {"type": "string"},
+                        "task": {
+                            "type": "string",
+                            "description": "What the task was.",
+                        },
+                        "outcome": {
+                            "type": "string",
+                            "description": "What happened — results, successes, failures.",
+                        },
+                        "tools_used": {
+                            "type": "string",
+                            "description": "Comma-separated list of tools used.",
+                        },
                     },
                     "required": ["task", "outcome"],
                 },
@@ -117,19 +127,19 @@ class CapabilityToolProvider:
             Tool(
                 name="tool_analytics",
                 description=(
-                    "Query tool usage statistics: "
-                    "call count, success rate, avg duration."
+                    "Query tool usage statistics: call count, success rate, "
+                    "average duration. Helps choose the right tool."
                 ),
                 input_schema={
                     "type": "object",
                     "properties": {
                         "tool_name": {
                             "type": "string",
-                            "description": "Specific tool (optional)",
+                            "description": "Filter to a specific tool. Omit for overview.",
                         },
                         "top_n": {
                             "type": "integer",
-                            "description": "Top N tools (default 10)",
+                            "description": "Number of top tools to return (default 10).",
                         },
                     },
                 },
@@ -139,18 +149,27 @@ class CapabilityToolProvider:
             Tool(
                 name="store_pattern",
                 description=(
-                    "Store a successful orchestration pattern for future reuse."
+                    "Save a successful orchestration approach for reuse on similar tasks."
                 ),
                 input_schema={
                     "type": "object",
                     "properties": {
-                        "task_type": {"type": "string"},
-                        "strategy": {"type": "string"},
+                        "task_type": {
+                            "type": "string",
+                            "description": "Category of the task (e.g. 'comparative analysis').",
+                        },
+                        "strategy": {
+                            "type": "string",
+                            "description": "Execution strategy used (sequential, parallel, pipeline).",
+                        },
                         "subtasks": {
                             "type": "string",
-                            "description": "JSON array of subtask descriptions",
+                            "description": "JSON array of subtask descriptions.",
                         },
-                        "notes": {"type": "string"},
+                        "notes": {
+                            "type": "string",
+                            "description": "What worked well or what to watch out for.",
+                        },
                     },
                     "required": ["task_type", "strategy"],
                 },
@@ -160,13 +179,19 @@ class CapabilityToolProvider:
             Tool(
                 name="find_pattern",
                 description=(
-                    "Find reusable orchestration patterns matching a task description."
+                    "Search for orchestration patterns that worked for similar tasks."
                 ),
                 input_schema={
                     "type": "object",
                     "properties": {
-                        "task_description": {"type": "string"},
-                        "top_k": {"type": "integer"},
+                        "task_description": {
+                            "type": "string",
+                            "description": "Description of the task to find patterns for.",
+                        },
+                        "top_k": {
+                            "type": "integer",
+                            "description": "Number of results (default 5).",
+                        },
                     },
                     "required": ["task_description"],
                 },

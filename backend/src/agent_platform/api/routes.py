@@ -23,35 +23,31 @@ class HITLRespondRequest(BaseModel):
     message: str | None = None
 
 
-@router.post("/agents", status_code=201)
-async def create_agent(req: CreateAgentRequest):
-    """Create a new agent with config resolved from files.
+def _resolve_config_from_files(template_name: str) -> AgentConfig:
+    """Resolve a full AgentConfig from source files and platform defaults.
 
-    Resolution:
-    1. {prompts_dir}/{name}.json for model, hitl_policy, temperature, etc.
-    2. {prompts_dir}/{name}.md for system prompt
+    Resolution order:
+    1. {prompts_dir}/{template_name}.json for model, hitl, temperature, etc.
+    2. {prompts_dir}/{template_name}.md for system prompt
     3. Falls back to default.json / default.md / platform defaults
     """
     from agent_platform.api._deps import (
         get_agent_config_resolver,
-        get_agent_repo,
         get_default_model,
         get_platform_config,
         get_system_prompt_resolver,
     )
 
-    repo = get_agent_repo()
     resolve_prompt = get_system_prompt_resolver()
     resolve_config = get_agent_config_resolver()
 
-    config = req.config or AgentConfig()
-    template_name = req.template or req.name
+    config = AgentConfig()
     file_config = resolve_config(template_name)
 
     # Apply file-based config overrides (name.json > default.json)
     if file_config.model:
         config.model = file_config.model
-    elif config.model == AgentConfig().model:
+    else:
         config.model = get_default_model()
 
     if file_config.hitl_policy:
@@ -127,8 +123,37 @@ async def create_agent(req: CreateAgentRequest):
                 config.max_subtasks = pc.maxSubtasks
 
     # Apply system prompt from template.md
-    if config.system_prompt == AgentConfig().system_prompt:
-        config.system_prompt = resolve_prompt(template_name)
+    config.system_prompt = resolve_prompt(template_name)
+
+    return config
+
+
+@router.post("/agents", status_code=201)
+async def create_agent(req: CreateAgentRequest):
+    """Create a new agent with config resolved from files."""
+    from agent_platform.api._deps import get_agent_repo
+
+    repo = get_agent_repo()
+    template_name = req.template or req.name
+    config = _resolve_config_from_files(template_name)
+
+    # Apply any explicit overrides from request
+    if req.config:
+        d = AgentConfig()
+        if req.config.model != d.model:
+            config.model = req.config.model
+        if req.config.temperature != d.temperature:
+            config.temperature = req.config.temperature
+        if req.config.max_iterations != d.max_iterations:
+            config.max_iterations = req.config.max_iterations
+        if req.config.system_prompt != d.system_prompt:
+            config.system_prompt = req.config.system_prompt
+        if req.config.hitl_policy != d.hitl_policy:
+            config.hitl_policy = req.config.hitl_policy
+        if req.config.allowed_tools:
+            config.allowed_tools = req.config.allowed_tools
+        if req.config.allowed_mcp_servers is not None:
+            config.allowed_mcp_servers = req.config.allowed_mcp_servers
 
     agent = Agent(name=req.name, config=config)
     await repo.create(agent)
@@ -149,10 +174,16 @@ async def get_agent(agent_id: str):
 
 @router.delete("/agents/{agent_id}")
 async def delete_agent(agent_id: str):
-    """Delete an agent."""
-    from agent_platform.api._deps import get_agent_repo
+    """Delete an agent and unregister any active loop."""
+    from agent_platform.api._deps import get_agent_repo, get_loop_registry
 
     repo = get_agent_repo()
+
+    # Unregister any active loop before deletion
+    loop_registry = get_loop_registry()
+    if loop_registry:
+        loop_registry.unregister(agent_id)
+
     deleted = await repo.delete(agent_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Agent not found")
@@ -206,6 +237,59 @@ async def reset_agent(agent_id: str):
     agent.status = AgentStatus.IDLE
     await repo.update(agent.id, agent)
     return agent.model_dump(mode="json")
+
+
+@router.post("/agents/{agent_id}/reload-config")
+async def reload_agent_config(agent_id: str):
+    """Reload agent config and system prompt from source files.
+
+    Re-resolves the agent's config from its template/name .md and .json
+    files, applies platform defaults, updates the agent record, and
+    patches the conversation's system message so the agent sees the
+    new prompt on its next turn.
+    """
+    from agent_platform.api._deps import (
+        get_agent_repo,
+        get_conversation_repo,
+        get_loop_registry,
+    )
+
+    repo = get_agent_repo()
+    conv_repo = get_conversation_repo()
+
+    agent = await repo.get(agent_id)
+    if agent is None:
+        raise HTTPException(status_code=404, detail="Agent not found")
+
+    # Unregister any active loop (conversation is being cleared)
+    loop_registry = get_loop_registry()
+    if loop_registry:
+        loop_registry.unregister(agent_id)
+
+    # Re-resolve config from source files using agent name
+    new_config = _resolve_config_from_files(agent.name)
+
+    # Track what changed
+    old_prompt = agent.config.system_prompt
+    old_model = agent.config.model
+
+    # Update agent config
+    agent.config = new_config
+    await repo.update(agent.id, agent)
+
+    # Clear conversation — delete existing and let runtime create
+    # a fresh one with the new system prompt on next turn
+    convos = await conv_repo.list(filters={"agent_id": agent_id})
+    for conv in convos:
+        await conv_repo.delete(conv.id)
+
+    return {
+        "status": "reloaded",
+        "agent_id": agent_id,
+        "prompt_changed": old_prompt != new_config.system_prompt,
+        "model_changed": old_model != new_config.model,
+        "conversation_cleared": len(convos) > 0,
+    }
 
 
 @router.post("/agents/{agent_id}/hitl-respond")

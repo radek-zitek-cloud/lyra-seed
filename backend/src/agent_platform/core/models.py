@@ -98,6 +98,7 @@ class MessageType(StrEnum):
     ANSWER = "answer"
     GUIDANCE = "guidance"
     STATUS_UPDATE = "status_update"
+    WAKE = "wake"
 
 
 class AgentMessage(BaseModel):

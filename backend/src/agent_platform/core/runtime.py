@@ -62,10 +62,18 @@ class AgentRuntime:
 
         # Add system prompt if conversation is empty
         if not conversation.messages:
+            from datetime import UTC, datetime
+
+            now = datetime.now(UTC)
+            time_context = (
+                f"\n\nCurrent date and time: "
+                f"{now.strftime('%Y-%m-%d %H:%M:%S %Z')} "
+                f"({now.strftime('%A')})"
+            )
             conversation.messages.append(
                 Message(
                     role=MessageRole.SYSTEM,
-                    content=agent.config.system_prompt,
+                    content=agent.config.system_prompt + time_context,
                 )
             )
 
@@ -119,22 +127,6 @@ class AgentRuntime:
                     allowed_tools=agent.config.allowed_tools or None,
                 )
 
-                # Emit LLM_REQUEST event
-                await self._event_bus.emit(
-                    Event(
-                        agent_id=agent_id,
-                        event_type=EventType.LLM_REQUEST,
-                        module="core.runtime",
-                        payload={
-                            "iteration": iteration,
-                            "model": agent.config.model,
-                            "message_count": len(conversation.messages),
-                            "tool_count": len(tools_schema),
-                        },
-                    )
-                )
-                events_emitted += 1
-
                 # Set agent_id and retry config on providers
                 if hasattr(self._llm, "_current_agent_id"):
                     self._llm._current_agent_id = agent_id
@@ -160,41 +152,7 @@ class AgentRuntime:
                     config=llm_config,
                 )
 
-                # Compute cost for this call
-                from agent_platform.observation.cost_tracker import (
-                    _get_cost_per_million,
-                )
-
-                _usage = response.usage or {}
-                _prompt_tok = _usage.get("prompt_tokens", 0) or 0
-                _compl_tok = _usage.get("completion_tokens", 0) or 0
-                _in_rate, _out_rate = _get_cost_per_million(llm_config.model)
-                _cost = (
-                    _prompt_tok / 1_000_000 * _in_rate
-                    + _compl_tok / 1_000_000 * _out_rate
-                )
-
-                # Emit LLM_RESPONSE event
-                await self._event_bus.emit(
-                    Event(
-                        agent_id=agent_id,
-                        event_type=EventType.LLM_RESPONSE,
-                        module="core.runtime",
-                        payload={
-                            "iteration": iteration,
-                            "has_content": response.content is not None,
-                            "content_preview": (
-                                response.content[:200] if response.content else None
-                            ),
-                            "tool_call_count": len(response.tool_calls),
-                            "tool_calls": [tc.name for tc in response.tool_calls],
-                            "usage": response.usage,
-                            "model": llm_config.model,
-                            "cost_usd": round(_cost, 6),
-                        },
-                    )
-                )
-                events_emitted += 1
+                events_emitted += 1  # provider emits LLM_REQUEST + LLM_RESPONSE
 
                 # If no tool calls, we have our final response
                 if not response.tool_calls:

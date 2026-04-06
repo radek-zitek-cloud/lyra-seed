@@ -31,26 +31,32 @@ class MemoryToolProvider:
         return [
             Tool(
                 name="remember",
-                description="Store a memory for future retrieval",
+                description=(
+                    "Store a memory for future retrieval. "
+                    "Use for important information that auto-extraction might miss."
+                ),
                 input_schema={
                     "type": "object",
                     "properties": {
                         "content": {
                             "type": "string",
-                            "description": "The content to remember",
+                            "description": "The information to store. Must be self-contained.",
                         },
                         "memory_type": {
                             "type": "string",
                             "enum": [t.value for t in MemoryType],
-                            "description": "Type of memory",
+                            "description": (
+                                "fact, preference, decision, outcome, "
+                                "procedure, tool_knowledge, or domain_knowledge."
+                            ),
                         },
                         "importance": {
                             "type": "number",
-                            "description": "Importance 0.0-1.0",
+                            "description": "0.0 (trivial) to 1.0 (critical). Higher resists decay. Default 0.5.",
                         },
                         "agent_id": {
                             "type": "string",
-                            "description": "Agent ID (auto-injected)",
+                            "description": "Auto-injected. Do not set.",
                         },
                     },
                     "required": ["content", "agent_id"],
@@ -60,25 +66,29 @@ class MemoryToolProvider:
             ),
             Tool(
                 name="recall",
-                description="Retrieve relevant memories by semantic search",
+                description=(
+                    "Search memories semantically. "
+                    "Includes your own memories and public memories from other agents."
+                ),
                 input_schema={
                     "type": "object",
                     "properties": {
                         "query": {
                             "type": "string",
-                            "description": "Search query",
+                            "description": "Natural-language search query. Be descriptive.",
                         },
                         "agent_id": {
                             "type": "string",
-                            "description": "Agent ID",
+                            "description": "Auto-injected. Do not set.",
                         },
                         "memory_type": {
                             "type": "string",
                             "enum": [t.value for t in MemoryType],
+                            "description": "Filter to a specific type. Omit to search all.",
                         },
                         "top_k": {
                             "type": "integer",
-                            "description": "Number of results",
+                            "description": "Number of results to return (default 5).",
                         },
                     },
                     "required": ["query", "agent_id"],
@@ -88,13 +98,20 @@ class MemoryToolProvider:
             ),
             Tool(
                 name="forget",
-                description="Delete a specific memory by ID",
+                description=(
+                    "Delete a specific memory by its ID. "
+                    "Use when a memory is outdated or incorrect."
+                ),
                 input_schema={
                     "type": "object",
                     "properties": {
                         "memory_id": {
                             "type": "string",
-                            "description": "Memory entry ID to delete",
+                            "description": "Memory entry ID (from recall results).",
+                        },
+                        "agent_id": {
+                            "type": "string",
+                            "description": "Auto-injected. Do not set.",
                         },
                     },
                     "required": ["memory_id"],

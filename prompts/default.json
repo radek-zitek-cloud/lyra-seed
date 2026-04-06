@@ -1,15 +1,14 @@
 {
-  "model": "openai/gpt-5.4",
-  "temperature": 0.7,
-  "max_iterations": 15,
+  "model": "google/gemini-3.1-pro-preview",
+  "summary_model": "google/gemini-3.1-flash-lite-preview",
+  "extraction_model": "google/gemini-3.1-flash-lite-preview",
+  "orchestration_model": "google/gemini-3.1-flash-lite-preview",
+
   "hitl_policy": "never",
   "auto_extract": true,
-
-  "summary_model": "openai/gpt-5.4-mini",
-  "extraction_model": "openai/gpt-5.4-mini",
-  "orchestration_model": "openai/gpt-5.4-mini",
- 
-  "max_subtasks": 10,
+  "temperature": 0.7,
+  "max_iterations": 20,
+  "max_subtasks": 20,
 
   "retry": {
     "max_retries": 3,

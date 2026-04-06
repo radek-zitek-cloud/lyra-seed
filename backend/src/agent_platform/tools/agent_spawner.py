@@ -65,18 +65,40 @@ class AgentSpawnerProvider:
             Tool(
                 name="spawn_agent",
                 description=(
-                    "Spawn an async sub-agent. Returns immediately with child_agent_id."
+                    "Create and start a sub-agent that runs asynchronously. "
+                    "Returns immediately with the child agent ID."
                 ),
                 input_schema={
                     "type": "object",
                     "properties": {
-                        "name": {"type": "string"},
-                        "task": {"type": "string"},
-                        "template": {"type": "string"},
-                        "system_prompt": {"type": "string"},
-                        "model": {"type": "string"},
-                        "temperature": {"type": "number"},
-                        "agent_id": {"type": "string"},
+                        "name": {
+                            "type": "string",
+                            "description": "Short descriptive name (e.g. 'researcher', 'coder').",
+                        },
+                        "task": {
+                            "type": "string",
+                            "description": "The instruction for the sub-agent. Must be self-contained.",
+                        },
+                        "template": {
+                            "type": "string",
+                            "description": "Load config/prompt from template files (prompts/{template}.md/.json).",
+                        },
+                        "system_prompt": {
+                            "type": "string",
+                            "description": "Custom system prompt. Overrides template prompt if both provided.",
+                        },
+                        "model": {
+                            "type": "string",
+                            "description": "Override LLM model. Inherits parent's by default.",
+                        },
+                        "temperature": {
+                            "type": "number",
+                            "description": "Override temperature. Inherits parent's by default.",
+                        },
+                        "agent_id": {
+                            "type": "string",
+                            "description": "Auto-injected. Do not set.",
+                        },
                     },
                     "required": ["name", "task"],
                 },
@@ -85,13 +107,24 @@ class AgentSpawnerProvider:
             ),
             Tool(
                 name="wait_for_agent",
-                description="Wait for a child agent to complete.",
+                description=(
+                    "Block until a child agent finishes and return its result."
+                ),
                 input_schema={
                     "type": "object",
                     "properties": {
-                        "child_agent_id": {"type": "string"},
-                        "timeout": {"type": "number"},
-                        "agent_id": {"type": "string"},
+                        "child_agent_id": {
+                            "type": "string",
+                            "description": "ID of the child agent to wait for.",
+                        },
+                        "timeout": {
+                            "type": "number",
+                            "description": "Max wait time in seconds (default 300).",
+                        },
+                        "agent_id": {
+                            "type": "string",
+                            "description": "Auto-injected. Do not set.",
+                        },
                     },
                     "required": ["child_agent_id"],
                 },
@@ -100,12 +133,21 @@ class AgentSpawnerProvider:
             ),
             Tool(
                 name="check_agent_status",
-                description="Check a child agent's status (non-blocking).",
+                description=(
+                    "Non-blocking status check on a child agent. "
+                    "Returns current status and a preview of its last message."
+                ),
                 input_schema={
                     "type": "object",
                     "properties": {
-                        "child_agent_id": {"type": "string"},
-                        "agent_id": {"type": "string"},
+                        "child_agent_id": {
+                            "type": "string",
+                            "description": "ID of the child agent.",
+                        },
+                        "agent_id": {
+                            "type": "string",
+                            "description": "Auto-injected. Do not set.",
+                        },
                     },
                     "required": ["child_agent_id"],
                 },
@@ -114,12 +156,20 @@ class AgentSpawnerProvider:
             ),
             Tool(
                 name="stop_agent",
-                description="Stop a running child agent.",
+                description=(
+                    "Stop a running child agent and set it to idle."
+                ),
                 input_schema={
                     "type": "object",
                     "properties": {
-                        "child_agent_id": {"type": "string"},
-                        "agent_id": {"type": "string"},
+                        "child_agent_id": {
+                            "type": "string",
+                            "description": "ID of the child agent to stop.",
+                        },
+                        "agent_id": {
+                            "type": "string",
+                            "description": "Auto-injected. Do not set.",
+                        },
                     },
                     "required": ["child_agent_id"],
                 },
@@ -128,12 +178,20 @@ class AgentSpawnerProvider:
             ),
             Tool(
                 name="get_agent_result",
-                description="Get child agent's last response.",
+                description=(
+                    "Retrieve a child agent's last response (non-blocking)."
+                ),
                 input_schema={
                     "type": "object",
                     "properties": {
-                        "child_agent_id": {"type": "string"},
-                        "agent_id": {"type": "string"},
+                        "child_agent_id": {
+                            "type": "string",
+                            "description": "ID of the child agent.",
+                        },
+                        "agent_id": {
+                            "type": "string",
+                            "description": "Auto-injected. Do not set.",
+                        },
                     },
                     "required": ["child_agent_id"],
                 },
@@ -142,11 +200,16 @@ class AgentSpawnerProvider:
             ),
             Tool(
                 name="list_child_agents",
-                description="List all child agents.",
+                description=(
+                    "List all sub-agents spawned by this agent with their current status."
+                ),
                 input_schema={
                     "type": "object",
                     "properties": {
-                        "agent_id": {"type": "string"},
+                        "agent_id": {
+                            "type": "string",
+                            "description": "Auto-injected. Do not set.",
+                        },
                     },
                     "required": [],
                 },
@@ -155,18 +218,41 @@ class AgentSpawnerProvider:
             ),
             Tool(
                 name="send_message",
-                description="Send a message to another agent.",
+                description=(
+                    "Send a message to another agent. "
+                    "Idle agents auto-wake on actionable message types."
+                ),
                 input_schema={
                     "type": "object",
                     "properties": {
-                        "target_agent_id": {"type": "string"},
-                        "content": {"type": "string"},
+                        "target_agent_id": {
+                            "type": "string",
+                            "description": "ID of the recipient agent.",
+                        },
+                        "content": {
+                            "type": "string",
+                            "description": "Message text.",
+                        },
                         "message_type": {
                             "type": "string",
-                            "enum": [t.value for t in MessageType],
+                            "enum": [
+                                "task", "result", "question",
+                                "answer", "guidance", "status_update",
+                            ],
+                            "description": (
+                                "task=assign work, result=return output, "
+                                "question=ask, answer=reply, "
+                                "guidance=instruct, status_update=inform (non-waking)."
+                            ),
                         },
-                        "in_reply_to": {"type": "string"},
-                        "agent_id": {"type": "string"},
+                        "in_reply_to": {
+                            "type": "string",
+                            "description": "ID of a previous message this replies to.",
+                        },
+                        "agent_id": {
+                            "type": "string",
+                            "description": "Auto-injected. Do not set.",
+                        },
                     },
                     "required": [
                         "target_agent_id",
@@ -179,13 +265,24 @@ class AgentSpawnerProvider:
             ),
             Tool(
                 name="receive_messages",
-                description="Check inbox for messages (non-blocking).",
+                description=(
+                    "Check inbox for messages from other agents (non-blocking)."
+                ),
                 input_schema={
                     "type": "object",
                     "properties": {
-                        "message_type": {"type": "string"},
-                        "since": {"type": "string"},
-                        "agent_id": {"type": "string"},
+                        "message_type": {
+                            "type": "string",
+                            "description": "Filter by type (e.g. 'task', 'result'). Omit for all.",
+                        },
+                        "since": {
+                            "type": "string",
+                            "description": "ISO timestamp — only return messages after this time.",
+                        },
+                        "agent_id": {
+                            "type": "string",
+                            "description": "Auto-injected. Do not set.",
+                        },
                     },
                     "required": [],
                 },
@@ -194,12 +291,21 @@ class AgentSpawnerProvider:
             ),
             Tool(
                 name="dismiss_agent",
-                description=("Mark a child agent as COMPLETED (no longer reusable)."),
+                description=(
+                    "Mark a child agent as permanently completed. "
+                    "It can no longer be reused or receive messages."
+                ),
                 input_schema={
                     "type": "object",
                     "properties": {
-                        "child_agent_id": {"type": "string"},
-                        "agent_id": {"type": "string"},
+                        "child_agent_id": {
+                            "type": "string",
+                            "description": "ID of the child agent to dismiss.",
+                        },
+                        "agent_id": {
+                            "type": "string",
+                            "description": "Auto-injected. Do not set.",
+                        },
                     },
                     "required": ["child_agent_id"],
                 },

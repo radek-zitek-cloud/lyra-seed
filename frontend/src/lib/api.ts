@@ -61,6 +61,12 @@ export async function resetAgent(id: string) {
   return res.json();
 }
 
+export async function reloadAgentConfig(id: string) {
+  const res = await fetch(`${API_BASE}/agents/${id}/reload-config`, { method: "POST" });
+  if (!res.ok) throw new Error("Failed to reload config");
+  return res.json();
+}
+
 export async function deleteAgent(id: string) {
   const res = await fetch(`${API_BASE}/agents/${id}`, { method: "DELETE" });
   if (!res.ok) throw new Error("Failed to delete agent");

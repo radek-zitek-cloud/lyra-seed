@@ -66,14 +66,15 @@ class OrchestrationToolProvider:
             Tool(
                 name="decompose_task",
                 description=(
-                    "Break a complex task into subtasks with an execution plan."
+                    "Break a complex task into a structured plan of subtasks. "
+                    "Returns the plan without executing it."
                 ),
                 input_schema={
                     "type": "object",
                     "properties": {
                         "task": {
                             "type": "string",
-                            "description": ("The complex task to decompose"),
+                            "description": "The complex task to decompose.",
                         },
                     },
                     "required": ["task"],
@@ -84,20 +85,23 @@ class OrchestrationToolProvider:
             Tool(
                 name="orchestrate",
                 description=(
-                    "End-to-end orchestration: decompose, "
-                    "execute, and synthesize results."
+                    "End-to-end orchestration: decompose into subtasks, "
+                    "execute them, and synthesize a unified response. "
+                    "Subtasks are text-only LLM calls without tool access."
                 ),
                 input_schema={
                     "type": "object",
                     "properties": {
                         "task": {
                             "type": "string",
-                            "description": "The complex task to orchestrate",
+                            "description": "The complex task to orchestrate.",
                         },
                         "strategy": {
                             "type": "string",
                             "enum": ["sequential", "parallel", "pipeline"],
-                            "description": ("Override strategy (optional)"),
+                            "description": (
+                                "Execution strategy. Omit to let the decomposer choose."
+                            ),
                         },
                     },
                     "required": ["task"],

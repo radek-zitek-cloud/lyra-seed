@@ -34,29 +34,28 @@ class DiscoveryProvider:
             Tool(
                 name="discover",
                 description=(
-                    "Search across all capability sources: "
-                    "skills, templates, MCP servers, knowledge "
-                    "base, and memories. Returns ranked results."
+                    "Unified search across all capability sources: "
+                    "skills, templates, MCP tools, knowledge base, and memories. "
+                    "Use before complex tasks to find what's available."
                 ),
                 input_schema={
                     "type": "object",
                     "properties": {
                         "query": {
                             "type": "string",
-                            "description": "What to search for",
+                            "description": "What capability or information to search for.",
                         },
                         "sources": {
                             "type": "string",
                             "description": (
                                 "JSON list of sources to search: "
-                                "skills, templates, mcp_servers, "
-                                "knowledge, memories. "
+                                "skills, templates, mcp_servers, knowledge, memories. "
                                 "Default: all."
                             ),
                         },
                         "top_k": {
                             "type": "integer",
-                            "description": "Max results (default 10)",
+                            "description": "Maximum number of results (default 10).",
                         },
                     },
                     "required": ["query"],

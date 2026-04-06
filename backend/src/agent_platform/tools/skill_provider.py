@@ -248,32 +248,41 @@ class SkillProvider:
         for name, desc, schema in [
             (
                 "list_skills",
-                "List available skills. Use query for semantic search.",
+                "List available skills. Supports semantic search via query parameter.",
                 {
                     "type": "object",
                     "properties": {
                         "query": {
                             "type": "string",
-                            "description": "Search query (optional)",
+                            "description": "Semantic search query. Omit to list all.",
                         },
                     },
                 },
             ),
             (
                 "create_skill",
-                "Create a new reusable skill.",
+                (
+                    "Create a new reusable skill from a prompt template. "
+                    "Checks for name conflicts and similar existing skills."
+                ),
                 {
                     "type": "object",
                     "properties": {
-                        "name": {"type": "string"},
-                        "description": {"type": "string"},
+                        "name": {
+                            "type": "string",
+                            "description": "Skill name (letters, numbers, hyphens, underscores).",
+                        },
+                        "description": {
+                            "type": "string",
+                            "description": "What the skill does. Used for search and deduplication.",
+                        },
                         "template": {
                             "type": "string",
-                            "description": "Prompt with {{param}}",
+                            "description": "Prompt template with {{parameter}} placeholders.",
                         },
                         "parameters": {
                             "type": "string",
-                            "description": "JSON params definition",
+                            "description": "JSON object defining parameters and their types.",
                         },
                     },
                     "required": ["name", "template"],
@@ -281,18 +290,24 @@ class SkillProvider:
             ),
             (
                 "test_skill",
-                "Dry-run a skill template and evaluate the output.",
+                (
+                    "Dry-run a skill template with test arguments "
+                    "and evaluate whether the output matches expectations."
+                ),
                 {
                     "type": "object",
                     "properties": {
-                        "template": {"type": "string"},
+                        "template": {
+                            "type": "string",
+                            "description": "The prompt template to test.",
+                        },
                         "description": {
                             "type": "string",
-                            "description": "Expected purpose",
+                            "description": "What the skill is supposed to do (used for evaluation).",
                         },
                         "test_args": {
                             "type": "string",
-                            "description": "JSON test arguments",
+                            "description": "JSON object of test argument values.",
                         },
                     },
                     "required": ["template", "description"],
@@ -300,14 +315,29 @@ class SkillProvider:
             ),
             (
                 "update_skill",
-                "Update an existing skill (versions the old one).",
+                (
+                    "Update an existing skill's template or description. "
+                    "The old version is preserved as a backup."
+                ),
                 {
                     "type": "object",
                     "properties": {
-                        "name": {"type": "string"},
-                        "description": {"type": "string"},
-                        "template": {"type": "string"},
-                        "parameters": {"type": "string"},
+                        "name": {
+                            "type": "string",
+                            "description": "Name of the existing skill to update.",
+                        },
+                        "description": {
+                            "type": "string",
+                            "description": "Updated description.",
+                        },
+                        "template": {
+                            "type": "string",
+                            "description": "New prompt template.",
+                        },
+                        "parameters": {
+                            "type": "string",
+                            "description": "Updated parameters JSON.",
+                        },
                     },
                     "required": ["name", "template"],
                 },

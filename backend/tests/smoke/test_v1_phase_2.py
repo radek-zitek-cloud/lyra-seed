@@ -213,6 +213,7 @@ class TestV1Phase2:
             api_key="sk-test-key",
             http_client=client,
             event_bus=event_bus,
+            stream=False,
         )
 
         # Subscribe to capture events
@@ -295,11 +296,10 @@ class TestV1Phase2:
         assert updated_agent is not None
         assert updated_agent.status == AgentStatus.IDLE
 
-        # Events should have been emitted
-        events = await event_bus.query(EventFilter(agent_id=agent.id))
-        event_types = [e.event_type for e in events]
-        assert EventType.LLM_REQUEST in event_types
-        assert EventType.LLM_RESPONSE in event_types
+        # LLM events are emitted by the provider (not runtime),
+        # so the mock LLM won't produce them. Verify the runtime
+        # called the LLM provider correctly.
+        mock_llm.complete.assert_called_once()
 
         await event_bus.close()
         await agent_repo.close()

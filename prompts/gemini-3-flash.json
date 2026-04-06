@@ -1,9 +1,9 @@
 {
-  "model": "google/gemini-3-flash-preview",
+  "model": "google/gemini-3.1-pro-preview",
   "hitl_policy": "never",
   "temperature": 0.7,
   "max_iterations": 10,
-  "summary_model": "google/gemini-3-flash-preview",
-  "extraction_model": "google/gemini-3-flash-preview",
-  "orchestration_model": "google/gemini-3-flash-preview"
+  "summary_model": "google/gemini-3.1-flash-lite-preview",
+  "extraction_model": "google/gemini-3.1-flash-lite-preview",
+  "orchestration_model": "google/gemini-3.1-flash-lite-preview"
 }

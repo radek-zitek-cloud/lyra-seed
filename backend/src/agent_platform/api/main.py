@@ -316,6 +316,21 @@ def create_app(
     )
     tool_registry.register_provider(discovery_provider)
 
+    # Date/time tool
+    from agent_platform.tools.datetime_provider import DateTimeToolProvider
+
+    tool_registry.register_provider(DateTimeToolProvider())
+
+    # Agent loop (scheduled periodic wake-ups)
+    from agent_platform.tools.agent_loop import (
+        AgentLoopProvider,
+        LoopRegistry,
+    )
+
+    loop_registry = LoopRegistry()
+    loop_provider = AgentLoopProvider(loop_registry)
+    tool_registry.register_provider(loop_provider)
+
     # Capability tools
     from agent_platform.tools.capability_tools import (
         CapabilityToolProvider,
@@ -400,8 +415,49 @@ def create_app(
             memory_store=memory_store,
             message_repo=message_repo,
             knowledge_store=knowledge_store,
+            loop_registry=loop_registry,
         )
+
+        # Start loop scheduler for periodic agent wake-ups
+        from agent_platform.core.models import (
+            AgentMessage,
+            AgentStatus,
+            MessageType,
+        )
+        from agent_platform.tools.agent_loop import loop_scheduler
+
+        async def _wake_agent(agent_id: str, message: str) -> None:
+            """Send a WAKE message and trigger auto-wake."""
+            agent = await agent_repo.get(agent_id)
+            if agent is None:
+                loop_registry.unregister(agent_id)
+                return
+            if agent.status != AgentStatus.IDLE:
+                return  # Skip this tick — agent is busy
+            msg = AgentMessage(
+                from_agent_id="scheduler",
+                to_agent_id=agent_id,
+                content=message,
+                message_type=MessageType.WAKE,
+            )
+            await message_repo.create(msg)
+            from agent_platform.tools.agent_messaging import (
+                wake_idle_agent,
+            )
+
+            await wake_idle_agent(agent_spawner, agent_id, msg)
+
+        scheduler_task = asyncio.create_task(
+            loop_scheduler(loop_registry, _wake_agent)
+        )
+
         yield
+        # Shutdown — stop loop scheduler
+        scheduler_task.cancel()
+        try:
+            await scheduler_task
+        except asyncio.CancelledError:
+            pass
         # Shutdown — disconnect agent-managed MCP servers
         await mcp_server_manager.disconnect_all()
         # Shutdown — cancel running child agents

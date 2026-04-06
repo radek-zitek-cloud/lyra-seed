@@ -21,11 +21,16 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-ACTIONABLE_MSG_TYPES = {"task", "question", "guidance", "result", "answer"}
+ACTIONABLE_MSG_TYPES = {"task", "question", "guidance", "result", "answer", "wake"}
 
 
 def build_wake_prompt(msg: AgentMessage) -> str:
     """Build the prompt injected when auto-waking an idle agent."""
+    # Scheduled wake-ups: just inject the message content as a nudge.
+    # The agent's conversation context already knows what to do.
+    if msg.message_type.value == "wake":
+        return f"[scheduled wake-up]: {msg.content}"
+
     prompt = f"[{msg.message_type.value} from {msg.from_agent_id}]: {msg.content}"
     if msg.message_type.value in ("task", "question"):
         prompt += (

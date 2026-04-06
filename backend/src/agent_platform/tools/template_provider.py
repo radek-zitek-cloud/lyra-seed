@@ -121,16 +121,15 @@ class TemplateProvider:
             Tool(
                 name="list_templates",
                 description=(
-                    "List available agent templates "
-                    "for spawn_agent. "
-                    "Use query for semantic search."
+                    "List available agent templates for spawn_agent. "
+                    "Supports semantic search via query parameter."
                 ),
                 input_schema={
                     "type": "object",
                     "properties": {
                         "query": {
                             "type": "string",
-                            "description": ("Search query (optional)"),
+                            "description": "Semantic search query (e.g. 'code generation'). Omit to list all.",
                         },
                     },
                 },
@@ -139,13 +138,16 @@ class TemplateProvider:
             ),
             Tool(
                 name="get_template",
-                description=("Get details of an agent template including its config."),
+                description=(
+                    "Get full details of an agent template including "
+                    "its system prompt, config overrides, and tool access."
+                ),
                 input_schema={
                     "type": "object",
                     "properties": {
                         "name": {
                             "type": "string",
-                            "description": "Template name",
+                            "description": "Template name (e.g. 'coder', 'researcher').",
                         },
                     },
                     "required": ["name"],

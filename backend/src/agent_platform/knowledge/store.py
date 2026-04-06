@@ -55,7 +55,12 @@ class KnowledgeStore:
         except Exception:
             pass
 
-    def ingest(self, path: Path, force: bool = False) -> int:
+    def ingest(
+        self,
+        path: Path,
+        force: bool = False,
+        base_dir: Path | None = None,
+    ) -> int:
         """Ingest a markdown file — chunks, embeds, stores.
 
         Skips re-embedding if the file content hasn't changed
@@ -66,7 +71,10 @@ class KnowledgeStore:
         content_hash = hashlib.sha256(
             file_content.encode()
         ).hexdigest()[:16]
-        source = path.name
+        if base_dir is not None:
+            source = str(path.relative_to(base_dir))
+        else:
+            source = path.name
 
         # Skip if content unchanged
         if (
@@ -77,7 +85,7 @@ class KnowledgeStore:
             logger.debug("Skipping %s (unchanged)", source)
             return 0
 
-        chunks = chunk_markdown(path)
+        chunks = chunk_markdown(path, source_name=source)
         if not chunks:
             return 0
 
@@ -161,10 +169,10 @@ class KnowledgeStore:
 
         total = 0
         skipped = 0
-        for path in sorted(dir_path.glob("*.md")):
+        for path in sorted(dir_path.glob("**/*.md", recurse_symlinks=True)):
             if path.name.startswith("README"):
                 continue
-            count = self.ingest(path)
+            count = self.ingest(path, base_dir=dir_path)
             if count:
                 total += count
             else:

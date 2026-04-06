@@ -16,6 +16,7 @@ import {
   fetchAgentCost,
   fetchAgentEvents,
   fetchAgentMessages,
+  reloadAgentConfig,
   resetAgent,
   respondHITL,
   sendAgentMessage,
@@ -45,8 +46,11 @@ export default function AgentPage() {
   const [agentMessages, setAgentMessages] = useState<Record<string, unknown>[]>([]);
   const [sending, setSending] = useState(false);
   const [showConfig, setShowConfig] = useState(false);
+  const [streamingContent, setStreamingContent] = useState("");
   const { events: liveEvents, connectionState, connect, disconnect } = useEventStream(agentId);
   const promptInFlight = useRef(false);
+  const streamingRef = useRef("");
+  const processedCount = useRef(0);
 
   const refreshAll = async () => {
     const [a, evts, convos, c, ch, msgs] = await Promise.all([
@@ -71,44 +75,92 @@ export default function AgentPage() {
 
   useEffect(() => {
     if (liveEvents.length === 0) return;
-    const latest = liveEvents[liveEvents.length - 1];
-    const eventType = latest.event_type as string;
 
+    // Process all events since last render (handles batched SSE arrivals)
+    const unprocessed = liveEvents.slice(processedCount.current);
+    processedCount.current = liveEvents.length;
+    if (unprocessed.length === 0) return;
+
+    // Separate token events from control events
+    const tokenEvents: typeof unprocessed = [];
+    const controlEvents: typeof unprocessed = [];
+    for (const evt of unprocessed) {
+      if (evt.event_type === "llm_token") {
+        tokenEvents.push(evt);
+      } else {
+        controlEvents.push(evt);
+      }
+    }
+
+    // Accumulate streaming tokens
+    if (tokenEvents.length > 0) {
+      for (const evt of tokenEvents) {
+        const token = (evt.payload as Record<string, unknown>)?.token;
+        if (typeof token === "string") {
+          streamingRef.current += token;
+        }
+      }
+      setStreamingContent(streamingRef.current);
+    }
+
+    if (controlEvents.length === 0) return;
+
+    // Add non-token events to timeline
     setEvents((prev) => {
       const ids = new Set(prev.map((e) => (e as Record<string, unknown>).id));
-      const newEvents = liveEvents.filter((e) => !ids.has(e.id));
+      const newEvents = controlEvents.filter(
+        (e) => !ids.has(e.id),
+      ) as unknown as Record<string, unknown>[];
       return newEvents.length > 0 ? [...prev, ...newEvents] : prev;
     });
 
-    if (
-      eventType === "hitl_request" ||
-      eventType === "hitl_response" ||
-      eventType === "error" ||
-      eventType === "agent_complete"
-    ) {
+    // Process side effects for each control event
+    let shouldRefreshAgent = false;
+    let shouldRefreshMessages = false;
+    let shouldRefreshChildren = false;
+    let shouldRefreshConversation = false;
+    let shouldClearStreaming = false;
+
+    for (const evt of controlEvents) {
+      const et = evt.event_type as string;
+
+      if (et === "llm_request" || et === "llm_response") {
+        shouldClearStreaming = true;
+      }
+
+      if (et === "hitl_request" || et === "hitl_response" || et === "error" || et === "agent_complete") {
+        shouldRefreshAgent = true;
+      }
+
+      if (et === "message_sent" || et === "message_received") {
+        shouldRefreshMessages = true;
+        shouldRefreshChildren = true;
+      }
+
+      if (et === "agent_spawn" || et === "agent_complete") {
+        shouldRefreshChildren = true;
+      }
+
+      if (et === "agent_complete" || (et === "llm_response" && !promptInFlight.current)) {
+        shouldRefreshConversation = true;
+      }
+    }
+
+    if (shouldClearStreaming) {
+      streamingRef.current = "";
+      setStreamingContent("");
+    }
+
+    if (shouldRefreshAgent) {
       fetchAgent(agentId).then(setAgent).catch(() => {});
     }
-
-    if (
-      eventType === "message_sent" ||
-      eventType === "message_received"
-    ) {
+    if (shouldRefreshMessages) {
       fetchAgentMessages(agentId).then(setAgentMessages).catch(() => {});
-      // Child status may have changed (sent task → running, got result → idle)
+    }
+    if (shouldRefreshChildren) {
       fetchAgentChildren(agentId).then(setChildren).catch(() => {});
     }
-
-    if (eventType === "agent_spawn" || eventType === "agent_complete") {
-      fetchAgentChildren(agentId).then(setChildren).catch(() => {});
-    }
-
-    // Refresh conversation when agent completes a turn
-    // Skip mid-turn refreshes while prompt is in flight to prevent
-    // the optimistic human message from disappearing
-    if (
-      eventType === "agent_complete" ||
-      (eventType === "llm_response" && !promptInFlight.current)
-    ) {
+    if (shouldRefreshConversation) {
       fetchAgentConversations(agentId)
         .then((convos: { messages: { role: string; content: string }[] }[]) => {
           if (convos.length > 0) setMessages(convos[0].messages);
@@ -161,7 +213,8 @@ export default function AgentPage() {
   const agentStatus = String((agent as Record<string, unknown>).status ?? "idle");
   const s = STATUS_STYLES[agentStatus] ?? DEFAULT_STATUS;
   const agentName = String((agent as Record<string, unknown>).name ?? "Agent");
-  const agentConfig = (agent as Record<string, unknown>).config as Record<string, unknown> | undefined;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const agentConfig = (agent as Record<string, unknown>).config as Record<string, any> | undefined;
   const agentModel = String(agentConfig?.model ?? "default");
   const parentId = (agent as Record<string, unknown>).parent_agent_id as string | null;
 
@@ -232,6 +285,25 @@ export default function AgentPage() {
             RESET
           </button>
         )}
+        <button
+          onClick={() => {
+            reloadAgentConfig(agentId).then(() => refreshAll()).catch(() => {});
+          }}
+          style={{
+            fontSize: "10px",
+            fontWeight: 700,
+            padding: "1px 8px",
+            borderRadius: "2px",
+            letterSpacing: "1px",
+            color: "#8af",
+            background: "rgba(136,170,255,0.08)",
+            border: "1px solid rgba(136,170,255,0.2)",
+            cursor: "pointer",
+            fontFamily: "inherit",
+          }}
+        >
+          RELOAD CONFIG
+        </button>
         {sending && (
           <>
             <span
@@ -283,6 +355,7 @@ export default function AgentPage() {
               flexDirection: "column",
               gap: "6px",
             }}>
+              {/* Core settings */}
               <div style={{ display: "flex", flexWrap: "wrap", gap: "12px", fontSize: "11px" }}>
                 {!!agentConfig.model && (
                   <span><span style={{ color: "#555" }}>model </span><span style={{ color: "#e0e0e0" }}>{String(agentConfig.model)}</span></span>
@@ -296,24 +369,91 @@ export default function AgentPage() {
                 {!!agentConfig.hitl_policy && (
                   <span><span style={{ color: "#555" }}>hitl </span><span style={{ color: "#e0e0e0" }}>{String(agentConfig.hitl_policy)}</span></span>
                 )}
+                {agentConfig.hitl_timeout_seconds != null && (
+                  <span><span style={{ color: "#555" }}>hitl_timeout </span><span style={{ color: "#e0e0e0" }}>{String(agentConfig.hitl_timeout_seconds)}s</span></span>
+                )}
                 {agentConfig.max_context_tokens != null && (
                   <span><span style={{ color: "#555" }}>ctx_tokens </span><span style={{ color: "#e0e0e0" }}>{String(agentConfig.max_context_tokens)}</span></span>
                 )}
                 {agentConfig.memory_top_k != null && (
                   <span><span style={{ color: "#555" }}>mem_k </span><span style={{ color: "#e0e0e0" }}>{String(agentConfig.memory_top_k)}</span></span>
                 )}
+                {agentConfig.max_subtasks != null && (
+                  <span><span style={{ color: "#555" }}>max_subtasks </span><span style={{ color: "#e0e0e0" }}>{String(agentConfig.max_subtasks)}</span></span>
+                )}
+                {agentConfig.auto_extract != null && (
+                  <span><span style={{ color: "#555" }}>auto_extract </span><span style={{ color: "#e0e0e0" }}>{String(agentConfig.auto_extract)}</span></span>
+                )}
               </div>
+              {/* Model overrides */}
+              {(agentConfig.summary_model || agentConfig.extraction_model || agentConfig.orchestration_model) && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "12px", fontSize: "11px" }}>
+                  {!!agentConfig.summary_model && (
+                    <span><span style={{ color: "#555" }}>summary_model </span><span style={{ color: "#e0e0e0" }}>{String(agentConfig.summary_model)}</span></span>
+                  )}
+                  {!!agentConfig.extraction_model && (
+                    <span><span style={{ color: "#555" }}>extraction_model </span><span style={{ color: "#e0e0e0" }}>{String(agentConfig.extraction_model)}</span></span>
+                  )}
+                  {!!agentConfig.orchestration_model && (
+                    <span><span style={{ color: "#555" }}>orchestration_model </span><span style={{ color: "#e0e0e0" }}>{String(agentConfig.orchestration_model)}</span></span>
+                  )}
+                </div>
+              )}
+              {/* Memory GC */}
+              {(agentConfig.prune_threshold != null || agentConfig.prune_max_entries != null) && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "12px", fontSize: "11px" }}>
+                  {agentConfig.prune_threshold != null && (
+                    <span><span style={{ color: "#555" }}>prune_threshold </span><span style={{ color: "#e0e0e0" }}>{String(agentConfig.prune_threshold)}</span></span>
+                  )}
+                  {agentConfig.prune_max_entries != null && (
+                    <span><span style={{ color: "#555" }}>prune_max </span><span style={{ color: "#e0e0e0" }}>{String(agentConfig.prune_max_entries)}</span></span>
+                  )}
+                </div>
+              )}
+              {/* Retry config */}
+              {agentConfig.retry && typeof agentConfig.retry === "object" && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "12px", fontSize: "11px" }}>
+                  {agentConfig.retry.max_retries != null && (
+                    <span><span style={{ color: "#555" }}>retries </span><span style={{ color: "#e0e0e0" }}>{String(agentConfig.retry.max_retries)}</span></span>
+                  )}
+                  {agentConfig.retry.base_delay != null && (
+                    <span><span style={{ color: "#555" }}>retry_delay </span><span style={{ color: "#e0e0e0" }}>{String(agentConfig.retry.base_delay)}s</span></span>
+                  )}
+                  {agentConfig.retry.timeout != null && (
+                    <span><span style={{ color: "#555" }}>retry_timeout </span><span style={{ color: "#e0e0e0" }}>{String(agentConfig.retry.timeout)}s</span></span>
+                  )}
+                </div>
+              )}
+              {/* Tool & MCP access */}
               {Array.isArray(agentConfig.allowed_tools) && (agentConfig.allowed_tools as string[]).length > 0 && (
                 <div style={{ fontSize: "11px" }}>
-                  <span style={{ color: "#555" }}>tools </span>
+                  <span style={{ color: "#555" }}>allowed_tools </span>
                   <span style={{ color: "#aa66ff" }}>
                     {(agentConfig.allowed_tools as string[]).join(", ")}
                   </span>
                 </div>
               )}
+              {Array.isArray(agentConfig.allowed_mcp_servers) && (agentConfig.allowed_mcp_servers as string[]).length > 0 && (
+                <div style={{ fontSize: "11px" }}>
+                  <span style={{ color: "#555" }}>allowed_mcp </span>
+                  <span style={{ color: "#00ccff" }}>
+                    {(agentConfig.allowed_mcp_servers as string[]).join(", ")}
+                  </span>
+                </div>
+              )}
+              {/* Memory sharing */}
+              {agentConfig.memory_sharing && typeof agentConfig.memory_sharing === "object" && Object.keys(agentConfig.memory_sharing as Record<string, unknown>).length > 0 && (
+                <div style={{ fontSize: "11px" }}>
+                  <span style={{ color: "#555" }}>memory_sharing </span>
+                  <span style={{ color: "#00ff41" }}>
+                    {Object.entries(agentConfig.memory_sharing as Record<string, string>).map(([k, v]) => `${k}:${v}`).join(", ")}
+                  </span>
+                </div>
+              )}
+              {/* System prompt */}
               {!!agentConfig.system_prompt && (
                 <div style={{ fontSize: "11px" }}>
-                  <div style={{ color: "#555", marginBottom: "2px" }}>system prompt</div>
+                  <div style={{ color: "#555", marginBottom: "2px" }}>system_prompt</div>
                   <pre style={{
                     color: "#b0b0b0",
                     background: "#0a0a0a",
@@ -388,7 +528,7 @@ export default function AgentPage() {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px", flex: 1, minHeight: 0 }}>
         {/* Left column: conversation + prompt + HITL */}
         <div style={{ display: "flex", flexDirection: "column", gap: "4px", minHeight: 0 }}>
-          <ConversationPanel messages={messages as never} />
+          <ConversationPanel messages={messages as never} streamingContent={streamingContent} />
           <PromptInput onSubmit={handlePrompt} disabled={sending} />
           {pendingHITL.length > 0 && (
             <HITLPanel

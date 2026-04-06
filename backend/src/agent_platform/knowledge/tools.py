@@ -22,20 +22,19 @@ class KnowledgeToolProvider:
             Tool(
                 name="search_knowledge",
                 description=(
-                    "Search the knowledge base for relevant "
-                    "information. Returns document chunks "
-                    "with source attribution."
+                    "Search the indexed knowledge base semantically. "
+                    "Returns relevant document chunks with source attribution."
                 ),
                 input_schema={
                     "type": "object",
                     "properties": {
                         "query": {
                             "type": "string",
-                            "description": "Search query",
+                            "description": "Natural-language search query.",
                         },
                         "top_k": {
                             "type": "integer",
-                            "description": "Max results (default 5)",
+                            "description": "Maximum number of results (default 5).",
                         },
                     },
                     "required": ["query"],
@@ -46,16 +45,15 @@ class KnowledgeToolProvider:
             Tool(
                 name="ingest_document",
                 description=(
-                    "Add a markdown document to the "
-                    "knowledge base. Chunks and indexes it "
-                    "for semantic search."
+                    "Add a markdown document to the knowledge base. "
+                    "Splits it into chunks by heading and indexes for semantic search."
                 ),
                 input_schema={
                     "type": "object",
                     "properties": {
                         "path": {
                             "type": "string",
-                            "description": "Path to .md file",
+                            "description": "Path to the .md file to ingest.",
                         },
                     },
                     "required": ["path"],

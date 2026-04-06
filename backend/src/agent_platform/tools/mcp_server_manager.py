@@ -147,20 +147,32 @@ class MCPServerManager:
         return [
             Tool(
                 name="add_mcp_server",
-                description="Add a pre-built MCP server package.",
+                description=(
+                    "Add a pre-built MCP server from an npm or pip package. "
+                    "It becomes available immediately after installation."
+                ),
                 input_schema={
                     "type": "object",
                     "properties": {
-                        "name": {"type": "string"},
-                        "description": {"type": "string"},
-                        "command": {"type": "string"},
+                        "name": {
+                            "type": "string",
+                            "description": "Server name (letters, numbers, hyphens, underscores).",
+                        },
+                        "description": {
+                            "type": "string",
+                            "description": "What capabilities the server provides.",
+                        },
+                        "command": {
+                            "type": "string",
+                            "description": "Command to run (e.g. 'npx', 'uvx').",
+                        },
                         "args": {
                             "type": "string",
-                            "description": "JSON array of args",
+                            "description": 'JSON array of arguments (e.g. \'["-y", "firecrawl-mcp"]\').',
                         },
                         "env": {
                             "type": "string",
-                            "description": "JSON env vars",
+                            "description": "JSON object of environment variables. Use ${VAR} for secrets from .env.",
                         },
                     },
                     "required": ["name", "command"],
@@ -171,21 +183,27 @@ class MCPServerManager:
             Tool(
                 name="create_mcp_server",
                 description=(
-                    "Scaffold a custom MCP server directory. "
-                    "Write code, then deploy_mcp_server."
+                    "Scaffold a directory for a custom MCP server. "
+                    "Write the server code, then call deploy_mcp_server to start it."
                 ),
                 input_schema={
                     "type": "object",
                     "properties": {
-                        "name": {"type": "string"},
-                        "description": {"type": "string"},
+                        "name": {
+                            "type": "string",
+                            "description": "Server name.",
+                        },
+                        "description": {
+                            "type": "string",
+                            "description": "What the server will provide.",
+                        },
                         "command": {
                             "type": "string",
-                            "description": "Start command",
+                            "description": "Start command (default: 'python').",
                         },
                         "args": {
                             "type": "string",
-                            "description": "JSON args",
+                            "description": "JSON start arguments (default: '[\"server.py\"]').",
                         },
                     },
                     "required": ["name"],
@@ -196,15 +214,16 @@ class MCPServerManager:
             Tool(
                 name="deploy_mcp_server",
                 description=(
-                    "Request deployment of a scaffolded MCP server. "
-                    "Returns server details for human review. "
-                    "The human must approve via the API before "
-                    "the server is actually deployed."
+                    "Deploy a scaffolded MCP server. "
+                    "Always requires human approval before the server starts."
                 ),
                 input_schema={
                     "type": "object",
                     "properties": {
-                        "name": {"type": "string"},
+                        "name": {
+                            "type": "string",
+                            "description": "Name of the scaffolded server to deploy.",
+                        },
                     },
                     "required": ["name"],
                 },
@@ -213,11 +232,17 @@ class MCPServerManager:
             ),
             Tool(
                 name="list_mcp_servers",
-                description="List MCP servers. Use query for search.",
+                description=(
+                    "List all agent-managed MCP servers with their status. "
+                    "Supports semantic search via query parameter."
+                ),
                 input_schema={
                     "type": "object",
                     "properties": {
-                        "query": {"type": "string"},
+                        "query": {
+                            "type": "string",
+                            "description": "Semantic search query. Omit to list all.",
+                        },
                     },
                 },
                 tool_type=ToolType.INTERNAL,
@@ -225,11 +250,17 @@ class MCPServerManager:
             ),
             Tool(
                 name="stop_mcp_server",
-                description="Stop an agent-managed MCP server.",
+                description=(
+                    "Stop a running agent-managed MCP server. "
+                    "Cannot stop platform-configured servers."
+                ),
                 input_schema={
                     "type": "object",
                     "properties": {
-                        "name": {"type": "string"},
+                        "name": {
+                            "type": "string",
+                            "description": "Name of the server to stop.",
+                        },
                     },
                     "required": ["name"],
                 },

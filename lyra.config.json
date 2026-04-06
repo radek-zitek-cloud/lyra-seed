@@ -14,7 +14,7 @@
       "command": "uvx",
       "args": ["mcp-shell-server"],
       "env": {
-        "ALLOW_COMMANDS": "ls,cat,pwd,grep,wc,touch,find,git,docker,python,pip,uv,uvx,npm,node,pnpm,npx,curl"
+        "ALLOW_COMMANDS": "ls,cat,pwd,grep,wc,touch,find,git,docker,python,pip,uv,uvx,npm,node,pnpm,npx,curl,ssh,gog"
       }
     },
     "firecrawl": {

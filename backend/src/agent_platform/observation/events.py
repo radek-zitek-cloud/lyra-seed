@@ -12,6 +12,7 @@ class EventType(StrEnum):
     """Types of events emitted by the platform."""
 
     LLM_REQUEST = "llm_request"
+    LLM_TOKEN = "llm_token"
     LLM_RESPONSE = "llm_response"
     TOOL_CALL = "tool_call"
     TOOL_RESULT = "tool_result"
